@@ -1,5 +1,6 @@
 #include "buffer.h"
 #include "lexer.h"
+#include "lexer.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -31,6 +32,10 @@ int main(int argc, char *argv[])
 		switch (token_data.token) {
 		case TOKEN_STRING_LITERAL:
 			printf("\"%s\"\n", token_data.string);
+			break;
+
+		case TOKEN_CHAR_CONST:
+			printf("'%c'\n", token_data.value);
 			break;
 
 		case TOKEN_IDENT:

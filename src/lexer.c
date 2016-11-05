@@ -1,15 +1,14 @@
 #include "debug.h"
 #include "lexer.h"
+#include <inttypes.h>
 #include <assert.h>
+	
 
-
-/*
- * Rule 1: Every function operating on the lexer shall alter the state in such
- *         way that lex->c points to first unprocessed character.
- */
-
-
-static enum token token_lookup[256];
+static const char simple_escape_sequence[256] = {
+	['\''] = '\'', ['\"'] = '\"', ['\?'] = '\?', ['\\'] = '\\',
+	['a'] = '\a', ['b'] = '\b', ['f'] = '\f', ['n'] = '\n',
+	['r'] = '\r', ['t'] = '\t', ['v'] = '\v',
+};
 
 
 void lexer_reset(struct lexer *lexer, struct buffer *buffer)
@@ -19,31 +18,31 @@ void lexer_reset(struct lexer *lexer, struct buffer *buffer)
 }
 
 
-static bool is_letter(char c)
+inline static bool is_letter(int c)
 {
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
 
 
-static bool is_digit(char c)
+inline static bool is_digit(int c)
 {
 	return c >= '0' && c <= '9';
 }
 
 
-static bool is_whitespace(char c)
+inline static bool is_whitespace(int c)
 {
 	return c == '\n' || c == '\r' || c == '\t' || c == 0x0C || c == ' ';
 }
 
 
-static bool is_hex_digit(char c)
+inline static bool is_hex_digit(int c)
 {
 	return is_digit(c) || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f');
 }
 
 
-static bool is_octal_digit(char c)
+inline static bool is_octal_digit(int c)
 {
 	return c >= '0' && c <= '7';
 }
@@ -66,6 +65,98 @@ static void unget_char(struct lexer *lexer, char c)
 
 	lexer->pushback = true;
 	lexer->pushback_char = c;
+}
+
+
+static inline int hex_val(int c)
+{
+	if (c >= '0' && c <= '9')
+		return c - '0';
+
+	if (c >= 'a' && c <= 'f')
+		return 10 + (c - 'a');
+
+	if (c >= 'A' && c <= 'F')
+		return 10 + (c - 'A');
+
+	return -1;
+}
+
+
+static uint32_t read_octal_number(struct lexer *lexer)
+{
+	uint32_t val = 0;
+	int c;
+	int i;
+
+	for (i = 0; i < 3; i++) {
+		c = get_char(lexer);
+
+		if (!is_octal_digit(c)) {
+			unget_char(lexer, c);
+			break;
+		}
+
+		val *= 8;
+		val += c - '0';
+	}
+
+	return val;
+}
+
+
+static uint32_t read_hex_number(struct lexer *lexer, size_t min_len, size_t max_len)
+{	
+	uint32_t val = 0;
+	int c;
+	int i;
+
+	for (i = 0; i < max_len; i++) {
+		c = get_char(lexer);
+
+		if (!is_hex_digit(c)) {
+			if (i < min_len)
+				DEBUG_PRINTF("error: character %c was unexpected, expected a hex digit", c);
+
+			unget_char(lexer, c);
+			break;
+		}
+
+		val *= 16;
+		val += hex_val(c);
+	}
+
+	return val;
+}
+
+
+static uint32_t read_escape_sequence(struct lexer *lexer)
+{
+	int c = get_char(lexer);
+
+	if (c > 0 && simple_escape_sequence[c])
+		return simple_escape_sequence[c];
+
+	if (is_octal_digit(c)) {
+		unget_char(lexer, c);
+		return read_octal_number(lexer);
+	}
+
+	switch (c) {
+	case 'x':	
+		return read_hex_number(lexer, 1, 8);
+
+	case 'u':
+		return read_hex_number(lexer, 4, 4);
+
+	case 'U':
+		return read_hex_number(lexer, 8, 8);
+
+	default:
+		DEBUG_PRINTF("error: unknown escape sequence: \\%c", c);
+	}
+
+	return -1;
 }
 
 
@@ -146,91 +237,20 @@ string_literal:
 		token->token = TOKEN_STRING_LITERAL;
 
 		for (i = 0; (c = get_char(lexer)) != -1; i++) {
-			if (escape) { // unlikely
-				escape = false;
-
-				switch (c) {
-				case 'n':
-					token->string[i] = '\n';
-					continue;
-
-				case '"':
-					token->string[i] = '\"';
-					continue;
-
-				case '\\':
-					token->string[i] = '\\';
-					continue;
-
-				case 'x':
-					/* hexadecimal-escape-sequence */
-					while ((c = get_char(lexer)) != -1) {
-						if (!is_hex_digit(c))
-							break;
-
-						// eat this hex digit
-					}
-					unget_char(lexer, c);
-					token->string[i] = 'X';
-					continue;
-
-				case 'u':
-					for (int l = 0; l < 4; l++) {
-						c = get_char(lexer);
-						if (!is_hex_digit(c)) {
-							DEBUG_PRINTF("Error: not a hex digit: %c", c);
-						}
-						else {
-							// eat this hex digit
-						}
-					}
-					token->string[i] = 'u';
-					continue;
-
-				case 'U':
-					DEBUG_MSG("Do case 'u' twice");
-					continue;
-
-				default:
-					if (is_octal_digit(c)) {
-						int j = 1;
-						do {
-							// eat this octal digit
-							c = get_char(lexer);
-							j++;
-						} while (j <= 3 && is_octal_digit(c));
-
-						unget_char(lexer, c);
-
-						token->string[i] = '8';
-						continue;
-					}
-					else {
-						// error
-						DEBUG_PRINTF("Invalid escape sequence: \\%c", c);
-						continue;
-					}
-				}
-			}
+			if (c == '\"')
+				break;
 
 			if (c == '\\') {
-				escape = true;
-				i--;
-				continue;
+				token->string[i] = read_escape_sequence(lexer);
 			}
-
-			if (c == '\"') {
+			else if (c == '\n') {
+				DEBUG_MSG("error: missing the final \"");
 				break;
 			}
-
-			if (c == '\n') {
-				DEBUG_MSG("Missing \"");
-				break;
+			else {
+				token->string[i] = c;
 			}
-
-			token->string[i] = c;
 		}
-
 		token->string[i] = '\0';
 
 		return true;
@@ -248,7 +268,32 @@ string_literal:
 	 */
 	else if (c == '\'') {
 char_const:
-		i = 1;
+		token->token = TOKEN_CHAR_CONST;
+
+		uint32_t val;
+		for (i = 0; (c = get_char(lexer)) != -1; i++) {
+			if (c == '\'') {
+				if (i == 0)
+					DEBUG_MSG("error: empty character constant");
+
+				break;
+			}
+
+			if (c == '\\') {
+				val = read_escape_sequence(lexer);
+			}
+			else if (c == '\n') {
+				DEBUG_MSG("error: missing the final \"");
+				break;
+			}
+			else {
+				val = (int)c;
+			}
+		}
+
+		token->value = val;
+
+		return true;
 	}
 	/*
 	 * line comment
@@ -256,19 +301,40 @@ char_const:
 	 * TOKEN_SOLIDUS
 	 */
 	else if (c == '/') {
-
 	}
 	/*
 	 * punctuator
 	 */
 	else {
-		// do some simple table lookup
+		switch (c) {
+		case '{':
+			token->token = TOKEN_LBRACE;
+			break;
+
+		case '}':
+			token->token = TOKEN_RBRACE;
+			break;
+
+		case '(':
+			token->token = TOKEN_LPAREN;
+			break;
+
+		case ')':
+			token->token = TOKEN_RPAREN;
+			break;
+
+		case ';':
+			token->token = TOKEN_SEMICOLON;
+			break;
+
+		default:
+			DEBUG_PRINTF("error: unexpected %c", c);
+			return false;
+		}
+
+		return true;
+
 	}
 
 	return false;
-}
-
-
-int read_hex_quad(struct lexer *lex)
-{
 }

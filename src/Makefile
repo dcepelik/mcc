@@ -2,7 +2,7 @@
 
 OBJS=mcc.o lexer.o buffer.o
 PROG=mcc
-CFLAGS+=-c -std=c11 -Wall --pedantic -DDEBUG
+CFLAGS+=-c -std=c11 -Wall --pedantic -DDEBUG -ggdb3
 LDFLAGS=-Wall
 
 
