@@ -1,6 +1,7 @@
-#include "buffer.h"
+#include "inbuf.h"
 #include "lexer.h"
 #include "lexer.h"
+#include "symtab.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -9,9 +10,10 @@
 int main(int argc, char *argv[])
 {
 	char *filename;
-	struct buffer buffer;
+	struct inbuf buffer;
 	struct lexer lexer;
 	struct token_data token_data;
+	struct symtab symtab;
 
 	if (argc != 2) {
 		fprintf(stderr, "Usage: %s FILE\n", argv[0]);
@@ -20,70 +22,30 @@ int main(int argc, char *argv[])
 
 	filename = argv[1];
 
-	if (buffer_open(&buffer, BUFFER_SIZE, filename) != MCC_ERROR_OK) {
+	if (inbuf_open(&buffer, BUFFER_SIZE, filename) != MCC_ERROR_OK) {
 		fprintf(stderr, "Cannot open input buffer '%s' for reading\n",
 			filename);
 		exit(EXIT_FAILURE);
 	}
 
-	lexer_reset(&lexer, &buffer);
+	symtab_init(&symtab);
 
-	while (lexer_next_token(&lexer, &token_data)) {
-		switch (token_data.token) {
-		case TOKEN_STRING_LITERAL:
-			printf("\"%s\"\n", token_data.string);
-			break;
+	lexer_init(&lexer);
+	lexer_set_buffer(&lexer, &buffer);
+	lexer_set_symtab(&lexer, &symtab);
 
-		case TOKEN_CHAR_CONST:
-			printf("'%c'\n", token_data.value);
-			break;
-
-		case TOKEN_IDENT:
-			printf("[%s]\n", token_data.ident);
-			break;
-
-		case TOKEN_PP_NUMBER:
-			printf("%i\n", token_data.value);
-			break;
-
-		case TOKEN_LBRACE:
-			printf("{\n");
-			break;
-
-		case TOKEN_RBRACE:
-			printf("}\n");
-			break;
-
-		case TOKEN_LPAREN:
-			printf("(\n");
-			break;
-
-		case TOKEN_RPAREN:
-			printf(")\n");
-			break;
-
-		case TOKEN_SEMICOLON:
-			printf(";\n");
-			break;
-
-		case TOKEN_EOF:
-			printf("EOF\n");
-			break;
-
-		case TOKEN_ERROR:
-			printf("#ERROR\n");
-			break;
-
-		default:
-			printf("Token unknown\n");
-			break;
-		}
-
+	while (lexer_next(&lexer, &token_data) == MCC_ERROR_OK) {
 		if (token_data.token == TOKEN_EOF)
 			break;
+
+		lexer_dump_token(&token_data);
 	}
 
-	buffer_close(&buffer);
+	printf("\n");
+
+	inbuf_close(&buffer);
+	lexer_free(&lexer);
+	symtab_free(&symtab);
 
 	return EXIT_SUCCESS;
 }

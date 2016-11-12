@@ -1,10 +1,12 @@
-#ifndef BUFFER_H
-#define BUFFER_H
+#ifndef INBUF_H
+#define INBUF_H
 
 #include "error.h"
 #include <stdio.h>
 
-struct buffer {
+#define INBUF_EOF	(-1)
+
+struct inbuf {
 	FILE *file;	/* file managed by this buffer */
 	char *data;	/* buffered data */
 	size_t size;	/* size of the buffer */
@@ -12,8 +14,8 @@ struct buffer {
 	size_t offset;	/* read offset in the buffer */
 };
 
-mcc_error_t buffer_open(struct buffer *buffer, size_t size, char *filename);
-int buffer_get_char(struct buffer *buffer);
-void buffer_close(struct buffer *buffer);
+mcc_error_t inbuf_open(struct inbuf *inbuf, size_t size, char *filename);
+int inbuf_get_char(struct inbuf *inbuf);
+void inbuf_close(struct inbuf *inbuf);
 
 #endif
