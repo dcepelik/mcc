@@ -4,6 +4,121 @@
 #include <inttypes.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <ctype.h>
+
+static enum token keywords[] = {
+	TOKEN_ALIGNAS, TOKEN_ALIGNOF, TOKEN_ATOMIC, TOKEN_BOOL, TOKEN_COMPLEX,
+	TOKEN_GENERIC, TOKEN_IMAGINARY, TOKEN_NORETURN, TOKEN_STATIC_ASSERT,
+	TOKEN_THREAD_LOCAL, TOKEN_AUTO, TOKEN_BREAK, TOKEN_CASE, TOKEN_CHAR,
+	TOKEN_CONST, TOKEN_CONTINUE, TOKEN_DEFAULT, TOKEN_DO, TOKEN_DOUBLE,
+	TOKEN_ELSE, TOKEN_ENUM, TOKEN_EXTERN, TOKEN_FLOAT, TOKEN_FOR,
+	TOKEN_GOTO, TOKEN_IF, TOKEN_INLINE, TOKEN_INT, TOKEN_LONG,
+	TOKEN_REGISTER, TOKEN_RESTRICT, TOKEN_RETURN, TOKEN_SHORT, TOKEN_SIGNED,
+	TOKEN_SIZEOF, TOKEN_STATIC, TOKEN_STRUCT, TOKEN_SWITCH, TOKEN_TYPEDEF,
+	TOKEN_UNION, TOKEN_UNSIGNED, TOKEN_VOID, TOKEN_VOLATILE, TOKEN_WHILE,
+};
+
+static const char *token_names[] = {
+	[TOKEN_ALIGNAS] = "_Alignas",
+	[TOKEN_ALIGNOF] = "_Alignof",
+	[TOKEN_AMPERSAND] = "&",
+	[TOKEN_AND_EQ] = "&=",
+	[TOKEN_ARROW] = "->",
+	[TOKEN_ASTERISK] = "*",
+	[TOKEN_ATOMIC] = "_Atomic",
+	[TOKEN_AUTO] = "auto",
+	[TOKEN_BOOL] = "_Bool",
+	[TOKEN_BREAK] = "break",
+	[TOKEN_CASE] = "case",
+	[TOKEN_CHAR] = "char",
+	[TOKEN_CHAR_CONST] = "CHAR_CONST",
+	[TOKEN_COLON] = ":",
+	[TOKEN_COMMA] = ",",
+	[TOKEN_COMPLEX] = "_Complex",
+	[TOKEN_CONST] = "const",
+	[TOKEN_CONTINUE] = "continue",
+	[TOKEN_DEC] = "--",
+	[TOKEN_DEFAULT] = "default",
+	[TOKEN_DIV] = "/",
+	[TOKEN_DIV_EQ] = "/=",
+	[TOKEN_DOT] = ".",
+	[TOKEN_DOUBLE] = "double",
+	[TOKEN_DO] = "do",
+	[TOKEN_ELLIPSIS] = "...",
+	[TOKEN_ELSE] = "else",
+	[TOKEN_ENUM] = "enum",
+	[TOKEN_EOF] = "EOF",
+	[TOKEN_EQEQ] = "==",
+	[TOKEN_EQ] = "=",
+	[TOKEN_ERROR] = "!ERROR",
+	[TOKEN_EXTERN] = "extern",
+	[TOKEN_FLOAT] = "float",
+	[TOKEN_FOR] = "for",
+	[TOKEN_GENERIC] = "_Generic",
+	[TOKEN_GE] = ">=",
+	[TOKEN_GOTO] = "goto",
+	[TOKEN_GT] = ">",
+	[TOKEN_HASH] = "#",
+	[TOKEN_HASH_HASH] = "##",
+	[TOKEN_HEADER_NAME] = "HEADER_NAME",
+	[TOKEN_IDENT] = "IDENT",
+	[TOKEN_IF] = "if",
+	[TOKEN_IMAGINARY] = "_Imaginary",
+	[TOKEN_INC] = "++",
+	[TOKEN_INLINE] = "inline",
+	[TOKEN_INT] = "int",
+	[TOKEN_LBRACE] = "{",
+	[TOKEN_LBRACKET] = "[",
+	[TOKEN_LE] = "<=",
+	[TOKEN_LOGICAL_AND] = "&&",
+	[TOKEN_LOGICAL_OR] = "||",
+	[TOKEN_LONG] = "long",
+	[TOKEN_LPAREN] = "(",
+	[TOKEN_LT] = "<",
+	[TOKEN_MINUS] = "-",
+	[TOKEN_MINUS_EQ] = "-=",
+	[TOKEN_MOD] = "%",
+	[TOKEN_MOD_EQ] = "%=",
+	[TOKEN_MUL_EQ] = "*=",
+	[TOKEN_NEG] = "~",
+	[TOKEN_NEQ] = "!=",
+	[TOKEN_NORETURN] = "_Noreturn",
+	[TOKEN_NOT] = "!",
+	[TOKEN_OR] = "|",
+	[TOKEN_OR_EQ] = "|=",
+	[TOKEN_PLUS] = "+",
+	[TOKEN_PLUS_EQ] = "+=",
+	[TOKEN_PP_NUMBER] = "PP_NUMBER",
+	[TOKEN_QUESTION_MARK] = "?",
+	[TOKEN_RBRACE] = "}",
+	[TOKEN_RBRACKET] = "]",
+	[TOKEN_REGISTER] = "register",
+	[TOKEN_RESTRICT] = "restrict",
+	[TOKEN_RETURN] = "return",
+	[TOKEN_RPAREN] = ")",
+	[TOKEN_SEMICOLON] = ";",
+	[TOKEN_SHL] = "<<",
+	[TOKEN_SHL_EQ] = "<<=",
+	[TOKEN_SHORT] = "short",
+	[TOKEN_SHR] = ">>",
+	[TOKEN_SHR_EQ] = ">>=",
+	[TOKEN_SIGNED] = "signed",
+	[TOKEN_SIZEOF] = "sizeof",
+	[TOKEN_STATIC] = "static",
+	[TOKEN_STATIC_ASSERT] = "_Static_assert",
+	[TOKEN_STRING_LITERAL] = "STRING_LITERAL",
+	[TOKEN_STRUCT] = "struct",
+	[TOKEN_SWITCH] = "switch",
+	[TOKEN_THREAD_LOCAL] = "_Thread_local",
+	[TOKEN_TYPEDEF] = "typedef",
+	[TOKEN_UNION] = "union",
+	[TOKEN_UNSIGNED] = "unsigned",
+	[TOKEN_VOID] = "void",
+	[TOKEN_VOLATILE] = "volatile",
+	[TOKEN_WHILE] = "while",
+	[TOKEN_XOR] = "^",
+	[TOKEN_XOR_EQ] = "^=",
+};
 
 
 inline static bool is_letter(int c)
@@ -233,9 +348,42 @@ static mcc_error_t lex_char_const(struct lexer *lexer, struct token_data *token)
 }
 
 
+static inline bool lexer_is_eol(struct lexer *lexer)
+{
+	return (lexer->c - lexer->line) >= lexer->line_len;
+}
+
+
 mcc_error_t lex_pp_number(struct lexer *lexer, struct token_data *token)
 {
-	lexer->c++;
+	char c;
+	size_t i = 0;
+
+	while (!lexer_is_eol(lexer)) {
+		if (*lexer->c == '+' || *lexer->c == '-') {
+			assert(lexer->c != lexer->line);
+
+			c = lexer->c[-1];
+			if (c != 'e' && c != 'E' && c != 'p' && c != 'P') {
+				break;
+			}
+		}
+		else if (*lexer->c == '\\') {
+			// process UCN
+			lexer->c++;
+			continue;
+		}
+		else if (!is_digit(*lexer->c) && !is_letter(*lexer->c) && *lexer->c != '.' && *lexer->c != '_') {
+			break;
+		}
+
+		token->string[i++] = *lexer->c;
+		lexer->c++;
+	}
+
+	token->token = TOKEN_PP_NUMBER;
+	token->string[i] = '\0';
+
 	return MCC_ERROR_OK;
 }
 
@@ -402,12 +550,6 @@ static inline void eat_whitespace(struct lexer *lexer)
 }
 
 
-static inline bool lexer_is_eol(struct lexer *lexer)
-{
-	return (lexer->c - lexer->line) >= lexer->line_len;
-}
-
-
 void eat_cpp_comment(struct lexer *lexer)
 {
 	lexer_read_line(lexer);
@@ -493,7 +635,7 @@ smash_whitespace:
 		return lex_char_const(lexer, token);
 
 	case '.':
-		if (!is_digit(lexer->c[1])) {
+		if (!is_digit(*lexer->c)) {
 			if (*lexer->c == '.' && lexer->c[1] == '.') {
 				token->token = TOKEN_ELLIPSIS;
 				lexer->c += 2;
@@ -505,10 +647,11 @@ smash_whitespace:
 			break;
 		}
 
-		/* fall-through to number processing */ 
+		/* fall-through to pp-number processing */ 
 
 	case '0': case '1': case '2': case '3': case '4': case '5':
 	case '6': case '7': case '8': case '9':
+		lexer->c--;
 		return lex_pp_number(lexer, token);
 
 	case '[':
@@ -786,8 +929,51 @@ void lexer_dump_token(struct token_data *token)
 		printf("\"%s\"", token->string);
 		break;
 
+	case TOKEN_CHAR_CONST:
+		switch (token->value) {
+		case '\n':
+			printf("\'\\n\'");
+			break;
+
+		case '\r':
+			printf("\'\\r\'");
+			break;
+
+		case '\v':
+			printf("\'\\v\'");
+			break;
+
+		case '\f':
+			printf("\'\\f\'");
+			break;
+
+		case '\a':
+			printf("\'\\a\'");
+			break;
+
+		case '\t':
+			printf("\'\\t\'");
+			break;
+
+		case '\b':
+			printf("\'\\b\'");
+			break;
+
+		default:
+			if (isprint(token->value))
+				printf("\'%c\'", token->value);
+			else
+				printf("\'0x%x\'", token->value);
+		}
+
+		break;
+
 	case TOKEN_IDENT:
 		printf("%s", token->ident);
+		break;
+
+	case TOKEN_PP_NUMBER:
+		printf("%s", token->string);
 		break;
 
 	default:
