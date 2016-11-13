@@ -1,4 +1,5 @@
 #include "error.h"
+#include <stdlib.h>
 
 
 const char *error_str(mcc_error_t err)
@@ -16,4 +17,6 @@ const char *error_str(mcc_error_t err)
 	case MCC_ERROR_OK:
 		return "No error.";
 	}
+
+	return NULL;
 }
