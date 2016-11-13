@@ -18,6 +18,12 @@ static enum token keywords[] = {
 	TOKEN_UNION, TOKEN_UNSIGNED, TOKEN_VOID, TOKEN_VOLATILE, TOKEN_WHILE,
 };
 
+static enum token cpp_directives[] = {
+	TOKEN_CPP_IF, TOKEN_CPP_IFDEF, TOKEN_CPP_IFNDEF, TOKEN_CPP_ELIF,
+	TOKEN_CPP_ELSE, TOKEN_CPP_ENDIF, TOKEN_CPP_INCLUDE, TOKEN_CPP_DEFINE,
+	TOKEN_CPP_UNDEF, TOKEN_CPP_LINE, TOKEN_CPP_ERROR, TOKEN_CPP_PRAGMA,
+};
+
 static const char *token_names[] = {
 	[TOKEN_ALIGNAS] = "_Alignas",
 	[TOKEN_ALIGNOF] = "_Alignof",
@@ -37,6 +43,18 @@ static const char *token_names[] = {
 	[TOKEN_COMPLEX] = "_Complex",
 	[TOKEN_CONST] = "const",
 	[TOKEN_CONTINUE] = "continue",
+	[TOKEN_CPP_DEFINE] = "define",
+	[TOKEN_CPP_ELIF] = "elif",
+	[TOKEN_CPP_ELSE] = "else",
+	[TOKEN_CPP_ENDIF] = "endif",
+	[TOKEN_CPP_ERROR] = "error",
+	[TOKEN_CPP_IFDEF] = "ifdef",
+	[TOKEN_CPP_IFNDEF] = "ifndef",
+	[TOKEN_CPP_IF] = "if",
+	[TOKEN_CPP_INCLUDE] = "include",
+	[TOKEN_CPP_LINE] = "line",
+	[TOKEN_CPP_PRAGMA] = "pragma",
+	[TOKEN_CPP_UNDEF] = "undef",
 	[TOKEN_DEC] = "--",
 	[TOKEN_DEFAULT] = "default",
 	[TOKEN_DIV] = "/",
@@ -284,7 +302,7 @@ static uint32_t read_escape_sequence(struct lexer *lexer)
 }
 
 
-mcc_error_t lex_identifier_or_keyword(struct lexer *lexer, struct token_data *token)
+mcc_error_t lex_name(struct lexer *lexer, struct token_data *token)
 {
 	size_t i = 0;
 
@@ -296,18 +314,30 @@ mcc_error_t lex_identifier_or_keyword(struct lexer *lexer, struct token_data *to
 	token->ident[i] = '\0';
 
 	struct symbol *symbol = symtab_search(lexer->symtab, token->ident);
-	if (symbol != NULL && symbol->type == SYMBOL_KEYWORD) {
-		token->token = symbol->keyword;
+
+	if (lexer->context == LEXER_CTX_C_SOURCE) {
+		if (symbol && symbol->type == SYMBOL_C_KEYWORD)
+			token->token = symbol->keyword;
+		else
+			token->token = TOKEN_IDENT;
+
+		return MCC_ERROR_OK;
 	}
-	else
-		token->token = TOKEN_IDENT;
+	else if (lexer->context == LEXER_CTX_CPP_SOURCE) {
+		if (symbol && symbol->type == SYMBOL_CPP_DIRECTIVE)
+			token->token = symbol->keyword;
+		else
+			token->token = TOKEN_IDENT;
 
+		return MCC_ERROR_OK;
+	}
+
+	token->token = TOKEN_IDENT;
 	return MCC_ERROR_OK;
-
 }
 
 
-static mcc_error_t lex_char_const(struct lexer *lexer, struct token_data *token)
+static mcc_error_t lex_char(struct lexer *lexer, struct token_data *token)
 {
 	uint32_t val;
 	bool seen_delimiter = false;
@@ -388,7 +418,7 @@ mcc_error_t lex_pp_number(struct lexer *lexer, struct token_data *token)
 }
 
 
-mcc_error_t lex_string_literal(struct lexer *lexer, struct token_data *token)
+mcc_error_t lex_string(struct lexer *lexer, struct token_data *token)
 {
 	bool seen_delimiter = false;
 	size_t i;
@@ -432,8 +462,20 @@ void setup_symbol_table(struct lexer *lexer)
 
 	for (i = 0; i < ARRAY_SIZE(keywords); i++) {
 		struct symbol *s = symtab_insert(lexer->symtab, token_names[keywords[i]]);
-		s->type = SYMBOL_KEYWORD;
+
+		assert(s != NULL); // TODO
+
+		s->type = SYMBOL_C_KEYWORD;
 		s->keyword = keywords[i];
+	}
+
+	for (i = 0; i < ARRAY_SIZE(cpp_directives); i++) {
+		struct symbol *s = symtab_insert(lexer->symtab, token_names[cpp_directives[i]]);
+
+		assert(s != NULL); // TODO
+
+		s->type = SYMBOL_CPP_DIRECTIVE;
+		s->keyword = cpp_directives[i];
 	}
 }
 
@@ -450,6 +492,8 @@ mcc_error_t lexer_init(struct lexer *lexer)
 	lexer->line[0] = '\0';
 	lexer->c = lexer->line; // TODO 
 
+	lexer->context = LEXER_CTX_C_SOURCE;
+
 	return MCC_ERROR_OK;
 }
 
@@ -460,8 +504,6 @@ void lexer_set_buffer(struct lexer *lexer, struct inbuf *buffer)
 
 	lexer->buffer = buffer;
 
-	lexer->line_no = 0;
-	lexer->col_no = 0;
 	lexer->line_len = 0;
 	lexer->c = lexer->line;
 }
@@ -480,6 +522,9 @@ void lexer_free(struct lexer *lexer)
 }
 
 
+/*
+ * TODO Add trigraph support.
+ */
 static mcc_error_t lexer_read_line(struct lexer *lexer)
 {
 	int c;
@@ -488,7 +533,7 @@ static mcc_error_t lexer_read_line(struct lexer *lexer)
 
 	assert(lexer->buffer != NULL);
 
-	for (lexer->col_no = 0; (c = inbuf_get_char(lexer->buffer)) != INBUF_EOF; lexer->col_no++) {
+	for (; (c = inbuf_get_char(lexer->buffer)) != INBUF_EOF; ) {
 		if (i + 2 >= lexer->line_size) {
 			lexer->line = realloc(lexer->line, 2 * lexer->line_size);
 
@@ -506,8 +551,6 @@ static mcc_error_t lexer_read_line(struct lexer *lexer)
 			continue;
 
 		case '\n':
-			lexer->line_no++;
-
 			if (escape) {
 				escape = false;
 				continue;
@@ -587,6 +630,11 @@ smash_whitespace:
 	if (lexer_is_eol(lexer)) {
 		err = lexer_read_line(lexer);
 
+		if (lexer->context == LEXER_CTX_CPP_SOURCE) {
+			token->token = TOKEN_EOL;
+			return err;
+		}
+
 		if (err == MCC_ERROR_OK)
 			goto smash_whitespace;
 		else
@@ -600,7 +648,7 @@ smash_whitespace:
 		/* u8"string" */
 		if (*lexer->c == '8' && lexer->c[1] == '\"') {
 			lexer->c += 2;
-			return lex_string_literal(lexer, token);
+			return lex_string(lexer, token);
 		}
 
 	case 'U':
@@ -608,13 +656,13 @@ smash_whitespace:
 		/* L'char' or U'char' or u'char' */
 		if (*lexer->c == '\'') {
 			lexer->c++;
-			return lex_char_const(lexer, token);
+			return lex_char(lexer, token);
 		}
 		
 		/* L"string" or U"string" or u"string" */
 		if (*lexer->c == '\"') {
 			lexer->c++;
-			return lex_string_literal(lexer, token);
+			return lex_string(lexer, token);
 		}
 
 	case '_': case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
@@ -626,13 +674,13 @@ smash_whitespace:
 	case 'R': case 'S': case 'T': case 'V': case 'W': case 'X': case 'Y':
 	case 'Z': case '\\':
 		lexer->c--;
-		return lex_identifier_or_keyword(lexer, token);
+		return lex_name(lexer, token);
 
 	case '\"':
-		return lex_string_literal(lexer, token);
+		return lex_string(lexer, token);
 
 	case '\'':
-		return lex_char_const(lexer, token);
+		return lex_char(lexer, token);
 
 	case '.':
 		if (!is_digit(*lexer->c)) {
@@ -920,56 +968,75 @@ smash_whitespace:
 }
 
 
+size_t char_to_printable(char c, char *str, size_t len)
+{
+	switch (c)
+	{
+	case '\a':
+		return snprintf(str, len, "\\a");
+
+	case '\b':
+		return snprintf(str, len, "\\b");
+
+	case '\f':
+		return snprintf(str, len, "\\f");
+
+	case '\r':
+		return snprintf(str, len, "\\r");
+
+	case '\n':
+		return snprintf(str, len, "\\n");
+
+	case '\v':
+		return snprintf(str, len, "\\v");
+
+	case '\t':
+		return snprintf(str, len, "\\t");
+
+	case '\\':
+		return snprintf(str, len, "\\");
+
+	case '\"':
+		return snprintf(str, len, "\\\"");
+
+	case '\'':
+		return snprintf(str, len, "\\\'");
+
+	case '\?':
+		return snprintf(str, len, "\\\?");
+	}
+
+	if (isprint(c))
+		return snprintf(str, len, "%c", c);
+	else
+		return snprintf(str, len, "0x%x", c);
+}
+
+
 void lexer_dump_token(struct token_data *token)
 {
 	const char *name = token_names[token->token];
+	char tmp[32];
+	char c;
+	size_t i = 0;
 
 	switch (token->token) {
 	case TOKEN_STRING_LITERAL:
-		printf("\"%s\"", token->string);
+		printf("\"");
+		while ((c = token->string[i++])) {
+			char_to_printable(c, tmp, sizeof(tmp));
+			printf("%s", tmp);
+		}
+		printf("\"");
 		break;
 
 	case TOKEN_CHAR_CONST:
-		switch (token->value) {
-		case '\n':
-			printf("\'\\n\'");
-			break;
-
-		case '\r':
-			printf("\'\\r\'");
-			break;
-
-		case '\v':
-			printf("\'\\v\'");
-			break;
-
-		case '\f':
-			printf("\'\\f\'");
-			break;
-
-		case '\a':
-			printf("\'\\a\'");
-			break;
-
-		case '\t':
-			printf("\'\\t\'");
-			break;
-
-		case '\b':
-			printf("\'\\b\'");
-			break;
-
-		default:
-			if (isprint(token->value))
-				printf("\'%c\'", token->value);
-			else
-				printf("\'0x%x\'", token->value);
-		}
-
+		char_to_printable(token->value, tmp, sizeof(tmp));
+		printf("\'%s\'", tmp);
 		break;
 
 	case TOKEN_IDENT:
-		printf("%s", token->ident);
+		printf("[%s]", token->ident);
 		break;
 
 	case TOKEN_PP_NUMBER:
@@ -981,4 +1048,10 @@ void lexer_dump_token(struct token_data *token)
 	}
 
 	putchar(' ');
+}
+
+
+void lexer_set_context(struct lexer *lexer, enum lexer_ctx context)
+{
+	lexer->context = context;
 }

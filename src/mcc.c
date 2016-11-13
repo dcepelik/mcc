@@ -1,6 +1,5 @@
-#include "inbuf.h"
-#include "lexer.h"
-#include "lexer.h"
+#include "error.h"
+#include "pp.h"
 #include "symtab.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,10 +9,10 @@
 int main(int argc, char *argv[])
 {
 	char *filename;
-	struct inbuf buffer;
-	struct lexer lexer;
 	struct token_data token_data;
 	struct symtab symtab;
+	struct pp pp;
+	mcc_error_t err;
 
 	if (argc != 2) {
 		fprintf(stderr, "Usage: %s FILE\n", argv[0]);
@@ -22,19 +21,20 @@ int main(int argc, char *argv[])
 
 	filename = argv[1];
 
-	if (inbuf_open(&buffer, BUFFER_SIZE, filename) != MCC_ERROR_OK) {
-		fprintf(stderr, "Cannot open input buffer '%s' for reading\n",
-			filename);
-		exit(EXIT_FAILURE);
-	}
-
 	symtab_init(&symtab);
 
-	lexer_init(&lexer);
-	lexer_set_buffer(&lexer, &buffer);
-	lexer_set_symtab(&lexer, &symtab);
+	pp_init(&pp);
+	err = pp_open(&pp, filename);
+	if (err != MCC_ERROR_OK) {
+		fprintf(stderr, "Cannot open input file '%s': %s\n",
+			filename,
+			error_str(err)
+		);
+	}
 
-	while (lexer_next(&lexer, &token_data) == MCC_ERROR_OK) {
+	pp_set_symtab(&pp, &symtab);
+
+	while (pp_next(&pp, &token_data) == MCC_ERROR_OK) {
 		if (token_data.token == TOKEN_EOF)
 			break;
 
@@ -43,8 +43,7 @@ int main(int argc, char *argv[])
 
 	printf("\n");
 
-	inbuf_close(&buffer);
-	lexer_free(&lexer);
+	pp_free(&pp);
 	symtab_free(&symtab);
 
 	return EXIT_SUCCESS;

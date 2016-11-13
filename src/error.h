@@ -10,4 +10,6 @@ enum mcc_error {
 
 typedef enum mcc_error mcc_error_t;
 
+const char *error_str(mcc_error_t err);
+
 #endif

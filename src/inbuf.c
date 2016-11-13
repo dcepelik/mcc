@@ -11,7 +11,7 @@ static void inbuf_fill(struct inbuf *buf)
 }
 
 
-mcc_error_t inbuf_open(struct inbuf *buf, size_t size, char *filename)
+mcc_error_t inbuf_open(struct inbuf *buf, size_t size, const char *filename)
 {
 	buf->file = fopen(filename, "r");
 	if (!buf->file)

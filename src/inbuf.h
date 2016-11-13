@@ -14,7 +14,7 @@ struct inbuf {
 	size_t offset;	/* read offset in the buffer */
 };
 
-mcc_error_t inbuf_open(struct inbuf *inbuf, size_t size, char *filename);
+mcc_error_t inbuf_open(struct inbuf *inbuf, size_t size, const char *filename);
 int inbuf_get_char(struct inbuf *inbuf);
 void inbuf_close(struct inbuf *inbuf);
 

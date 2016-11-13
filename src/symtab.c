@@ -6,7 +6,7 @@
 #include <string.h>
 
 /*
- * TODO Use of this hashing function is not backed up by ani analysis of its
+ * TODO Use of this hashing function is not backed up by any analysis of its
  *      performance. Measure and, if necessary, improve the function.
  *
  * Taken from http://www.cse.yorku.ca/~oz/hash.html#sdbm.

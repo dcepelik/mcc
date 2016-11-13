@@ -1,0 +1,16 @@
+TOKEN_HASH
+[include]
+<stdio.h>
+TOKEN_INT
+[main]
+(
+TOKEN_VOID
+)
+{
+[printf]
+(
+"Hello World!\n"
+)
+;
+}
+EOF

@@ -1,1 +1,1 @@
-# `mcc`: The Minimalist C Compiler Project
+# `mcc`: Minimalist C Compiler

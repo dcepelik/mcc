@@ -1,0 +1,17 @@
+"String \awith\b various\t\"escape\"\n\nsequences\x20within\u0020\U00000020it\?"
+
+"single line string con\
+tained in multiple physical lines"
+
+L"string"
+U"string"
+u"string"
+u8"string"
+
+"an unterminated string
+
+'\x20'
+'\u0020'
+'\U0020'
+'u
+'\\'

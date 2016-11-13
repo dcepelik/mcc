@@ -13,10 +13,23 @@ void pp_free(struct pp *pp)
 }
 
 
-void pp_set_buffer(struct pp *pp, struct inbuf *buffer)
+mcc_error_t pp_open(struct pp *pp, const char *filename)
 {
-	pp->buffer = buffer;
-	lexer_set_buffer(&pp->lexer, pp->buffer);
+	mcc_error_t err;
+
+	err = inbuf_open(&pp->buffer, 1024, filename);
+	if (err != MCC_ERROR_OK)
+		return err;
+
+	lexer_set_buffer(&pp->lexer, &pp->buffer);
+
+	return MCC_ERROR_OK;
+}
+
+
+void pp_close(struct pp *pp)
+{
+	inbuf_close(&pp->buffer);
 }
 
 
@@ -27,7 +40,27 @@ void pp_set_symtab(struct pp *pp, struct symtab *table)
 }
 
 
-void pp_next(struct pp *pp, struct token_data *token)
+mcc_error_t pp_next(struct pp *pp, struct token_data *token)
 {
-	(void)lexer_next(&pp->lexer, token);
+	mcc_error_t err;
+
+	err = lexer_next(&pp->lexer, token);
+	if (err != MCC_ERROR_OK)
+		return err;
+
+	switch (token->token)
+	{
+	case TOKEN_HASH:
+		lexer_set_context(&pp->lexer, LEXER_CTX_C_SOURCE);
+		break;
+
+	case TOKEN_EOL:
+		lexer_set_context(&pp->lexer, LEXER_CTX_C_SOURCE);
+		break;
+
+	default:
+		break;
+	}
+
+	return err;
 }
