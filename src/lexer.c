@@ -1,10 +1,25 @@
 #include "debug.h"
 #include "lexer.h"
-#include "symtab.h"
-#include <inttypes.h>
+#include "tokinfo.h"
 #include <assert.h>
-#include <stdlib.h>
 #include <ctype.h>
+#include <inttypes.h>
+#include <stdlib.h>
+
+
+static const char simple_escape_seq[256] = {
+	['a'] = '\a',
+	['b'] = '\b',
+	['f'] = '\f',
+	['r'] = '\r',
+	['n'] = '\n',
+	['v'] = '\v',
+	['t'] = '\t',
+	['\\'] = '\\',
+	['\"'] = '\"',
+	['\''] = '\'',
+	['\?'] = '\?',
+};
 
 
 inline static bool is_letter(int c)
@@ -52,8 +67,10 @@ static int32_t read_octal_number(struct lexer *lexer)
 		lexer->c++;
 	}
 
-	if (i == 0)
+	if (i == 0) {
 		DEBUG_MSG("error: octal digit expected");
+		DEBUG_PRINTF("\tline: %s", lexer->line);
+	}
 
 	return val;
 }
@@ -101,65 +118,25 @@ static uint32_t read_escape_sequence(struct lexer *lexer)
 {
 	assert(lexer->c[-1] == '\\');
 
-	switch (*lexer->c) {
-	case 'a':
-		lexer->c++;
-		return '\a';
+	int c = *lexer->c;
+	lexer->c++;
 
-	case 'b':
-		lexer->c++;
-		return '\b';
+	if (simple_escape_seq[c])
+		return simple_escape_seq[c];
 
-	case 'f':
-		lexer->c++;
-		return '\f';
-
-	case 'r':
-		lexer->c++;
-		return '\r';
-
-	case 'n':
-		lexer->c++;
-		return '\n';
-
-	case 'v':
-		lexer->c++;
-		return '\v';
-
-	case 't':
-		lexer->c++;
-		return '\t';
-
-	case '\\':
-		lexer->c++;
-		return '\\';
-
-	case '\"':
-		lexer->c++;
-		return '\"';
-
-	case '\'':
-		lexer->c++;
-		return '\'';
-
-	case '?':
-		lexer->c++;
-		return '\?';
-
+	switch (c) {
 	case '0': case '1': case '2': case '3':
 	case '4': case '5': case '6': case '7':
+		lexer->c--;
 		return read_octal_number(lexer);
 
 	case 'x':	
-		lexer->c++;
 		return read_hex_number(lexer, 1, 8);
 
 	case 'u':
-		lexer->c++;
 		return read_hex_number(lexer, 4, 4);
 
 	case 'U':
-		lexer->c++;
 		return read_hex_number(lexer, 8, 8);
 
 	default:
@@ -296,7 +273,7 @@ mcc_error_t lex_string(struct lexer *lexer, struct tokinfo *tokinfo)
 	}
 
 	tokinfo->string[i] = '\0';
-	tokinfo->token = TOKEN_STRING_LITERAL;
+	tokinfo->token = TOKEN_STRING;
 
 	return MCC_ERROR_OK;
 }
@@ -326,12 +303,6 @@ void lexer_set_inbuf(struct lexer *lexer, struct inbuf *inbuf)
 
 	lexer->line_len = 0;
 	lexer->c = lexer->line;
-}
-
-
-void lexer_set_symtab(struct lexer *lexer, struct symtab *symtab)
-{
-	lexer->symtab = symtab;
 }
 
 
@@ -835,7 +806,7 @@ void lexer_dump_token(struct tokinfo *tokinfo)
 	size_t i = 0;
 
 	switch (tokinfo->token) {
-	case TOKEN_STRING_LITERAL:
+	case TOKEN_STRING:
 		printf("\"");
 		while ((c = tokinfo->string[i++])) {
 			char_to_printable(c, tmp, sizeof(tmp));

@@ -1,6 +1,8 @@
 #ifndef TOKINFO_H
 #define TOKINFO_H
 
+#include <stdbool.h>
+
 #define IDENT_MAX_LEN	64
 #define INIT_LINE_SIZE	1024
 
@@ -10,7 +12,7 @@ enum token
 	TOKEN_NAME,
 	TOKEN_NUMBER,
 	TOKEN_CHAR_CONST,
-	TOKEN_STRING_LITERAL,
+	TOKEN_STRING,
 
 	TOKEN_LBRACKET,
 	TOKEN_RBRACKET,
@@ -122,14 +124,20 @@ enum token
 	TOKEN_WHILE,
 };
 
-struct tokinfo {
-	enum token token;
-
-	union {
-		char ident[IDENT_MAX_LEN];
-		char string[IDENT_MAX_LEN];
+struct tokinfo
+{
+	union
+	{
+		struct symbol *symbol;
 		int value;
+		int c;
+		char *str;
 	};
+
+	enum token token;
+	bool preceded_by_whitespace;
 };
+
+const char *token_name(enum token token);
 
 #endif

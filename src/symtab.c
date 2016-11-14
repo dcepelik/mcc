@@ -50,9 +50,15 @@ bool symtab_contains(struct symtab *symtab, const char *name)
 
 mcc_error_t symtab_resize(struct symtab *symtab, size_t new_size)
 {
+	/*
+	 * TODO This is wrong; when the table's reallocated, hashes must be
+	 *      recalculated! Fix this.
+	 */
+	assert(false);
+
 	size_t i;
 
-	symtab->table = realloc(symtab->table, new_size * sizeof(struct symbol));
+	symtab->table = calloc(symtab->table, new_size * sizeof(struct symbol));
 	if (symtab->table == NULL)
 		return MCC_ERROR_NOMEM;
 

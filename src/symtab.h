@@ -9,10 +9,7 @@
 
 enum symbol_type
 {
-	SYMBOL_C_KEYWORD,
-	SYMBOL_CPP_DIRECTIVE,
-	SYMBOL_VARIABLE,
-	SYMBOL_FUNCTION,
+	SYMBOL_TYPE_CPP_MACRO,		/* C preprocessor macro */
 };
 
 struct symbol
@@ -20,10 +17,6 @@ struct symbol
 	char *name;			/* symbol name */
 	enum symbol_type type;		/* symbol type */
 	struct symbol *next;		/* next symbol in the list */
-
-	union {
-		enum token keyword;
-	};
 };
 
 struct symtab
