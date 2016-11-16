@@ -1,0 +1,289 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.8	//
+BUFFER_SIZE	mcc.c	7;"	d	file:
+CPP_H	cpp.h	2;"	d
+DEBUG	debug.h	7;"	d
+DEBUG_EXPR	debug.h	16;"	d
+DEBUG_H	debug.h	2;"	d
+DEBUG_MSG	debug.h	15;"	d
+DEBUG_PRINTF	debug.h	10;"	d
+ERROR_H	error.h	2;"	d
+HASHTAB_H	hashtab.h	7;"	d
+IDENT_MAX_LEN	tokinfo.h	6;"	d
+INBUF_EOF	inbuf.h	7;"	d
+INBUF_H	inbuf.h	2;"	d
+INIT_LINE_SIZE	tokinfo.h	7;"	d
+LDFLAGS	Makefile	/^LDFLAGS=-Wall$/;"	m
+LEXER_EOL_MAC	lexer.h	/^	LEXER_EOL_MAC,$/;"	e	enum:lexer_eol_style
+LEXER_EOL_MSDOS	lexer.h	/^	LEXER_EOL_MSDOS,$/;"	e	enum:lexer_eol_style
+LEXER_EOL_UNIX	lexer.h	/^	LEXER_EOL_UNIX,$/;"	e	enum:lexer_eol_style
+LEXER_EOL_UNKNOWN	lexer.h	/^	LEXER_EOL_UNKNOWN,$/;"	e	enum:lexer_eol_style
+LEXER_H	lexer.h	2;"	d
+MCC_ERROR_ACCESS	error.h	/^	MCC_ERROR_ACCESS,$/;"	e	enum:mcc_error
+MCC_ERROR_EOF	error.h	/^	MCC_ERROR_EOF,$/;"	e	enum:mcc_error
+MCC_ERROR_NOMEM	error.h	/^	MCC_ERROR_NOMEM,$/;"	e	enum:mcc_error
+MCC_ERROR_OK	error.h	/^	MCC_ERROR_OK,$/;"	e	enum:mcc_error
+MEMPOOL_H	mempool.h	7;"	d
+OBJPOOL_H	objpool.h	9;"	d
+OBJS	Makefile	/^OBJS=mcc.o lexer.o inbuf.o symtab.o objpool.o cpp.o error.o tokinfo.o$/;"	m
+PROG	Makefile	/^PROG=mcc$/;"	m
+SYMBOL_H	symtab.h	7;"	d
+SYMBOL_TYPE_CPP_MACRO	symtab.h	/^	SYMBOL_TYPE_CPP_MACRO,		\/* C preprocessor macro *\/$/;"	e	enum:symbol_type
+TOKEN_ALIGNAS	tokinfo.h	/^	TOKEN_ALIGNAS,$/;"	e	enum:token
+TOKEN_ALIGNOF	tokinfo.h	/^	TOKEN_ALIGNOF,$/;"	e	enum:token
+TOKEN_AMPERSAND	tokinfo.h	/^	TOKEN_AMPERSAND,$/;"	e	enum:token
+TOKEN_AND_EQ	tokinfo.h	/^	TOKEN_AND_EQ,$/;"	e	enum:token
+TOKEN_ARROW	tokinfo.h	/^	TOKEN_ARROW,$/;"	e	enum:token
+TOKEN_ASTERISK	tokinfo.h	/^	TOKEN_ASTERISK,$/;"	e	enum:token
+TOKEN_ATOMIC	tokinfo.h	/^	TOKEN_ATOMIC,$/;"	e	enum:token
+TOKEN_AUTO	tokinfo.h	/^	TOKEN_AUTO,$/;"	e	enum:token
+TOKEN_BOOL	tokinfo.h	/^	TOKEN_BOOL,$/;"	e	enum:token
+TOKEN_BREAK	tokinfo.h	/^	TOKEN_BREAK,$/;"	e	enum:token
+TOKEN_CASE	tokinfo.h	/^	TOKEN_CASE,$/;"	e	enum:token
+TOKEN_CHAR	tokinfo.h	/^	TOKEN_CHAR,$/;"	e	enum:token
+TOKEN_CHAR_CONST	tokinfo.h	/^	TOKEN_CHAR_CONST,$/;"	e	enum:token
+TOKEN_COLON	tokinfo.h	/^	TOKEN_COLON,$/;"	e	enum:token
+TOKEN_COMMA	tokinfo.h	/^	TOKEN_COMMA,$/;"	e	enum:token
+TOKEN_COMPLEX	tokinfo.h	/^	TOKEN_COMPLEX,$/;"	e	enum:token
+TOKEN_CONST	tokinfo.h	/^	TOKEN_CONST,$/;"	e	enum:token
+TOKEN_CONTINUE	tokinfo.h	/^	TOKEN_CONTINUE,$/;"	e	enum:token
+TOKEN_CPP_DEFINE	tokinfo.h	/^	TOKEN_CPP_DEFINE,$/;"	e	enum:token
+TOKEN_CPP_ELIF	tokinfo.h	/^	TOKEN_CPP_ELIF,$/;"	e	enum:token
+TOKEN_CPP_ELSE	tokinfo.h	/^	TOKEN_CPP_ELSE,$/;"	e	enum:token
+TOKEN_CPP_ENDIF	tokinfo.h	/^	TOKEN_CPP_ENDIF,$/;"	e	enum:token
+TOKEN_CPP_ERROR	tokinfo.h	/^	TOKEN_CPP_ERROR,$/;"	e	enum:token
+TOKEN_CPP_IF	tokinfo.h	/^	TOKEN_CPP_IF,$/;"	e	enum:token
+TOKEN_CPP_IFDEF	tokinfo.h	/^	TOKEN_CPP_IFDEF,$/;"	e	enum:token
+TOKEN_CPP_IFNDEF	tokinfo.h	/^	TOKEN_CPP_IFNDEF,$/;"	e	enum:token
+TOKEN_CPP_INCLUDE	tokinfo.h	/^	TOKEN_CPP_INCLUDE,$/;"	e	enum:token
+TOKEN_CPP_LINE	tokinfo.h	/^	TOKEN_CPP_LINE,$/;"	e	enum:token
+TOKEN_CPP_PRAGMA	tokinfo.h	/^	TOKEN_CPP_PRAGMA,$/;"	e	enum:token
+TOKEN_CPP_UNDEF	tokinfo.h	/^	TOKEN_CPP_UNDEF,$/;"	e	enum:token
+TOKEN_DEC	tokinfo.h	/^	TOKEN_DEC,$/;"	e	enum:token
+TOKEN_DEFAULT	tokinfo.h	/^	TOKEN_DEFAULT,$/;"	e	enum:token
+TOKEN_DIV	tokinfo.h	/^	TOKEN_DIV,$/;"	e	enum:token
+TOKEN_DIV_EQ	tokinfo.h	/^	TOKEN_DIV_EQ,$/;"	e	enum:token
+TOKEN_DO	tokinfo.h	/^	TOKEN_DO,$/;"	e	enum:token
+TOKEN_DOT	tokinfo.h	/^	TOKEN_DOT,$/;"	e	enum:token
+TOKEN_DOUBLE	tokinfo.h	/^	TOKEN_DOUBLE,$/;"	e	enum:token
+TOKEN_ELLIPSIS	tokinfo.h	/^	TOKEN_ELLIPSIS,$/;"	e	enum:token
+TOKEN_ELSE	tokinfo.h	/^	TOKEN_ELSE,$/;"	e	enum:token
+TOKEN_ENUM	tokinfo.h	/^	TOKEN_ENUM,$/;"	e	enum:token
+TOKEN_EOF	tokinfo.h	/^	TOKEN_EOF,$/;"	e	enum:token
+TOKEN_EQ	tokinfo.h	/^	TOKEN_EQ,$/;"	e	enum:token
+TOKEN_EQ_EQ	tokinfo.h	/^	TOKEN_EQ_EQ,$/;"	e	enum:token
+TOKEN_EXTERN	tokinfo.h	/^	TOKEN_EXTERN,$/;"	e	enum:token
+TOKEN_FLOAT	tokinfo.h	/^	TOKEN_FLOAT,$/;"	e	enum:token
+TOKEN_FOR	tokinfo.h	/^	TOKEN_FOR,$/;"	e	enum:token
+TOKEN_GE	tokinfo.h	/^	TOKEN_GE,$/;"	e	enum:token
+TOKEN_GENERIC	tokinfo.h	/^	TOKEN_GENERIC,$/;"	e	enum:token
+TOKEN_GOTO	tokinfo.h	/^	TOKEN_GOTO,$/;"	e	enum:token
+TOKEN_GT	tokinfo.h	/^	TOKEN_GT,$/;"	e	enum:token
+TOKEN_HASH	tokinfo.h	/^	TOKEN_HASH,$/;"	e	enum:token
+TOKEN_HASH_HASH	tokinfo.h	/^	TOKEN_HASH_HASH,$/;"	e	enum:token
+TOKEN_HEADER_NAME	tokinfo.h	/^	TOKEN_HEADER_NAME,$/;"	e	enum:token
+TOKEN_IF	tokinfo.h	/^	TOKEN_IF,$/;"	e	enum:token
+TOKEN_IMAGINARY	tokinfo.h	/^	TOKEN_IMAGINARY,$/;"	e	enum:token
+TOKEN_INC	tokinfo.h	/^	TOKEN_INC,$/;"	e	enum:token
+TOKEN_INLINE	tokinfo.h	/^	TOKEN_INLINE,$/;"	e	enum:token
+TOKEN_INT	tokinfo.h	/^	TOKEN_INT,$/;"	e	enum:token
+TOKEN_LBRACE	tokinfo.h	/^	TOKEN_LBRACE,$/;"	e	enum:token
+TOKEN_LBRACKET	tokinfo.h	/^	TOKEN_LBRACKET,$/;"	e	enum:token
+TOKEN_LE	tokinfo.h	/^	TOKEN_LE,$/;"	e	enum:token
+TOKEN_LOGICAL_AND	tokinfo.h	/^	TOKEN_LOGICAL_AND,$/;"	e	enum:token
+TOKEN_LOGICAL_OR	tokinfo.h	/^	TOKEN_LOGICAL_OR,$/;"	e	enum:token
+TOKEN_LONG	tokinfo.h	/^	TOKEN_LONG,$/;"	e	enum:token
+TOKEN_LPAREN	tokinfo.h	/^	TOKEN_LPAREN,$/;"	e	enum:token
+TOKEN_LT	tokinfo.h	/^	TOKEN_LT,$/;"	e	enum:token
+TOKEN_MINUS	tokinfo.h	/^	TOKEN_MINUS,$/;"	e	enum:token
+TOKEN_MINUS_EQ	tokinfo.h	/^	TOKEN_MINUS_EQ,$/;"	e	enum:token
+TOKEN_MOD	tokinfo.h	/^	TOKEN_MOD,$/;"	e	enum:token
+TOKEN_MOD_EQ	tokinfo.h	/^	TOKEN_MOD_EQ,$/;"	e	enum:token
+TOKEN_MUL_EQ	tokinfo.h	/^	TOKEN_MUL_EQ,$/;"	e	enum:token
+TOKEN_NAME	tokinfo.h	/^	TOKEN_NAME,$/;"	e	enum:token
+TOKEN_NEG	tokinfo.h	/^	TOKEN_NEG,$/;"	e	enum:token
+TOKEN_NEQ	tokinfo.h	/^	TOKEN_NEQ,$/;"	e	enum:token
+TOKEN_NORETURN	tokinfo.h	/^	TOKEN_NORETURN,$/;"	e	enum:token
+TOKEN_NOT	tokinfo.h	/^	TOKEN_NOT,$/;"	e	enum:token
+TOKEN_NUMBER	tokinfo.h	/^	TOKEN_NUMBER,$/;"	e	enum:token
+TOKEN_OR	tokinfo.h	/^	TOKEN_OR,$/;"	e	enum:token
+TOKEN_OR_EQ	tokinfo.h	/^	TOKEN_OR_EQ,$/;"	e	enum:token
+TOKEN_PLUS	tokinfo.h	/^	TOKEN_PLUS,$/;"	e	enum:token
+TOKEN_PLUS_EQ	tokinfo.h	/^	TOKEN_PLUS_EQ,$/;"	e	enum:token
+TOKEN_QUESTION_MARK	tokinfo.h	/^	TOKEN_QUESTION_MARK,$/;"	e	enum:token
+TOKEN_RBRACE	tokinfo.h	/^	TOKEN_RBRACE,$/;"	e	enum:token
+TOKEN_RBRACKET	tokinfo.h	/^	TOKEN_RBRACKET,$/;"	e	enum:token
+TOKEN_REGISTER	tokinfo.h	/^	TOKEN_REGISTER,$/;"	e	enum:token
+TOKEN_RESTRICT	tokinfo.h	/^	TOKEN_RESTRICT,$/;"	e	enum:token
+TOKEN_RETURN	tokinfo.h	/^	TOKEN_RETURN,$/;"	e	enum:token
+TOKEN_RPAREN	tokinfo.h	/^	TOKEN_RPAREN,$/;"	e	enum:token
+TOKEN_SEMICOLON	tokinfo.h	/^	TOKEN_SEMICOLON,$/;"	e	enum:token
+TOKEN_SHL	tokinfo.h	/^	TOKEN_SHL,$/;"	e	enum:token
+TOKEN_SHL_EQ	tokinfo.h	/^	TOKEN_SHL_EQ,$/;"	e	enum:token
+TOKEN_SHORT	tokinfo.h	/^	TOKEN_SHORT,$/;"	e	enum:token
+TOKEN_SHR	tokinfo.h	/^	TOKEN_SHR,$/;"	e	enum:token
+TOKEN_SHR_EQ	tokinfo.h	/^	TOKEN_SHR_EQ,$/;"	e	enum:token
+TOKEN_SIGNED	tokinfo.h	/^	TOKEN_SIGNED,$/;"	e	enum:token
+TOKEN_SIZEOF	tokinfo.h	/^	TOKEN_SIZEOF,$/;"	e	enum:token
+TOKEN_STATIC	tokinfo.h	/^	TOKEN_STATIC,$/;"	e	enum:token
+TOKEN_STATIC_ASSERT	tokinfo.h	/^	TOKEN_STATIC_ASSERT,$/;"	e	enum:token
+TOKEN_STRING	tokinfo.h	/^	TOKEN_STRING,$/;"	e	enum:token
+TOKEN_STRUCT	tokinfo.h	/^	TOKEN_STRUCT,$/;"	e	enum:token
+TOKEN_SWITCH	tokinfo.h	/^	TOKEN_SWITCH,$/;"	e	enum:token
+TOKEN_THREAD_LOCAL	tokinfo.h	/^	TOKEN_THREAD_LOCAL,$/;"	e	enum:token
+TOKEN_TYPEDEF	tokinfo.h	/^	TOKEN_TYPEDEF,$/;"	e	enum:token
+TOKEN_UNION	tokinfo.h	/^	TOKEN_UNION,$/;"	e	enum:token
+TOKEN_UNSIGNED	tokinfo.h	/^	TOKEN_UNSIGNED,$/;"	e	enum:token
+TOKEN_VOID	tokinfo.h	/^	TOKEN_VOID,$/;"	e	enum:token
+TOKEN_VOLATILE	tokinfo.h	/^	TOKEN_VOLATILE,$/;"	e	enum:token
+TOKEN_WHILE	tokinfo.h	/^	TOKEN_WHILE,$/;"	e	enum:token
+TOKEN_XOR	tokinfo.h	/^	TOKEN_XOR,$/;"	e	enum:token
+TOKEN_XOR_EQ	tokinfo.h	/^	TOKEN_XOR_EQ,$/;"	e	enum:token
+TOKINFO_H	tokinfo.h	2;"	d
+alloc_new_block	objpool.c	/^static mcc_error_t alloc_new_block(struct objpool *pool)$/;"	f	file:
+alloc_size	mempool.h	/^	size_t alloc_size;		\/* allocated size *\/$/;"	m	struct:mempool_block
+big_chain	mempool.h	/^	struct mempool_chain big_chain;		\/* chain of blocks for big objects *\/$/;"	m	struct:mempool	typeref:struct:mempool::mempool_chain
+block_size	mempool.h	/^	size_t block_size;			\/* size of small objects block *\/$/;"	m	struct:mempool
+block_size	objpool.h	/^	size_t block_size;$/;"	m	struct:objpool
+c	lexer.h	/^	char *c;$/;"	m	struct:lexer
+c	tokinfo.h	/^		int c;$/;"	m	union:tokinfo::__anon1
+char_to_printable	lexer.c	/^size_t char_to_printable(char c, char *str, size_t len)$/;"	f
+count	hashtab.h	/^	size_t count;$/;"	m	struct:hashtab
+count	inbuf.h	/^	size_t count;	\/* number of bytes in the buffer *\/$/;"	m	struct:inbuf
+cpp	cpp.h	/^struct cpp$/;"	s
+cpp_close	cpp.c	/^void cpp_close(struct cpp *cpp)$/;"	f
+cpp_free	cpp.c	/^void cpp_free(struct cpp *cpp)$/;"	f
+cpp_init	cpp.c	/^mcc_error_t cpp_init(struct cpp *cpp)$/;"	f
+cpp_next	cpp.c	/^mcc_error_t cpp_next(struct cpp *cpp, struct tokinfo *tokinfo)$/;"	f
+cpp_open	cpp.c	/^mcc_error_t cpp_open(struct cpp *cpp, const char *filename)$/;"	f
+cpp_set_symtab	cpp.c	/^void cpp_set_symtab(struct cpp *cpp, struct symtab *table)$/;"	f
+data	inbuf.h	/^	char *data;	\/* buffered data *\/$/;"	m	struct:inbuf
+eat_c_comment	lexer.c	/^void eat_c_comment(struct lexer *lexer)$/;"	f
+eat_cpp_comment	lexer.c	/^void eat_cpp_comment(struct lexer *lexer)$/;"	f
+eat_whitespace	lexer.c	/^static inline void eat_whitespace(struct lexer *lexer)$/;"	f	file:
+eol	lexer.h	/^	enum lexer_eol_style eol;$/;"	m	struct:lexer	typeref:enum:lexer::lexer_eol_style
+error_str	error.c	/^const char *error_str(mcc_error_t err)$/;"	f
+file	inbuf.h	/^	FILE *file;	\/* file managed by this buffer *\/$/;"	m	struct:inbuf
+first_block	objpool.h	/^	struct objpool_block *first_block;$/;"	m	struct:objpool	typeref:struct:objpool::objpool_block
+first_unused	objpool.h	/^	struct objpool_unused *first_unused;$/;"	m	struct:objpool	typeref:struct:objpool::objpool_unused
+hashnode	hashtab.h	/^struct hashnode$/;"	s
+hashtab	hashtab.h	/^struct hashtab$/;"	s
+hashtab_contains	hashtab.c	/^bool hashtab_contains(struct hashtab *hashtab, const char *key)$/;"	f
+hashtab_count	hashtab.c	/^size_t hashtab_count(struct hashtab *hashtab)$/;"	f
+hashtab_free	hashtab.c	/^void hashtab_free(struct hashtab *hashtab)$/;"	f
+hashtab_hash	hashtab.c	/^static inline uint64_t hashtab_hash(const char *key)$/;"	f	file:
+hashtab_init	hashtab.c	/^bool hashtab_init(struct hashtab *hashtab, struct objpool *pool, size_t init_size)$/;"	f
+hashtab_insert	hashtab.c	/^void *hashtab_insert(struct hashtab *hashtab, const char *key)$/;"	f
+hashtab_insert_node	hashtab.c	/^static void hashtab_insert_node(struct hashtab *hashtab, struct hashnode *new_node)$/;"	f	file:
+hashtab_next	hashtab.c	/^void *hashtab_next(struct hashtab *hashtab, struct hashnode *node)$/;"	f
+hashtab_remove	hashtab.c	/^bool hashtab_remove(struct hashtab *hashtab, struct hashnode *node)$/;"	f
+hashtab_resize	hashtab.c	/^static bool hashtab_resize(struct hashtab *hashtab, size_t new_size)$/;"	f	file:
+hashtab_search	hashtab.c	/^void *hashtab_search(struct hashtab *hashtab, const char *key)$/;"	f
+hex_val	lexer.c	/^static inline int hex_val(int c)$/;"	f	file:
+i	test.c	/^	int i;$/;"	m	struct:my_item	file:
+inbuf	cpp.h	/^	struct inbuf inbuf;$/;"	m	struct:cpp	typeref:struct:cpp::inbuf
+inbuf	inbuf.h	/^struct inbuf {$/;"	s
+inbuf	lexer.h	/^	struct inbuf *inbuf;$/;"	m	struct:lexer	typeref:struct:lexer::inbuf
+inbuf_close	inbuf.c	/^void inbuf_close(struct inbuf *buf)$/;"	f
+inbuf_fill	inbuf.c	/^static void inbuf_fill(struct inbuf *buf)$/;"	f	file:
+inbuf_get_char	inbuf.c	/^int inbuf_get_char(struct inbuf *buf)$/;"	f
+inbuf_open	inbuf.c	/^mcc_error_t inbuf_open(struct inbuf *buf, size_t size, const char *filename)$/;"	f
+is_digit	lexer.c	/^inline static bool is_digit(int c)$/;"	f	file:
+is_hex_digit	lexer.c	/^inline static bool is_hex_digit(int c)$/;"	f	file:
+is_letter	lexer.c	/^inline static bool is_letter(int c)$/;"	f	file:
+is_octal_digit	lexer.c	/^inline static bool is_octal_digit(int c)$/;"	f	file:
+is_whitespace	lexer.c	/^inline static bool is_whitespace(int c)$/;"	f	file:
+key	hashtab.h	/^	const char *key;$/;"	m	struct:hashnode
+last	mempool.h	/^	struct mempool_block *last;	\/* last block *\/$/;"	m	struct:mempool_chain	typeref:struct:mempool_chain::mempool_block
+last_free	mempool.h	/^	size_t last_free;		\/* free memory in last block *\/$/;"	m	struct:mempool_chain
+lex_char	lexer.c	/^static mcc_error_t lex_char(struct lexer *lexer, struct tokinfo *tokinfo)$/;"	f	file:
+lex_name	lexer.c	/^mcc_error_t lex_name(struct lexer *lexer, struct tokinfo *tokinfo)$/;"	f
+lex_pp_number	lexer.c	/^mcc_error_t lex_pp_number(struct lexer *lexer, struct tokinfo *tokinfo)$/;"	f
+lex_string	lexer.c	/^mcc_error_t lex_string(struct lexer *lexer, struct tokinfo *tokinfo)$/;"	f
+lexer	cpp.h	/^	struct lexer lexer;$/;"	m	struct:cpp	typeref:struct:cpp::lexer
+lexer	lexer.h	/^struct lexer$/;"	s
+lexer_dump_token	lexer.c	/^void lexer_dump_token(struct tokinfo *tokinfo)$/;"	f
+lexer_eol_style	lexer.h	/^enum lexer_eol_style$/;"	g
+lexer_free	lexer.c	/^void lexer_free(struct lexer *lexer)$/;"	f
+lexer_init	lexer.c	/^mcc_error_t lexer_init(struct lexer *lexer)$/;"	f
+lexer_is_eol	lexer.c	/^static inline bool lexer_is_eol(struct lexer *lexer)$/;"	f	file:
+lexer_next	lexer.c	/^mcc_error_t lexer_next(struct lexer *lexer, struct tokinfo *tokinfo)$/;"	f
+lexer_read_line	lexer.c	/^static mcc_error_t lexer_read_line(struct lexer *lexer)$/;"	f	file:
+lexer_set_inbuf	lexer.c	/^void lexer_set_inbuf(struct lexer *lexer, struct inbuf *inbuf)$/;"	f
+line	lexer.h	/^	char *line;$/;"	m	struct:lexer
+line_len	lexer.h	/^	size_t line_len;$/;"	m	struct:lexer
+line_size	lexer.h	/^	size_t line_size;$/;"	m	struct:lexer
+main	mcc.c	/^int main(int argc, char *argv[])$/;"	f
+main	test-mempool.c	/^int main(void)$/;"	f
+main	test.c	/^int main(void)$/;"	f
+mcc_error	error.h	/^enum mcc_error {$/;"	g
+mcc_error_t	error.h	/^typedef enum mcc_error mcc_error_t;$/;"	t	typeref:enum:mcc_error
+mempool	mempool.h	/^struct mempool$/;"	s
+mempool_alloc	mempool.c	/^void *mempool_alloc(struct mempool *pool, size_t size)$/;"	f
+mempool_alloc_chain	mempool.c	/^static inline void *mempool_alloc_chain(struct mempool_chain *chain, size_t size)$/;"	f	file:
+mempool_block	mempool.h	/^struct mempool_block$/;"	s
+mempool_chain	mempool.h	/^struct mempool_chain$/;"	s
+mempool_free	mempool.c	/^void mempool_free(struct mempool *pool)$/;"	f
+mempool_free_chain	mempool.c	/^static void mempool_free_chain(struct mempool_chain *chain)$/;"	f	file:
+mempool_init	mempool.c	/^void mempool_init(struct mempool *pool, size_t block_size)$/;"	f
+mempool_init_chain	mempool.c	/^static void mempool_init_chain(struct mempool_chain *chain)$/;"	f	file:
+mempool_new_block	mempool.c	/^struct mempool_block *mempool_new_block(struct mempool_chain *chain, size_t size)$/;"	f
+mry	objpool.h	/^	void *mry;$/;"	m	struct:objpool
+my_item	test.c	/^struct my_item$/;"	s	file:
+next	hashtab.h	/^	struct hashnode *next;$/;"	m	struct:hashnode	typeref:struct:hashnode::hashnode
+next	objpool.h	/^	struct objpool_block *next;$/;"	m	struct:objpool_block	typeref:struct:objpool_block::objpool_block
+next	objpool.h	/^	struct objpool_unused *next;$/;"	m	struct:objpool_unused	typeref:struct:objpool_unused::objpool_unused
+node	symtab.h	/^	struct hashnode node;$/;"	m	struct:symbol	typeref:struct:symbol::hashnode
+node	test.c	/^	struct hashnode node;$/;"	m	struct:my_item	typeref:struct:my_item::hashnode	file:
+num_blocks	mempool.h	/^	size_t num_blocks;		\/* number of blocks in the chain *\/$/;"	m	struct:mempool_chain
+num_blocks	objpool.h	/^	size_t num_blocks;$/;"	m	struct:objpool
+num_objs	objpool.h	/^	size_t num_objs;$/;"	m	struct:objpool
+obj_size	objpool.h	/^	size_t obj_size;$/;"	m	struct:objpool
+objpool	objpool.h	/^struct objpool$/;"	s
+objpool_alloc	objpool.c	/^void *objpool_alloc(struct objpool *pool)$/;"	f
+objpool_block	objpool.h	/^struct objpool_block$/;"	s
+objpool_dealloc	objpool.c	/^void objpool_dealloc(struct objpool *pool, void *mem)$/;"	f
+objpool_free	objpool.c	/^void objpool_free(struct objpool *pool)$/;"	f
+objpool_init	objpool.c	/^void objpool_init(struct objpool *objpool, size_t obj_size, size_t objs_per_block)$/;"	f
+objpool_unused	objpool.h	/^struct objpool_unused$/;"	s
+objs_per_block	objpool.h	/^	size_t objs_per_block;$/;"	m	struct:objpool
+offset	inbuf.h	/^	size_t offset;	\/* read offset in the buffer *\/$/;"	m	struct:inbuf
+pool	hashtab.h	/^	struct objpool *pool;$/;"	m	struct:hashtab	typeref:struct:hashtab::objpool
+preceded_by_whitespace	tokinfo.h	/^	bool preceded_by_whitespace;$/;"	m	struct:tokinfo
+prev	mempool.h	/^	struct mempool_block *prev;	\/* previous block in the chain *\/$/;"	m	struct:mempool_block	typeref:struct:mempool_block::mempool_block
+read_escape_sequence	lexer.c	/^static uint32_t read_escape_sequence(struct lexer *lexer)$/;"	f	file:
+read_hex_number	lexer.c	/^static uint32_t read_hex_number(struct lexer *lexer, size_t min_len, size_t max_len)$/;"	f	file:
+read_octal_number	lexer.c	/^static int32_t read_octal_number(struct lexer *lexer)$/;"	f	file:
+simple_escape_seq	lexer.c	/^static const char simple_escape_seq[256] = {$/;"	v	file:
+size	hashtab.h	/^	size_t size;$/;"	m	struct:hashtab
+size	inbuf.h	/^	size_t size;	\/* size of the buffer *\/$/;"	m	struct:inbuf
+size	mempool.h	/^	size_t size;			\/* usable size *\/$/;"	m	struct:mempool_block
+small_chain	mempool.h	/^	struct mempool_chain small_chain;	\/* chain of blocks for small objects *\/$/;"	m	struct:mempool	typeref:struct:mempool::mempool_chain
+small_treshold	mempool.h	/^	size_t small_treshold;			\/* maximum size of a small object *\/$/;"	m	struct:mempool
+str	tokinfo.h	/^		char *str;$/;"	m	union:tokinfo::__anon1
+strings	test-mempool.c	/^const char *strings[] = {$/;"	v
+symbol	symtab.h	/^struct symbol$/;"	s
+symbol	tokinfo.h	/^		struct symbol *symbol;$/;"	m	union:tokinfo::__anon1	typeref:struct:tokinfo::__anon1::symbol
+symbol_type	symtab.h	/^enum symbol_type$/;"	g
+symbols	symtab.h	/^	struct objpool symbols;		\/* object pool for the symbols *\/$/;"	m	struct:symtab	typeref:struct:symtab::objpool
+symtab	symtab.h	/^struct symtab$/;"	s
+symtab_contains	symtab.c	/^bool symtab_contains(struct symtab *symtab, const char *name)$/;"	f
+symtab_free	symtab.c	/^void symtab_free(struct symtab *symtab)$/;"	f
+symtab_init	symtab.c	/^bool symtab_init(struct symtab *symtab)$/;"	f
+symtab_insert	symtab.c	/^struct symbol *symtab_insert(struct symtab *symtab, const char *name)$/;"	f
+symtab_search	symtab.c	/^struct symbol *symtab_search(struct symtab *symtab, const char *name)$/;"	f
+table	cpp.h	/^	struct symtab *table;$/;"	m	struct:cpp	typeref:struct:cpp::symtab
+table	hashtab.h	/^	struct hashnode *table;$/;"	m	struct:hashtab	typeref:struct:hashtab::hashnode
+table	symtab.h	/^	struct hashtab table;		\/* a hash table *\/$/;"	m	struct:symtab	typeref:struct:symtab::hashtab
+token	tokinfo.h	/^	enum token token;$/;"	m	struct:tokinfo	typeref:enum:tokinfo::token
+token	tokinfo.h	/^enum token$/;"	g
+token_name	tokinfo.c	/^const char *token_name(enum token token)$/;"	f
+token_names	tokinfo.c	/^const char *token_names[] = {$/;"	v
+tokinfo	tokinfo.h	/^struct tokinfo$/;"	s
+total_size	mempool.h	/^	size_t total_size;		\/* total size of the chain *\/$/;"	m	struct:mempool_chain
+type	symtab.h	/^	enum symbol_type type;$/;"	m	struct:symbol	typeref:enum:symbol::symbol_type
+value	tokinfo.h	/^		int value;$/;"	m	union:tokinfo::__anon1

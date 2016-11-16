@@ -69,7 +69,6 @@ static int32_t read_octal_number(struct lexer *lexer)
 
 	if (i == 0) {
 		DEBUG_MSG("error: octal digit expected");
-		DEBUG_PRINTF("\tline: %s", lexer->line);
 	}
 
 	return val;
@@ -149,15 +148,15 @@ static uint32_t read_escape_sequence(struct lexer *lexer)
 
 mcc_error_t lex_name(struct lexer *lexer, struct tokinfo *tokinfo)
 {
-	size_t i = 0;
+	strbuf_reset(&lexer->strbuf);
 
 	while (is_letter(*lexer->c) || is_digit(*lexer->c) || *lexer->c == '_' || *lexer->c == '\\') {
-		tokinfo->ident[i++] = *lexer->c;
+		strbuf_putc(&lexer->strbuf, *lexer->c); // TODO UCN support affects this
 		lexer->c++;
 	}
 
+	tokinfo->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->token_data);
 	tokinfo->token = TOKEN_NAME;
-	tokinfo->ident[i] = '\0';
 
 	return MCC_ERROR_OK;
 }
@@ -206,18 +205,21 @@ static mcc_error_t lex_char(struct lexer *lexer, struct tokinfo *tokinfo)
 
 static inline bool lexer_is_eol(struct lexer *lexer)
 {
-	return (lexer->c - lexer->line) >= lexer->line_len;
+	return (lexer->c - strbuf_get_string(&lexer->linebuf))
+		>= strbuf_strlen(&lexer->linebuf);
 }
 
 
 mcc_error_t lex_pp_number(struct lexer *lexer, struct tokinfo *tokinfo)
 {
 	char c;
-	size_t i = 0;
+
+	strbuf_reset(&lexer->strbuf);
 
 	while (!lexer_is_eol(lexer)) {
 		if (*lexer->c == '+' || *lexer->c == '-') {
-			assert(lexer->c != lexer->line);
+			/* assert(not at the BOL) */
+			assert(lexer->c != strbuf_get_string(&lexer->linebuf));
 
 			c = lexer->c[-1];
 			if (c != 'e' && c != 'E' && c != 'p' && c != 'P') {
@@ -233,12 +235,12 @@ mcc_error_t lex_pp_number(struct lexer *lexer, struct tokinfo *tokinfo)
 			break;
 		}
 
-		tokinfo->string[i++] = *lexer->c;
+		strbuf_putc(&lexer->strbuf, *lexer->c);
 		lexer->c++;
 	}
 
 	tokinfo->token = TOKEN_NUMBER;
-	tokinfo->string[i] = '\0';
+	tokinfo->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->token_data);
 
 	return MCC_ERROR_OK;
 }
@@ -246,6 +248,8 @@ mcc_error_t lex_pp_number(struct lexer *lexer, struct tokinfo *tokinfo)
 
 mcc_error_t lex_string(struct lexer *lexer, struct tokinfo *tokinfo)
 {
+	strbuf_reset(&lexer->strbuf);
+
 	bool seen_delimiter = false;
 	size_t i;
 
@@ -260,10 +264,10 @@ mcc_error_t lex_string(struct lexer *lexer, struct tokinfo *tokinfo)
 
 		if (*lexer->c == '\\') {
 			lexer->c++;
-			tokinfo->string[i] = read_escape_sequence(lexer);
+			strbuf_putc(&lexer->strbuf, read_escape_sequence(lexer));
 		}
 		else {
-			tokinfo->string[i] = *lexer->c;
+			strbuf_putc(&lexer->strbuf, *lexer->c);
 			lexer->c++;
 		}
 	}
@@ -272,8 +276,8 @@ mcc_error_t lex_string(struct lexer *lexer, struct tokinfo *tokinfo)
 		DEBUG_MSG("error: missing the final \"");
 	}
 
-	tokinfo->string[i] = '\0';
 	tokinfo->token = TOKEN_STRING;
+	tokinfo->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->token_data);
 
 	return MCC_ERROR_OK;
 }
@@ -283,13 +287,16 @@ mcc_error_t lexer_init(struct lexer *lexer)
 {
 	lexer->inbuf = NULL;
 
-	lexer->line_size = 1024; // TODO
-	lexer->line = malloc(lexer->line_size);
-	if (!lexer->line)
+	if (!strbuf_init(&lexer->linebuf, 1024))
 		return MCC_ERROR_NOMEM;
 
-	lexer->line[0] = '\0';
-	lexer->c = lexer->line; // TODO 
+	if (!strbuf_init(&lexer->strbuf, 1024))
+		return MCC_ERROR_NOMEM;
+
+	lexer->c = strbuf_get_string(&lexer->linebuf);
+
+	objpool_init(&lexer->tokinfo_pool, sizeof(struct tokinfo), 64);
+	mempool_init(&lexer->token_data, 1024);
 
 	return MCC_ERROR_OK;
 }
@@ -297,18 +304,17 @@ mcc_error_t lexer_init(struct lexer *lexer)
 
 void lexer_set_inbuf(struct lexer *lexer, struct inbuf *inbuf)
 {
-	assert(lexer->inbuf == NULL);
-
+	assert(lexer->inbuf == NULL); // TODO
 	lexer->inbuf = inbuf;
-
-	lexer->line_len = 0;
-	lexer->c = lexer->line;
 }
 
 
 void lexer_free(struct lexer *lexer)
 {
-	free(lexer->line);
+	strbuf_free(&lexer->linebuf);
+	strbuf_free(&lexer->strbuf);
+	mempool_free(&lexer->token_data);
+	objpool_free(&lexer->tokinfo_pool);
 }
 
 
@@ -317,27 +323,21 @@ void lexer_free(struct lexer *lexer)
  */
 static mcc_error_t lexer_read_line(struct lexer *lexer)
 {
-	int c;
-	size_t i = 0;
-	bool escape = false;
-
 	assert(lexer->inbuf != NULL);
 
+	int c;
+	bool escape = false;
+
+	strbuf_reset(&lexer->linebuf);
+
 	for (; (c = inbuf_get_char(lexer->inbuf)) != INBUF_EOF; ) {
-		if (i + 2 >= lexer->line_size) {
-			lexer->line = realloc(lexer->line, 2 * lexer->line_size);
-
-			if (!lexer->line)
-				return MCC_ERROR_NOMEM;
-		}
-
 		switch (c) {
 		case ' ':
 		case '\t':
 		case '\v':
-		// TODO more cases
 		case '\f':
-			lexer->line[i++] = c;
+		// TODO more cases
+			strbuf_putc(&lexer->linebuf, c);
 			continue;
 
 		case '\n':
@@ -356,10 +356,10 @@ static mcc_error_t lexer_read_line(struct lexer *lexer)
 
 		default:
 			if (escape) {
-				lexer->line[i++] = '\\';
+				strbuf_putc(&lexer->linebuf, '\\');
 			}
 
-			lexer->line[i++] = c;
+			strbuf_putc(&lexer->linebuf, c);
 			escape = false;
 		}
 	}
@@ -368,9 +368,7 @@ static mcc_error_t lexer_read_line(struct lexer *lexer)
 		return MCC_ERROR_EOF;
 
 eol_or_eof:
-	lexer->line[i] = '\0';
-	lexer->line_len = i;
-	lexer->c = lexer->line;
+	lexer->c = strbuf_get_string(&lexer->linebuf);
 
 	return MCC_ERROR_OK;
 }
@@ -709,7 +707,7 @@ smash_whitespace:
 			lexer->c++;
 		}
 		else {
-			tokinfo->token = TOKEN_SEMICOLON;
+			tokinfo->token = TOKEN_COLON;
 		}
 
 		break;
@@ -808,7 +806,7 @@ void lexer_dump_token(struct tokinfo *tokinfo)
 	switch (tokinfo->token) {
 	case TOKEN_STRING:
 		printf("\"");
-		while ((c = tokinfo->string[i++])) {
+		while ((c = tokinfo->str[i++])) {
 			char_to_printable(c, tmp, sizeof(tmp));
 			printf("%s", tmp);
 		}
@@ -821,11 +819,11 @@ void lexer_dump_token(struct tokinfo *tokinfo)
 		break;
 
 	case TOKEN_NAME:
-		printf("%s", tokinfo->ident);
+		printf("%s", tokinfo->str);
 		break;
 
 	case TOKEN_NUMBER:
-		printf("%s", tokinfo->string);
+		printf("%s", tokinfo->str);
 		break;
 
 	default:

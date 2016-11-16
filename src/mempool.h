@@ -1,35 +1,39 @@
+/*
+ * mempool:
+ * Variable-size memory allocator without support for individual deallocation.
+ */
+
 #ifndef MEMPOOL_H
 #define MEMPOOL_H
 
-#include "error.h"
-#include <assert.h>
 #include <stdlib.h>
-
-struct mempool
-{
-	void *mry;
-	size_t item_size;
-	size_t block_size;
-	size_t items_per_block;
-	size_t num_allocated;
-	size_t num_blocks;
-	struct mempool_block *first_block;
-	struct mempool_unused *first_unused;
-};
 
 struct mempool_block
 {
-	struct mempool_block *next;
+	struct mempool_block *prev;	/* previous block in the chain */
+	size_t alloc_size;		/* allocated size */
+	size_t size;			/* usable size */
 };
 
-struct mempool_unused
+struct mempool_chain
 {
-	struct mempool_unused *next;
+	struct mempool_block *last;	/* last block */
+	size_t last_free;		/* free memory in last block */
+	size_t total_size;		/* total size of the chain */
+	size_t num_blocks;		/* number of blocks in the chain */
 };
 
-void mempool_init(struct mempool *pool, size_t item_size, size_t items_per_block);
-void *mempool_alloc(struct mempool *pool);
-void mempool_dealloc(struct mempool *pool, void *mem);
+struct mempool
+{
+	struct mempool_chain small;	/* chain of blocks for small objects */
+	struct mempool_chain big;	/* chain of blocks for big objects */
+	struct mempool_chain unused;	/* chain of unused blocks */
+	size_t block_size;		/* size of small objects block */
+	size_t small_treshold;		/* maximum size of a small object */
+};
+
+void mempool_init(struct mempool *pool, size_t block_size);
+void *mempool_alloc(struct mempool *pool, size_t size);
 void mempool_free(struct mempool *pool);
 
 #endif

@@ -5,129 +5,42 @@
 #include <inttypes.h>
 #include <string.h>
 
-/*
- * TODO Use of this hashing function is not backed up by any analysis of its
- *      performance. Measure and, if necessary, improve the function.
- *
- * Taken from http://www.cse.yorku.ca/~oz/hash.html#sdbm.
- */
-static inline uint64_t hash(const char *name)
+
+bool symtab_init(struct symtab *symtab)
 {
-	uint64_t hash = 0;
-	int c;
-
-	while ((c = *name++))
-		hash = c + (hash << 6) + (hash << 16) - hash;
-
-	return hash;
+	objpool_init(&symtab->symbol_pool, sizeof(struct symbol), 16);
+	mempool_init(&symtab->symdata_pool, 1024);
+	return hashtab_init(&symtab->table, &symtab->symbol_pool, 64);
 }
 
 
 struct symbol *symtab_search(struct symtab *symtab, const char *name)
 {
-	size_t index;
-	struct symbol *sym;
-
-	index = hash(name) % symtab->size;
-	sym = symtab->table[index];
-
-	while (sym != NULL) {
-		if (strcmp(name, sym->name) == 0)
-			return sym;
-
-		sym = sym->next;
-	}
-
-	return NULL;
+	return hashtab_search(&symtab->table, name);
 }
 
 
 bool symtab_contains(struct symtab *symtab, const char *name)
 {
-	return symtab_search(symtab, name) != NULL;
-}
-
-
-mcc_error_t symtab_resize(struct symtab *symtab, size_t new_size)
-{
-	/*
-	 * TODO This is wrong; when the table's reallocated, hashes must be
-	 *      recalculated! Fix this.
-	 */
-	assert(false);
-
-	size_t i;
-
-	symtab->table = calloc(symtab->table, new_size * sizeof(struct symbol));
-	if (symtab->table == NULL)
-		return MCC_ERROR_NOMEM;
-
-	for (i = symtab->size; i < new_size; i++)
-		symtab->table[i] = NULL;
-
-	symtab->size = new_size;
-
-	return MCC_ERROR_OK;
+	return hashtab_contains(&symtab->table, name);
 }
 
 
 struct symbol *symtab_insert(struct symtab *symtab, const char *name)
 {
-	float load;
-	size_t index;
-	struct symbol *prev;
-	struct symbol *new;
-
-	new = mempool_alloc(&symtab->symbols);
-
-	new->name = strdup(name);
-	if (new->name == NULL) {
-		mempool_dealloc(&symtab->symbols, new);
-		return NULL;
-	}
-	new->next = NULL;
-
-	load = (symtab->count + 1) / symtab->size;
-	if (load > 0.5) {
-		if (symtab_resize(symtab, 2 * symtab->size) != MCC_ERROR_OK)
-			return NULL;
-	}
-
-	assert(symtab->table != NULL);
-
-	index = hash(name) % symtab->size;
-	
-	if (symtab->table[index] == NULL) {
-		symtab->table[index] = new;
-	}
-	else {
-		prev = symtab->table[index];
-		while (prev->next != NULL)
-			prev = prev->next;
-
-		prev->next = new;
-	}
-
-	symtab->count++;
-
-	return new;
+	return hashtab_insert(&symtab->table, name);
 }
 
 
-mcc_error_t symtab_init(struct symtab *symtab)
+void *symtab_alloc(struct symtab *symtab, size_t size)
 {
-	mempool_init(&symtab->symbols, sizeof(struct symbol), 64);
-
-	symtab->size = 0;
-	symtab->count = 0;
-	symtab->table = NULL;
-
-	return symtab_resize(symtab, 128);
+	return mempool_alloc(&symtab->symdata_pool, size);
 }
 
 
 void symtab_free(struct symtab *symtab)
 {
-	mempool_free(&symtab->symbols);
-	free(symtab->table);
+	hashtab_free(&symtab->table);
+	objpool_free(&symtab->symbol_pool);
+	mempool_free(&symtab->symdata_pool);
 }

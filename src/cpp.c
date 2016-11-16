@@ -36,7 +36,6 @@ void cpp_close(struct cpp *cpp)
 void cpp_set_symtab(struct cpp *cpp, struct symtab *table)
 {
 	cpp->table = table;
-	lexer_set_symtab(&cpp->lexer, table);
 }
 
 

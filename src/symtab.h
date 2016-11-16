@@ -1,9 +1,13 @@
+/*
+ * symtab:
+ * Symbol table.
+ */
+
 #ifndef SYMBOL_H
 #define SYMBOL_H
 
-#include "error.h"
-#include "mempool.h"
-#include "lexer.h"
+#include "objpool.h"
+#include "hashtab.h"
 #include <stdbool.h>
 #include <stdlib.h>
 
@@ -14,23 +18,22 @@ enum symbol_type
 
 struct symbol
 {
-	char *name;			/* symbol name */
-	enum symbol_type type;		/* symbol type */
-	struct symbol *next;		/* next symbol in the list */
+	struct hashnode node;
+	enum symbol_type type;
 };
 
 struct symtab
 {
-	struct mempool symbols;		/* mempool for the symbols */
-	struct symbol **table;		/* the table itself */
-	size_t count;			/* number of items in the table */
-	size_t size;			/* size (capacity) of the table */
+	struct objpool symbol_pool;	/* object pool for the symbols */
+	struct mempool symdata_pool;	/* memory pool for symbol data */
+	struct hashtab table;		/* a hash table */
 };
 
-mcc_error_t symtab_init(struct symtab *table);
+bool symtab_init(struct symtab *table);
 bool symtab_contains(struct symtab *table, const char *name);
 struct symbol *symtab_search(struct symtab *table, const char *name);
 struct symbol *symtab_insert(struct symtab *table, const char *name);
+void *symtab_alloc(struct symtab *table, size_t size);
 void symtab_free(struct symtab *table);
 
 #endif

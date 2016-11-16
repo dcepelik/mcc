@@ -9,6 +9,9 @@
  */
 
 #include "inbuf.h"
+#include "mempool.h"
+#include "objpool.h"
+#include "strbuf.h"
 #include "tokinfo.h"
 #include <stdbool.h>
 
@@ -22,12 +25,13 @@ enum lexer_eol_style
 
 struct lexer
 {
-	struct inbuf *inbuf;
-	char *line;
-	size_t line_len;
-	size_t line_size;
-	char *c;
-	enum lexer_eol_style eol;
+	struct objpool tokinfo_pool;	/* objpool for struct tokinfo */
+	struct mempool token_data;	/* mempool for token data */
+	struct strbuf linebuf;		/* current logical line buffer */
+	struct strbuf strbuf;		/* buffer to accumulate various strings */
+	struct inbuf *inbuf;		/* input buffer being tokenized */
+	char *c;			/* pointer to current character */
+	enum lexer_eol_style eol;	/* end-of-line style in use */
 };
 
 mcc_error_t lexer_init(struct lexer *lexer);

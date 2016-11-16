@@ -8,8 +8,8 @@
 #endif
 
 #define DEBUG_PRINTF(fmt, ...) do { \
-	if (DEBUG) fprintf(stderr, "*** DEBUG OUTPUT ***\t" fmt " at %s:%d\n", \
-				__VA_ARGS__, __FILE__, __LINE__); \
+	if (DEBUG) fprintf(stderr, "*** DEBUG ***\t%s\t% 4d\t" fmt "\n", \
+				__FILE__, __LINE__, __VA_ARGS__); \
 } while (0);
 
 #define DEBUG_MSG(msg)			DEBUG_PRINTF("%s", msg);

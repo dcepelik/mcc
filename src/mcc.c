@@ -43,6 +43,7 @@ int main(int argc, char *argv[])
 
 	printf("\n");
 
+	cpp_close(&cpp);
 	cpp_free(&cpp);
 	symtab_free(&symtab);
 

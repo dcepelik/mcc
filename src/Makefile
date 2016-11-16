@@ -1,8 +1,8 @@
 .PHONY: clean
 
-OBJS=mcc.o lexer.o inbuf.o symtab.o mempool.o cpp.o error.o tokinfo.o
+OBJS=mcc.o lexer.o inbuf.o symtab.o objpool.o cpp.o error.o tokinfo.o strbuf.o hashtab.o mempool.o
 PROG=mcc
-CFLAGS+=-c -std=gnu11 -Wall --pedantic -DDEBUG -ggdb3
+CFLAGS+=-c -std=gnu11 -Wall --pedantic -ggdb3
 LDFLAGS=-Wall
 
 
@@ -10,13 +10,19 @@ $(PROG): $(OBJS)
 	$(CC) $(LDFALGS) -o $@ $^
 
 
-lexer.o: lexer.c lexer.h inbuf.o symtab.o error.o tokinfo.o
+lexer.o: lexer.c lexer.h inbuf.o symtab.o error.o tokinfo.o strbuf.o
 	$(CC) $(CFLAGS) -o $@ $<
 
-symtab.o: symtab.c symtab.h mempool.o error.o tokinfo.o
+symtab.o: symtab.c symtab.h objpool.o error.o tokinfo.o hashtab.o
 	$(CC) $(CFLAGS) -o $@ $<
 
-pp.o: cpp.c lexer.o error.o tokinfo.o
+cpp.o: cpp.c cpp.h lexer.o error.o tokinfo.o
+	$(CC) $(CFLAGS) -o $@ $<
+
+objpool.o: objpool.c objpool.h
+	$(CC) $(CFLAGS) -o $@ $<
+
+mempool.o: mempool.c mempool.h strbuf.o
 	$(CC) $(CFLAGS) -o $@ $<
 
 %.o: %.c %.h
