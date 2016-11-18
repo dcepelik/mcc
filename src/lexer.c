@@ -413,8 +413,6 @@ mcc_error_t lexer_next(struct lexer *lexer, struct tokinfo *tokinfo)
 	mcc_error_t err;
 
 smash_whitespace:
-	eat_whitespace(lexer);
-	
 	if (lexer_is_eol(lexer)) {
 		err = lexer_read_line(lexer);
 
@@ -422,6 +420,9 @@ smash_whitespace:
 			goto smash_whitespace;
 		else
 			return err;
+	}
+	else {
+		eat_whitespace(lexer);
 	}
 
 	lexer->c++;
