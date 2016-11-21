@@ -502,11 +502,14 @@ mcc_error_t lexer_next(struct lexer *lexer, struct tokinfo *tokinfo)
 {
 	mcc_error_t err;
 
+	tokinfo->is_at_bol = false;
+
 	//tokinfo = objpool_alloc(&lexer->tokinfo_pool);
 
 smash_whitespace:
 	if (lexer_is_eol(lexer)) {
 		err = lexer_read_line(lexer);
+		tokinfo->is_at_bol = true;
 
 		if (err == MCC_ERROR_OK)
 			goto smash_whitespace;

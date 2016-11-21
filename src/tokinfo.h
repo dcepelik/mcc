@@ -136,6 +136,7 @@ struct tokinfo
 
 	enum token token;
 	bool preceded_by_whitespace;
+	bool is_at_bol;
 };
 
 const char *token_name(enum token token);
