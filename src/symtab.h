@@ -13,12 +13,15 @@
 
 enum symbol_type
 {
+	SYMBOL_TYPE_UNKNOWN,		/* type was not determined yet */
 	SYMBOL_TYPE_CPP_MACRO,		/* C preprocessor macro */
+	SYMBOL_TYPE_CPP_BUILTIN,	/* C preprocessor's built-in macro */
+	SYMBOL_TYPE_CPP_DIRECTIVE	/* C preprocessor directive */
 };
 
 struct symbol
 {
-	struct hashnode node;
+	struct hashnode hashnode;
 	enum symbol_type type;
 };
 
@@ -35,5 +38,8 @@ struct symbol *symtab_search(struct symtab *table, const char *name);
 struct symbol *symtab_insert(struct symtab *table, const char *name);
 void *symtab_alloc(struct symtab *table, size_t size);
 void symtab_free(struct symtab *table);
+
+const char *symbol_get_name(struct symbol *symbol);
+const char *symbol_get_type(struct symbol *symbol);
 
 #endif

@@ -1,5 +1,6 @@
-#include "objpool.h"
+#include "debug.h"
 #include "error.h"
+#include "objpool.h"
 #include <assert.h>
 
 
@@ -36,6 +37,8 @@ static mcc_error_t alloc_new_block(struct objpool *pool)
 	if (new_block == NULL)
 		return MCC_ERROR_NOMEM;
 
+	DEBUG_PRINTF("Allocated new block, alloc_size = %zu B", pool->block_size);
+
 	new_block->next = pool->first_block;
 	pool->first_block = new_block;
 
@@ -57,6 +60,8 @@ static mcc_error_t alloc_new_block(struct objpool *pool)
 
 void *objpool_alloc(struct objpool *pool)
 {
+	DEBUG_MSG("Allocating new object from pool");
+
 	void *mem;
 
 	if (pool->first_unused == NULL)

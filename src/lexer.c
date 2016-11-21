@@ -1,6 +1,7 @@
 #include "debug.h"
 #include "lexer.h"
 #include "tokinfo.h"
+#include "symtab.h"
 #include <assert.h>
 #include <ctype.h>
 #include <inttypes.h>
@@ -146,6 +147,20 @@ static uint32_t read_escape_sequence(struct lexer *lexer)
 }
 
 
+struct symbol *lexer_upsert_symbol(struct lexer *lexer, char *name)
+{
+	struct symbol *symbol;
+	
+	symbol = symtab_search(lexer->symtab, name);
+	if (!symbol) {
+		symbol = symtab_insert(lexer->symtab, name);
+		symbol->type = SYMBOL_TYPE_UNKNOWN;
+	}
+
+	return symbol;
+}
+
+
 mcc_error_t lex_name(struct lexer *lexer, struct tokinfo *tokinfo)
 {
 	strbuf_reset(&lexer->strbuf);
@@ -155,10 +170,13 @@ mcc_error_t lex_name(struct lexer *lexer, struct tokinfo *tokinfo)
 		lexer->c++;
 	}
 
-	tokinfo->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->token_data);
 	tokinfo->token = TOKEN_NAME;
+	tokinfo->symbol = lexer_upsert_symbol(lexer, strbuf_get_string(&lexer->strbuf));
 
-	return MCC_ERROR_OK;
+	if (tokinfo->symbol != NULL)
+		return MCC_ERROR_OK;
+
+	return MCC_ERROR_NOMEM;
 }
 
 
@@ -242,7 +260,10 @@ mcc_error_t lex_pp_number(struct lexer *lexer, struct tokinfo *tokinfo)
 	tokinfo->token = TOKEN_NUMBER;
 	tokinfo->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->token_data);
 
-	return MCC_ERROR_OK;
+	if (tokinfo->str)
+		return MCC_ERROR_OK;
+
+	return MCC_ERROR_NOMEM;
 }
 
 
@@ -279,12 +300,81 @@ mcc_error_t lex_string(struct lexer *lexer, struct tokinfo *tokinfo)
 	tokinfo->token = TOKEN_STRING;
 	tokinfo->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->token_data);
 
+	if (tokinfo->str)
+		return MCC_ERROR_OK;
+
+	return MCC_ERROR_NOMEM;
+}
+
+
+static bool is_valid_qchar(struct lexer *lexer)
+{
+	if (*lexer->c == '\n' || *lexer->c == '\r')
+		return false;
+
+	if (*lexer->c == '\'' || *lexer->c == '\\' || *lexer->c == '\"')
+		return false;
+
+	if (*lexer->c == '/' && (lexer->c[1] == '/' || lexer->c[1] == '*'))
+		return false;
+
+	return true;
+}
+
+
+static bool is_valid_hchar(struct lexer *lexer)
+{
+	return is_valid_qchar(lexer) || *lexer->c != '\"';
+}
+
+
+mcc_error_t lex_header_hname(struct lexer *lexer, struct tokinfo *tokinfo)
+{
+	strbuf_reset(&lexer->strbuf);
+
+	while (*lexer->c != '>') {
+		if (!is_valid_hchar(lexer)) {
+			DEBUG_PRINTF("error: invalid hchar: %c", *lexer->c);
+		}
+		else {
+			strbuf_putc(&lexer->strbuf, *lexer->c);
+		}
+
+		lexer->c++;
+	}
+
+	tokinfo->token = TOKEN_HEADER_NAME;
+	tokinfo->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->token_data);
+
+	return MCC_ERROR_OK;
+}
+
+
+mcc_error_t lex_header_qname(struct lexer *lexer, struct tokinfo *tokinfo)
+{
+	strbuf_reset(&lexer->strbuf);
+
+	while (*lexer->c != '\"') {
+		if (!is_valid_qchar(lexer)) {
+			DEBUG_PRINTF("error: invalid qchar: %c", *lexer->c);
+		}
+		else {
+			strbuf_putc(&lexer->strbuf, *lexer->c);
+		}
+
+		lexer->c++;
+	}
+
+	tokinfo->token = TOKEN_HEADER_NAME;
+	tokinfo->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->token_data);
+
 	return MCC_ERROR_OK;
 }
 
 
 mcc_error_t lexer_init(struct lexer *lexer)
 {
+	lexer->inside_include = false;
 	lexer->inbuf = NULL;
 
 	if (!strbuf_init(&lexer->linebuf, 1024))
@@ -412,6 +502,8 @@ mcc_error_t lexer_next(struct lexer *lexer, struct tokinfo *tokinfo)
 {
 	mcc_error_t err;
 
+	//tokinfo = objpool_alloc(&lexer->tokinfo_pool);
+
 smash_whitespace:
 	if (lexer_is_eol(lexer)) {
 		err = lexer_read_line(lexer);
@@ -461,7 +553,10 @@ smash_whitespace:
 		return lex_name(lexer, tokinfo);
 
 	case '\"':
-		return lex_string(lexer, tokinfo);
+		if (lexer->inside_include)
+			return lex_header_hname(lexer, tokinfo);
+		else
+			return lex_string(lexer, tokinfo);
 
 	case '\'':
 		return lex_char(lexer, tokinfo);
@@ -625,31 +720,36 @@ smash_whitespace:
 		}
 
 	case '<':
-		if (*lexer->c == '=') {
-			tokinfo->token = TOKEN_LE;
-		}
-		else if (*lexer->c == '<') {
-			if (lexer->c[1] == '=') {
-				tokinfo->token = TOKEN_SHR_EQ;
-				lexer->c += 2;
+		if (!lexer->inside_include) {
+			if (*lexer->c == '=') {
+				tokinfo->token = TOKEN_LE;
 			}
-			else {
-				tokinfo->token = TOKEN_SHR;
+			else if (*lexer->c == '<') {
+				if (lexer->c[1] == '=') {
+					tokinfo->token = TOKEN_SHR_EQ;
+					lexer->c += 2;
+				}
+				else {
+					tokinfo->token = TOKEN_SHR;
+					lexer->c++;
+				}
+			}
+			else if (lexer->c[1] == '%') {
+				tokinfo->token = TOKEN_LBRACE;
 				lexer->c++;
 			}
-		}
-		else if (lexer->c[1] == '%') {
-			tokinfo->token = TOKEN_LBRACE;
-			lexer->c++;
-		}
-		else if (lexer->c[1] == ':') {
-			tokinfo->token = TOKEN_LBRACKET;
-			lexer->c++;
+			else if (lexer->c[1] == ':') {
+				tokinfo->token = TOKEN_LBRACKET;
+				lexer->c++;
+			}
+			else {
+				tokinfo->token = TOKEN_LT;
+			}
+			break;
 		}
 		else {
-			tokinfo->token = TOKEN_LT;
+			return lex_header_hname(lexer, tokinfo);
 		}
-		break;
 
 	case '>':
 		if (*lexer->c == '=') {
@@ -820,11 +920,15 @@ void lexer_dump_token(struct tokinfo *tokinfo)
 		break;
 
 	case TOKEN_NAME:
-		printf("%s", tokinfo->str);
+		printf("%s[%s]", symbol_get_name(tokinfo->symbol), symbol_get_type(tokinfo->symbol));
 		break;
 
 	case TOKEN_NUMBER:
 		printf("%s", tokinfo->str);
+		break;
+
+	case TOKEN_HEADER_NAME:
+		printf("HEADER_NAME\"%s\"", tokinfo->str);
 		break;
 
 	default:
@@ -832,4 +936,10 @@ void lexer_dump_token(struct tokinfo *tokinfo)
 	}
 
 	putchar(' ');
+}
+
+
+void lexer_set_symtab(struct lexer *lexer, struct symtab *symtab)
+{
+	lexer->symtab = symtab;
 }

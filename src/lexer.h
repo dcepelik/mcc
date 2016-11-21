@@ -30,13 +30,16 @@ struct lexer
 	struct strbuf linebuf;		/* current logical line buffer */
 	struct strbuf strbuf;		/* buffer to accumulate various strings */
 	struct inbuf *inbuf;		/* input buffer being tokenized */
+	struct symtab *symtab;		/* symbol table */
 	char *c;			/* pointer to current character */
 	enum lexer_eol_style eol;	/* end-of-line style in use */
+	bool inside_include;		/* are we lexing in an #include? */
 };
 
 mcc_error_t lexer_init(struct lexer *lexer);
 void lexer_set_inbuf(struct lexer *lexer, struct inbuf *buf);
 mcc_error_t lexer_next(struct lexer *lexer, struct tokinfo *tokinfo);
+void lexer_set_symtab(struct lexer *lexer, struct symtab *symtab);
 void lexer_free(struct lexer *lexer);
 void lexer_dump_token(struct tokinfo *token);
 

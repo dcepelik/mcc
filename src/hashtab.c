@@ -1,3 +1,4 @@
+#include "debug.h"
 #include "hashtab.h"
 #include <assert.h>
 #include <string.h>
@@ -36,7 +37,7 @@ static bool hashtab_resize(struct hashtab *hashtab, size_t new_size)
 {
 	struct hashnode *old_table;
 	size_t old_size;
-	struct hashnode *node;
+	struct hashnode *node, *tmp_node;
 	size_t i;
 
 	old_table = hashtab->table;
@@ -53,8 +54,9 @@ static bool hashtab_resize(struct hashtab *hashtab, size_t new_size)
 		node = old_table[i].next;
 
 		while (node) {
+			tmp_node = node->next;
 			hashtab_insert_node(hashtab, node);
-			node = node->next;
+			node = tmp_node;
 		}
 	}
 
@@ -120,9 +122,11 @@ void *hashtab_insert(struct hashtab *hashtab, const char *key)
 	float load;
 
 	load = hashtab->count / hashtab->size;
-	if (load > 0.5)
+	if (load > 0.5) {
+		DEBUG_MSG("Resize needed");
 		if (!hashtab_resize(hashtab, 2 * hashtab->size))
 			return false;
+	}
 
 	new_node = objpool_alloc(hashtab->pool);
 	if (!new_node)

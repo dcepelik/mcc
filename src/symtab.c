@@ -44,3 +44,30 @@ void symtab_free(struct symtab *symtab)
 	objpool_free(&symtab->symbol_pool);
 	mempool_free(&symtab->symdata_pool);
 }
+
+
+const char *symbol_get_name(struct symbol *symbol)
+{
+	return symbol->hashnode.key;
+}
+
+
+const char *symbol_get_type(struct symbol *symbol)
+{
+	switch (symbol->type)
+	{
+	case SYMBOL_TYPE_UNKNOWN:
+		return "unknown";
+
+	case SYMBOL_TYPE_CPP_MACRO:
+		return "CPP macro";
+	
+	case SYMBOL_TYPE_CPP_BUILTIN:
+		return "CPP built-in macro";
+
+	case SYMBOL_TYPE_CPP_DIRECTIVE:
+		return "CPP directive";
+	}
+
+	return NULL;
+}
