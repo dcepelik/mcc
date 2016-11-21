@@ -26,19 +26,21 @@ enum lexer_eol_style
 struct lexer
 {
 	struct objpool tokinfo_pool;	/* objpool for struct tokinfo */
-	struct mempool token_data;	/* mempool for token data */
-	struct strbuf linebuf;		/* current logical line buffer */
-	struct strbuf strbuf;		/* buffer to accumulate various strings */
-	struct inbuf *inbuf;		/* input buffer being tokenized */
+	struct mempool token_data;	/* mempool for token data (strings mostly) */
+	struct strbuf linebuf;		/* buffer for current logical line */
+	struct strbuf strbuf;		/* buffer for string accumulation */
+	struct inbuf *inbuf;		/* input buffer */
 	struct symtab *symtab;		/* symbol table */
-	char *c;			/* pointer to current character */
-	enum lexer_eol_style eol;	/* end-of-line style in use */
+	char *c;			/* current character pointer (within line) */
+	enum lexer_eol_style eol;	/* end-of-line style used in inbuf */
 	bool inside_include;		/* are we lexing in an #include? */
+	bool inside_directive;
+	bool num_tokens_after_eol;
 };
 
 mcc_error_t lexer_init(struct lexer *lexer);
 void lexer_set_inbuf(struct lexer *lexer, struct inbuf *buf);
-mcc_error_t lexer_next(struct lexer *lexer, struct tokinfo *tokinfo);
+struct tokinfo *lexer_next(struct lexer *lexer);
 void lexer_set_symtab(struct lexer *lexer, struct symtab *symtab);
 void lexer_free(struct lexer *lexer);
 void lexer_dump_token(struct tokinfo *token);

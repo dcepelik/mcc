@@ -161,7 +161,7 @@ struct symbol *lexer_upsert_symbol(struct lexer *lexer, char *name)
 }
 
 
-mcc_error_t lex_name(struct lexer *lexer, struct tokinfo *tokinfo)
+struct tokinfo *lex_name(struct lexer *lexer, struct tokinfo *tokinfo)
 {
 	strbuf_reset(&lexer->strbuf);
 
@@ -173,14 +173,14 @@ mcc_error_t lex_name(struct lexer *lexer, struct tokinfo *tokinfo)
 	tokinfo->token = TOKEN_NAME;
 	tokinfo->symbol = lexer_upsert_symbol(lexer, strbuf_get_string(&lexer->strbuf));
 
-	if (tokinfo->symbol != NULL)
-		return MCC_ERROR_OK;
+	if (!tokinfo->symbol)
+		return NULL;
 
-	return MCC_ERROR_NOMEM;
+	return tokinfo;
 }
 
 
-static mcc_error_t lex_char(struct lexer *lexer, struct tokinfo *tokinfo)
+static struct tokinfo *lex_char(struct lexer *lexer, struct tokinfo *tokinfo)
 {
 	uint32_t val;
 	bool seen_delimiter = false;
@@ -217,7 +217,7 @@ static mcc_error_t lex_char(struct lexer *lexer, struct tokinfo *tokinfo)
 	tokinfo->value = val;
 	tokinfo->token = TOKEN_CHAR_CONST;
 
-	return MCC_ERROR_OK;
+	return tokinfo;
 }
 
 
@@ -228,7 +228,7 @@ static inline bool lexer_is_eol(struct lexer *lexer)
 }
 
 
-mcc_error_t lex_pp_number(struct lexer *lexer, struct tokinfo *tokinfo)
+struct tokinfo *lex_pp_number(struct lexer *lexer, struct tokinfo *tokinfo)
 {
 	char c;
 
@@ -260,14 +260,14 @@ mcc_error_t lex_pp_number(struct lexer *lexer, struct tokinfo *tokinfo)
 	tokinfo->token = TOKEN_NUMBER;
 	tokinfo->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->token_data);
 
-	if (tokinfo->str)
-		return MCC_ERROR_OK;
+	if (!tokinfo->str)
+		return NULL;
 
-	return MCC_ERROR_NOMEM;
+	return tokinfo;
 }
 
 
-mcc_error_t lex_string(struct lexer *lexer, struct tokinfo *tokinfo)
+struct tokinfo *lex_string(struct lexer *lexer, struct tokinfo *tokinfo)
 {
 	strbuf_reset(&lexer->strbuf);
 
@@ -300,10 +300,10 @@ mcc_error_t lex_string(struct lexer *lexer, struct tokinfo *tokinfo)
 	tokinfo->token = TOKEN_STRING;
 	tokinfo->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->token_data);
 
-	if (tokinfo->str)
-		return MCC_ERROR_OK;
+	if (!tokinfo->str)
+		return NULL;
 
-	return MCC_ERROR_NOMEM;
+	return tokinfo;
 }
 
 
@@ -328,7 +328,7 @@ static bool is_valid_hchar(struct lexer *lexer)
 }
 
 
-mcc_error_t lex_header_hname(struct lexer *lexer, struct tokinfo *tokinfo)
+struct tokinfo *lex_header_hname(struct lexer *lexer, struct tokinfo *tokinfo)
 {
 	strbuf_reset(&lexer->strbuf);
 
@@ -346,11 +346,15 @@ mcc_error_t lex_header_hname(struct lexer *lexer, struct tokinfo *tokinfo)
 	tokinfo->token = TOKEN_HEADER_NAME;
 	tokinfo->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->token_data);
 
-	return MCC_ERROR_OK;
+	if (!tokinfo->str)
+		return NULL;
+
+	return tokinfo;
 }
 
 
-mcc_error_t lex_header_qname(struct lexer *lexer, struct tokinfo *tokinfo)
+// TODO merge with lex_header_hname
+struct tokinfo *lex_header_qname(struct lexer *lexer, struct tokinfo *tokinfo)
 {
 	strbuf_reset(&lexer->strbuf);
 
@@ -368,7 +372,10 @@ mcc_error_t lex_header_qname(struct lexer *lexer, struct tokinfo *tokinfo)
 	tokinfo->token = TOKEN_HEADER_NAME;
 	tokinfo->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->token_data);
 
-	return MCC_ERROR_OK;
+	if (!tokinfo->str)
+		return NULL;
+
+	return tokinfo;
 }
 
 
@@ -498,9 +505,14 @@ search_comment_terminator:
 }
 
 
-mcc_error_t lexer_next(struct lexer *lexer, struct tokinfo *tokinfo)
+struct tokinfo *lexer_next(struct lexer *lexer)
 {
+	struct tokinfo *tokinfo;
 	mcc_error_t err;
+
+	tokinfo = objpool_alloc(&lexer->tokinfo_pool);
+	if (!tokinfo)
+		return NULL;
 
 	tokinfo->is_at_bol = false;
 
@@ -509,16 +521,28 @@ mcc_error_t lexer_next(struct lexer *lexer, struct tokinfo *tokinfo)
 smash_whitespace:
 	if (lexer_is_eol(lexer)) {
 		err = lexer_read_line(lexer);
-		tokinfo->is_at_bol = true;
+		lexer->num_tokens_after_eol = 0;
 
-		if (err == MCC_ERROR_OK)
+		if (lexer->inside_directive) {
+			tokinfo->token = TOKEN_EOL;
+			return tokinfo;
+		}
+
+		if (err == MCC_ERROR_OK) {
 			goto smash_whitespace;
-		else
-			return err;
+		}
+		else {
+			return NULL;
+		}
 	}
 	else {
 		eat_whitespace(lexer);
 	}
+
+	if (lexer->num_tokens_after_eol == 0)
+		tokinfo->is_at_bol = true;
+
+	lexer->num_tokens_after_eol++;
 
 	lexer->c++;
 
@@ -851,7 +875,7 @@ smash_whitespace:
 		lexer->c++;
 	}
 
-	return MCC_ERROR_OK;
+	return tokinfo;
 }
 
 
