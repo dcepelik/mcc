@@ -33,9 +33,11 @@ struct lexer
 	struct symtab *symtab;		/* symbol table */
 	char *c;			/* current character pointer (within line) */
 	enum lexer_eol_style eol_style;	/* end-of-line style used in inbuf */
+	struct tokinfo eol;		/* tokinfo of an EOL token */
+	struct tokinfo eof;		/* tokinfo of an EOF token */
+
 	bool inside_include;		/* are we lexing in an #include? */
-	struct tokinfo eol;
-	struct tokinfo eof;
+	bool next_at_bol;		/* is next token at BOL? */
 };
 
 mcc_error_t lexer_init(struct lexer *lexer);

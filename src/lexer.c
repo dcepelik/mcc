@@ -380,10 +380,7 @@ struct tokinfo *lex_header_qname(struct lexer *lexer, struct tokinfo *tokinfo)
 
 
 mcc_error_t lexer_init(struct lexer *lexer)
-{
-	lexer->inside_include = false;
-	lexer->inbuf = NULL;
-
+{	
 	if (!strbuf_init(&lexer->linebuf, 1024))
 		return MCC_ERROR_NOMEM;
 
@@ -396,6 +393,9 @@ mcc_error_t lexer_init(struct lexer *lexer)
 	lexer->c = strbuf_get_string(&lexer->linebuf);
 	lexer->eol.token = TOKEN_EOL;
 	lexer->eof.token = TOKEN_EOF;
+	lexer->inbuf = NULL;
+	lexer->inside_include = false;
+	lexer->next_at_bol = true;
 
 	return MCC_ERROR_OK;
 }
@@ -515,6 +515,7 @@ struct tokinfo *lexer_next(struct lexer *lexer)
 next_nonwhite_char:
 	if (lexer_is_eol(lexer)) {
 		err = lexer_read_line(lexer);
+		lexer->next_at_bol = true;
 
 		if (err == MCC_ERROR_EOF)
 			return &lexer->eof;
@@ -531,7 +532,8 @@ next_nonwhite_char:
 	if (!tokinfo)
 		return NULL;
 
-	tokinfo->is_at_bol = false;
+	tokinfo->is_at_bol = lexer->next_at_bol;
+	lexer->next_at_bol = false;
 
 	lexer->c++;
 	switch (lexer->c[-1]) {

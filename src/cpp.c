@@ -143,11 +143,13 @@ struct tokinfo *cpp_next(struct cpp *cpp)
 	case TOKEN_EOF:
 		return *cpp->cur; /* TOKEN_EOF not edible */
 
-	/*case TOKEN_HASH:
+	case TOKEN_HASH:
 		if (cpp->cur->is_at_bol) {
 			cpp->cur++;
 			return cpp_directive(cpp);
-		}*/
+		}
+
+		break;
 
 	default:
 		return *cpp->cur++;
