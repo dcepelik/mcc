@@ -9,7 +9,7 @@
 int main(int argc, char *argv[])
 {
 	char *filename;
-	struct tokinfo tokinfo;
+	struct tokinfo *tokinfo;
 	struct symtab symtab;
 	struct cpp cpp;
 	mcc_error_t err;
@@ -34,11 +34,16 @@ int main(int argc, char *argv[])
 
 	cpp_set_symtab(&cpp, &symtab);
 
-	while (cpp_next(&cpp, &tokinfo) == MCC_ERROR_OK) {
-		if (tokinfo.token == TOKEN_EOF)
+	while ((tokinfo = cpp_next(&cpp))) {
+		if (tokinfo->token == TOKEN_EOF)
 			break;
 
-		lexer_dump_token(&tokinfo);
+		lexer_dump_token(tokinfo);
+	}
+
+	if (!tokinfo) {
+		fprintf(stderr, "Out of memory.\n");
+		return EXIT_FAILURE;
 	}
 
 	printf("\n");

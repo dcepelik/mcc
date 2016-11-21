@@ -116,3 +116,19 @@ void mempool_free(struct mempool *pool)
 	mempool_free_chain(&pool->small);
 	mempool_free_chain(&pool->big);
 }
+
+
+static void mempool_print_chain_stats(struct mempool_chain *chain)
+{
+	printf("%lu blocks, %lu B total\n", chain->num_blocks, chain->total_size);
+}
+
+
+void mempool_print_stats(struct mempool *pool)
+{
+	printf("Mempool stats:\n");
+	printf("\tBig objects chain: ");
+	mempool_print_chain_stats(&pool->big);
+	printf("\tSmall objects chain: ");
+	mempool_print_chain_stats(&pool->small);
+}

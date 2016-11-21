@@ -63,6 +63,7 @@ enum token
 	TOKEN_HASH,
 	TOKEN_HASH_HASH,
 
+	TOKEN_EOL,
 	TOKEN_EOF,
 
 	TOKEN_CPP_IF,
@@ -129,14 +130,14 @@ struct tokinfo
 	union
 	{
 		struct symbol *symbol;
+		char *str;
 		int value;
 		int c;
-		char *str;
 	};
 
 	enum token token;
-	bool preceded_by_whitespace;
-	bool is_at_bol;
+	int preceded_by_whitespace:1;
+	int is_at_bol:1;
 };
 
 const char *token_name(enum token token);

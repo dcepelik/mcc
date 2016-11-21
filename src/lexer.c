@@ -214,8 +214,8 @@ static struct tokinfo *lex_char(struct lexer *lexer, struct tokinfo *tokinfo)
 	if (!seen_delimiter)
 		DEBUG_MSG("error: missing the final \'");
 
-	tokinfo->value = val;
 	tokinfo->token = TOKEN_CHAR_CONST;
+	tokinfo->value = val;
 
 	return tokinfo;
 }
@@ -390,10 +390,12 @@ mcc_error_t lexer_init(struct lexer *lexer)
 	if (!strbuf_init(&lexer->strbuf, 1024))
 		return MCC_ERROR_NOMEM;
 
-	lexer->c = strbuf_get_string(&lexer->linebuf);
+	objpool_init(&lexer->tokinfo_pool, sizeof(struct tokinfo), 256);
+	mempool_init(&lexer->token_data, 2048);
 
-	objpool_init(&lexer->tokinfo_pool, sizeof(struct tokinfo), 64);
-	mempool_init(&lexer->token_data, 1024);
+	lexer->c = strbuf_get_string(&lexer->linebuf);
+	lexer->eol.token = TOKEN_EOL;
+	lexer->eof.token = TOKEN_EOF;
 
 	return MCC_ERROR_OK;
 }
@@ -510,42 +512,28 @@ struct tokinfo *lexer_next(struct lexer *lexer)
 	struct tokinfo *tokinfo;
 	mcc_error_t err;
 
+next_nonwhite_char:
+	if (lexer_is_eol(lexer)) {
+		err = lexer_read_line(lexer);
+
+		if (err == MCC_ERROR_EOF)
+			return &lexer->eof;
+
+		if (err != MCC_ERROR_OK)
+			return NULL;
+
+		return &lexer->eol;
+	}
+
+	eat_whitespace(lexer);
+
 	tokinfo = objpool_alloc(&lexer->tokinfo_pool);
 	if (!tokinfo)
 		return NULL;
 
 	tokinfo->is_at_bol = false;
 
-	//tokinfo = objpool_alloc(&lexer->tokinfo_pool);
-
-smash_whitespace:
-	if (lexer_is_eol(lexer)) {
-		err = lexer_read_line(lexer);
-		lexer->num_tokens_after_eol = 0;
-
-		if (lexer->inside_directive) {
-			tokinfo->token = TOKEN_EOL;
-			return tokinfo;
-		}
-
-		if (err == MCC_ERROR_OK) {
-			goto smash_whitespace;
-		}
-		else {
-			return NULL;
-		}
-	}
-	else {
-		eat_whitespace(lexer);
-	}
-
-	if (lexer->num_tokens_after_eol == 0)
-		tokinfo->is_at_bol = true;
-
-	lexer->num_tokens_after_eol++;
-
 	lexer->c++;
-
 	switch (lexer->c[-1]) {
 	case 'u':
 		/* u8"string" */
@@ -711,13 +699,13 @@ smash_whitespace:
 		if (*lexer->c == '*') {
 			lexer->c++;
 			eat_c_comment(lexer);
-			goto smash_whitespace;
+			goto next_nonwhite_char;
 		}
 
 		if (*lexer->c == '/') {
 			lexer->c++;
 			eat_cpp_comment(lexer);
-			goto smash_whitespace;
+			goto next_nonwhite_char;
 		}
 
 		if (*lexer->c == '=') {
@@ -873,6 +861,7 @@ smash_whitespace:
 	default:
 		DEBUG_PRINTF("error: character %c was unexpected", *lexer->c);
 		lexer->c++;
+		goto next_nonwhite_char;
 	}
 
 	return tokinfo;
@@ -947,7 +936,7 @@ void lexer_dump_token(struct tokinfo *tokinfo)
 		break;
 
 	case TOKEN_NAME:
-		printf("%s[%s]", symbol_get_name(tokinfo->symbol), symbol_get_type(tokinfo->symbol));
+		printf("%s", symbol_get_name(tokinfo->symbol));
 		break;
 
 	case TOKEN_NUMBER:

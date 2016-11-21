@@ -43,6 +43,7 @@ const char *token_names[] = {
 	[TOKEN_ELSE] = "else",
 	[TOKEN_ENUM] = "enum",
 	[TOKEN_EOF] = "EOF",
+	[TOKEN_EOL] = "EOL",
 	[TOKEN_EQ_EQ] = "==",
 	[TOKEN_EQ] = "=",
 	[TOKEN_EXTERN] = "extern",

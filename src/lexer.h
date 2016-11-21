@@ -32,10 +32,10 @@ struct lexer
 	struct inbuf *inbuf;		/* input buffer */
 	struct symtab *symtab;		/* symbol table */
 	char *c;			/* current character pointer (within line) */
-	enum lexer_eol_style eol;	/* end-of-line style used in inbuf */
+	enum lexer_eol_style eol_style;	/* end-of-line style used in inbuf */
 	bool inside_include;		/* are we lexing in an #include? */
-	bool inside_directive;
-	bool num_tokens_after_eol;
+	struct tokinfo eol;
+	struct tokinfo eof;
 };
 
 mcc_error_t lexer_init(struct lexer *lexer);

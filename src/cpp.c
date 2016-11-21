@@ -1,7 +1,9 @@
+#include "array.h"
 #include "common.h"
 #include "cpp.h"
 #include "debug.h"
 #include "symtab.h"
+#include <assert.h>
 
 
 struct directive
@@ -69,15 +71,34 @@ static void cpp_setup_symtab(struct cpp *cpp)
 }
 
 
-mcc_error_t cpp_init(struct cpp *cpp)
+static struct tokinfo *cpp_directive(struct cpp *cpp)
 {
-	return lexer_init(&cpp->lexer);
+	DEBUG_PRINTF("In %s", __func__);
+	return *cpp->cur;
 }
 
 
-void cpp_free(struct cpp *cpp)
+static bool cpp_load_line_of_tokens(struct cpp *cpp)
 {
-	lexer_free(&cpp->lexer);
+	struct tokinfo *tokinfo;
+	size_t i;
+
+	array_reset(cpp->tokens);
+
+	for (i = 0; (tokinfo = lexer_next(&cpp->lexer)); i++) {
+		cpp->tokens = array_claim(cpp->tokens, 1);
+		if (!cpp->tokens)
+			return false;
+
+		cpp->tokens[i] = tokinfo;
+
+		if (tokinfo->token == TOKEN_EOL || tokinfo->token == TOKEN_EOF)
+			break;
+	}
+
+	cpp->cur = cpp->tokens;
+
+	return tokinfo != NULL; /* lexer_next did not fail */
 }
 
 
@@ -110,22 +131,53 @@ void cpp_set_symtab(struct cpp *cpp, struct symtab *table)
 }
 
 
-mcc_error_t cpp_next(struct cpp *cpp, struct tokinfo *tokinfo)
+struct tokinfo *cpp_next(struct cpp *cpp)
+{
+	if (cpp->cur == cpp->tokens + array_size(cpp->tokens)) {
+		cpp_load_line_of_tokens(cpp);
+	}
+
+	assert(array_size(cpp->tokens) > 0);
+
+	switch (cpp->cur[0]->token) {
+	case TOKEN_EOF:
+		return *cpp->cur; /* TOKEN_EOF not edible */
+
+	/*case TOKEN_HASH:
+		if (cpp->cur->is_at_bol) {
+			cpp->cur++;
+			return cpp_directive(cpp);
+		}*/
+
+	default:
+		return *cpp->cur++;
+	}
+	
+	return *cpp->cur++;
+}
+
+
+mcc_error_t cpp_init(struct cpp *cpp)
 {
 	mcc_error_t err;
 
-	err = lexer_next(&cpp->lexer, tokinfo);
+	cpp->tokens = array_new(16, sizeof(struct tokinfo));
+	if (!cpp->tokens)
+		return MCC_ERROR_NOMEM;
+
+	cpp->cur = cpp->tokens;
+
+	err = lexer_init(&cpp->lexer);
 	if (err != MCC_ERROR_OK)
 		return err;
 
-	switch (tokinfo->token)
-	{
-	case TOKEN_HASH:
-		break;
-
-	default:
-		break;
-	}
-
-	return err;
+	return MCC_ERROR_OK;
 }
+
+
+void cpp_free(struct cpp *cpp)
+{
+	lexer_free(&cpp->lexer);
+	array_delete(cpp->tokens);
+}
+

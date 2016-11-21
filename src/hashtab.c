@@ -72,6 +72,8 @@ bool hashtab_init(struct hashtab *hashtab, struct objpool *pool, size_t init_siz
 	hashtab->size = 0;
 	hashtab->count = 0;
 
+	mempool_init(&hashtab->keys, 1024);
+
 	return hashtab_resize(hashtab, init_size);
 }
 
@@ -120,19 +122,24 @@ void *hashtab_insert(struct hashtab *hashtab, const char *key)
 {
 	struct hashnode *new_node;
 	float load;
+	char *key_copy;
+	size_t key_len;
 
 	load = hashtab->count / hashtab->size;
 	if (load > 0.5) {
-		DEBUG_MSG("Resize needed");
 		if (!hashtab_resize(hashtab, 2 * hashtab->size))
 			return false;
 	}
+
+	key_len = strlen(key);
+	key_copy = mempool_alloc(&hashtab->keys, key_len + 1);
+	strncpy(key_copy, key, key_len + 1);
 
 	new_node = objpool_alloc(hashtab->pool);
 	if (!new_node)
 		return NULL;
 
-	new_node->key = key;
+	new_node->key = key_copy;
 
 	hashtab_insert_node(hashtab, new_node);
 	hashtab->count++;
@@ -167,5 +174,6 @@ bool hashtab_remove(struct hashtab *hashtab, struct hashnode *node)
 
 void hashtab_free(struct hashtab *hashtab)
 {
+	mempool_free(&hashtab->keys);
 	free(hashtab->table);
 }

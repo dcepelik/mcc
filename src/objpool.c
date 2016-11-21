@@ -19,7 +19,7 @@ void objpool_init(struct objpool *objpool, size_t obj_size, size_t objs_per_bloc
 	objpool->num_blocks = 0;
 
 	min_size = obj_size * objs_per_block + sizeof(struct objpool_block);
-	objpool->block_size = 8; //512 * 1024;
+	objpool->block_size = min_size;
 
 	while (min_size > objpool->block_size)
 		objpool->block_size *= 2;
@@ -102,4 +102,10 @@ void objpool_free(struct objpool *pool)
 
 		free(block);
 	}
+}
+
+
+void objpool_print_stats(struct objpool *pool)
+{
+	printf("objpool stats: %lu objs, %lu blocks\n", pool->num_objs, pool->num_blocks);
 }

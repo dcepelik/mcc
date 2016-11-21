@@ -15,6 +15,9 @@ static bool strbuf_resize(struct strbuf *buf, size_t new_size)
 		return false;
 
 	buf->size = new_size;
+	if (buf->len > buf->size - 1)
+		buf->len = buf->size - 1;
+
 	return true;
 }
 

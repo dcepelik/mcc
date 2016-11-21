@@ -7,6 +7,7 @@
 #define HASHTAB_H
 
 #include "objpool.h"
+#include "mempool.h"
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -15,6 +16,7 @@ struct hashtab
 {
 	struct hashnode *table;
 	struct objpool *pool;
+	struct mempool keys;
 	size_t count;
 	size_t size;
 };
