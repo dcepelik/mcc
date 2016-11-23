@@ -19,6 +19,12 @@ static void cpp_missing_handler(void)
 }
 
 
+static void cpp_directive_error(void)
+{
+	DEBUG_MSG("#error");
+}
+
+
 static void cpp_setup_symtab_directives(struct cpp *cpp)
 {
 	struct symbol *symbol;
@@ -35,7 +41,7 @@ static void cpp_setup_symtab_directives(struct cpp *cpp)
 		{ .name = "define", .handler = cpp_missing_handler },
 		{ .name = "undef", .handler = cpp_missing_handler },
 		{ .name = "line", .handler = cpp_missing_handler },
-		{ .name = "error", .handler = cpp_missing_handler },
+		{ .name = "error", .handler = cpp_directive_error },
 		{ .name = "pragma", .handler = cpp_missing_handler },
 	};
 
@@ -73,7 +79,22 @@ static void cpp_setup_symtab(struct cpp *cpp)
 
 static struct tokinfo *cpp_directive(struct cpp *cpp)
 {
-	DEBUG_PRINTF("In %s", __func__);
+	DEBUG_TRACE;
+
+	if (cpp->cur[0]->token != TOKEN_NAME) {
+		DEBUG_MSG("error: expected directive name");
+		// TODO Invalid pp line, read till EOL
+		cpp->cur++;
+		return *cpp->cur;
+	}
+
+	if (cpp->cur[0]->symbol->type != SYMBOL_TYPE_CPP_DIRECTIVE) {
+		DEBUG_PRINTF("error: %s is not a C preprocessor directive",
+			symbol_get_name(cpp->cur[0]->symbol));
+		cpp->cur++;
+		return *cpp->cur;
+	}
+
 	return *cpp->cur;
 }
 
@@ -133,9 +154,8 @@ void cpp_set_symtab(struct cpp *cpp, struct symtab *table)
 
 struct tokinfo *cpp_next(struct cpp *cpp)
 {
-	if (cpp->cur == cpp->tokens + array_size(cpp->tokens)) {
+	if (cpp->cur == cpp->tokens + array_size(cpp->tokens))
 		cpp_load_line_of_tokens(cpp);
-	}
 
 	assert(array_size(cpp->tokens) > 0);
 
@@ -144,7 +164,7 @@ struct tokinfo *cpp_next(struct cpp *cpp)
 		return *cpp->cur; /* TOKEN_EOF not edible */
 
 	case TOKEN_HASH:
-		if (cpp->cur->is_at_bol) {
+		if (cpp->cur[0]->is_at_bol) {
 			cpp->cur++;
 			return cpp_directive(cpp);
 		}
