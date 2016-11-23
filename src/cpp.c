@@ -6,6 +6,12 @@
 #include <assert.h>
 
 
+/*
+ * TODO Assuming that list_node is first member of struct tokinfo.
+ *      Define a container_of macro to drop this requirement.
+ */
+
+
 struct directive
 {
 	const char *name;
@@ -81,43 +87,39 @@ static struct tokinfo *cpp_directive(struct cpp *cpp)
 {
 	DEBUG_TRACE;
 
-	if (cpp->cur[0]->token != TOKEN_NAME) {
+	struct tokinfo *cur = list_first(&cpp->tokens);
+
+	if (cur->token != TOKEN_NAME) {
 		DEBUG_MSG("error: expected directive name");
 		// TODO Invalid pp line, read till EOL
-		cpp->cur++;
-		return *cpp->cur;
+
+		list_remove_first(&cpp->tokens);
+		return cur;
+
 	}
 
-	if (cpp->cur[0]->symbol->type != SYMBOL_TYPE_CPP_DIRECTIVE) {
+	if (cur->symbol->type != SYMBOL_TYPE_CPP_DIRECTIVE) {
 		DEBUG_PRINTF("error: %s is not a C preprocessor directive",
-			symbol_get_name(cpp->cur[0]->symbol));
-		cpp->cur++;
-		return *cpp->cur;
+			symbol_get_name(cur->symbol));
+
+		list_remove_first(&cpp->tokens);
+		return cur;
 	}
 
-	return *cpp->cur;
+	return cur;
 }
 
 
 static bool cpp_load_line_of_tokens(struct cpp *cpp)
 {
 	struct tokinfo *tokinfo;
-	size_t i;
 
-	array_reset(cpp->tokens);
-
-	for (i = 0; (tokinfo = lexer_next(&cpp->lexer)); i++) {
-		cpp->tokens = array_claim(cpp->tokens, 1);
-		if (!cpp->tokens)
-			return false;
-
-		cpp->tokens[i] = tokinfo;
+	while ((tokinfo = lexer_next(&cpp->lexer))) {
+		list_insert_last(&cpp->tokens, &tokinfo->list_node);
 
 		if (tokinfo->token == TOKEN_EOL || tokinfo->token == TOKEN_EOF)
 			break;
 	}
-
-	cpp->cur = cpp->tokens;
 
 	return tokinfo != NULL; /* lexer_next did not fail */
 }
@@ -154,28 +156,31 @@ void cpp_set_symtab(struct cpp *cpp, struct symtab *table)
 
 struct tokinfo *cpp_next(struct cpp *cpp)
 {
-	if (cpp->cur == cpp->tokens + array_size(cpp->tokens))
+	struct tokinfo *cur;
+
+	if (list_length(&cpp->tokens) == 0)
 		cpp_load_line_of_tokens(cpp);
 
-	assert(array_size(cpp->tokens) > 0);
+	assert(list_length(&cpp->tokens) > 0); /* at least TOKEN_EOF/TOKEN_EOL */
 
-	switch (cpp->cur[0]->token) {
+	cur = list_first(&cpp->tokens);
+
+	switch (cur->token) {
 	case TOKEN_EOF:
-		return *cpp->cur; /* TOKEN_EOF not edible */
+		return cur; /* TOKEN_EOF not edible */
 
 	case TOKEN_HASH:
-		if (cpp->cur[0]->is_at_bol) {
-			cpp->cur++;
+		if (cur->is_at_bol) {
+			list_remove_first(&cpp->tokens);
 			return cpp_directive(cpp);
 		}
 
 		break;
 
 	default:
-		return *cpp->cur++;
+		list_remove_first(&cpp->tokens);
+		return cur;
 	}
-	
-	return *cpp->cur++;
 }
 
 
@@ -183,11 +188,7 @@ mcc_error_t cpp_init(struct cpp *cpp)
 {
 	mcc_error_t err;
 
-	cpp->tokens = array_new(16, sizeof(struct tokinfo));
-	if (!cpp->tokens)
-		return MCC_ERROR_NOMEM;
-
-	cpp->cur = cpp->tokens;
+	list_init(&cpp->tokens);
 
 	err = lexer_init(&cpp->lexer);
 	if (err != MCC_ERROR_OK)
@@ -200,6 +201,6 @@ mcc_error_t cpp_init(struct cpp *cpp)
 void cpp_free(struct cpp *cpp)
 {
 	lexer_free(&cpp->lexer);
-	array_delete(cpp->tokens);
+	list_free(&cpp->tokens);
 }
 

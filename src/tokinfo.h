@@ -1,6 +1,7 @@
 #ifndef TOKINFO_H
 #define TOKINFO_H
 
+#include "list.h"
 #include <stdbool.h>
 
 #define IDENT_MAX_LEN	64
@@ -127,6 +128,8 @@ enum token
 
 struct tokinfo
 {
+	struct list_node list_node;
+
 	union
 	{
 		struct symbol *symbol;

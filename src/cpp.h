@@ -3,14 +3,15 @@
 
 #include "lexer.h"
 #include "error.h"
+#include "list.h"
 
 struct cpp
 {
 	struct lexer lexer;		/* lexer */
 	struct inbuf inbuf;		/* input buffer */
 	struct symtab *table;		/* symbol table */
-	struct tokinfo **tokens;	/* token buffer */
-	struct tokinfo **cur;		/* current token in tokens */
+	struct list tokens;		/* list of tokens */
+	struct tokinfo *current;	/* current token information */
 };
 
 mcc_error_t cpp_init(struct cpp *cpp);

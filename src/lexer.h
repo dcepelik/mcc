@@ -35,7 +35,6 @@ struct lexer
 	enum lexer_eol_style eol_style;	/* end-of-line style used in inbuf */
 	struct tokinfo eol;		/* tokinfo of an EOL token */
 	struct tokinfo eof;		/* tokinfo of an EOF token */
-
 	bool inside_include;		/* are we lexing in an #include? */
 	bool next_at_bol;		/* is next token at BOL? */
 };
