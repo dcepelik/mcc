@@ -307,75 +307,74 @@ struct tokinfo *lex_string(struct lexer *lexer, struct tokinfo *tokinfo)
 }
 
 
-static bool is_valid_qchar(struct lexer *lexer)
+static bool is_valid_qchar(char c)
 {
-	if (*lexer->c == '\n' || *lexer->c == '\r')
+	switch (c) {
+	case '\n':
+	case '\r':
+	case '\'':
+	case '\\':
+	case '\"':
 		return false;
 
-	if (*lexer->c == '\'' || *lexer->c == '\\' || *lexer->c == '\"')
-		return false;
-
-	if (*lexer->c == '/' && (lexer->c[1] == '/' || lexer->c[1] == '*'))
-		return false;
-
-	return true;
+	default:
+		return true;
+	}
 }
 
 
-static bool is_valid_hchar(struct lexer *lexer)
+static bool is_valid_hchar(char c)
 {
-	return is_valid_qchar(lexer) || *lexer->c != '\"';
+	return is_valid_qchar(c) || c != '\"';
+}
+
+
+struct tokinfo *lex_header_name(struct lexer *lexer, struct tokinfo *tokinfo,
+	bool (*is_valid_char)(char c), char delim)
+{
+	char c;
+	bool seen_delim = false;
+
+	strbuf_reset(&lexer->strbuf);
+
+	while ((c = *lexer->c++) != '\0') {
+		if (c == delim) {
+			seen_delim = true;
+			break;
+		}
+
+		if (!is_valid_char(c)) {
+			DEBUG_PRINTF("error: unexpected char: %c", c);
+		}
+		else {
+			strbuf_putc(&lexer->strbuf, c);
+		}
+	}
+
+	if (!seen_delim)
+		DEBUG_PRINTF("error: %c was expected here", delim);
+
+	// TODO Check (and warn about) presence of // and /* comments within header name
+
+	tokinfo->token = TOKEN_HEADER_NAME;
+	tokinfo->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->token_data);
+
+	if (!tokinfo->str)
+		return NULL;
+
+	return tokinfo;
 }
 
 
 struct tokinfo *lex_header_hname(struct lexer *lexer, struct tokinfo *tokinfo)
 {
-	strbuf_reset(&lexer->strbuf);
-
-	while (*lexer->c != '>') {
-		if (!is_valid_hchar(lexer)) {
-			DEBUG_PRINTF("error: invalid hchar: %c", *lexer->c);
-		}
-		else {
-			strbuf_putc(&lexer->strbuf, *lexer->c);
-		}
-
-		lexer->c++;
-	}
-
-	tokinfo->token = TOKEN_HEADER_NAME;
-	tokinfo->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->token_data);
-
-	if (!tokinfo->str)
-		return NULL;
-
-	return tokinfo;
+	return lex_header_name(lexer, tokinfo, is_valid_hchar, '>');
 }
 
 
-// TODO merge with lex_header_hname
 struct tokinfo *lex_header_qname(struct lexer *lexer, struct tokinfo *tokinfo)
 {
-	strbuf_reset(&lexer->strbuf);
-
-	while (*lexer->c != '\"') {
-		if (!is_valid_qchar(lexer)) {
-			DEBUG_PRINTF("error: invalid qchar: %c", *lexer->c);
-		}
-		else {
-			strbuf_putc(&lexer->strbuf, *lexer->c);
-		}
-
-		lexer->c++;
-	}
-
-	tokinfo->token = TOKEN_HEADER_NAME;
-	tokinfo->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->token_data);
-
-	if (!tokinfo->str)
-		return NULL;
-
-	return tokinfo;
+	return lex_header_name(lexer, tokinfo, is_valid_qchar, '\"');
 }
 
 
@@ -571,7 +570,7 @@ next_nonwhite_char:
 
 	case '\"':
 		if (lexer->inside_include)
-			return lex_header_hname(lexer, tokinfo);
+			return lex_header_qname(lexer, tokinfo);
 		else
 			return lex_string(lexer, tokinfo);
 
