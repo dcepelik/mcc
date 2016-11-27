@@ -34,11 +34,11 @@ int main(int argc, char *argv[])
 
 	cpp_set_symtab(&cpp, &symtab);
 
-	while ((tokinfo = cpp_next(&cpp))) {
+	while ((tokinfo = cpp_next(&cpp))) {	
+		lexer_dump_token(tokinfo);
+
 		if (tokinfo->token == TOKEN_EOF)
 			break;
-
-		lexer_dump_token(tokinfo);
 	}
 
 	if (!tokinfo) {

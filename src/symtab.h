@@ -6,8 +6,9 @@
 #ifndef SYMBOL_H
 #define SYMBOL_H
 
-#include "objpool.h"
+#include "cpp.h"
 #include "hashtab.h"
+#include "objpool.h"
 #include <stdbool.h>
 #include <stdlib.h>
 
@@ -23,6 +24,10 @@ struct symbol
 {
 	struct hashnode hashnode;
 	enum symbol_type type;
+
+	union {
+		enum cpp_directive directive;
+	};
 };
 
 struct symtab
