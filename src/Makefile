@@ -1,4 +1,4 @@
-.PHONY: clean
+.PHONY: clean gdb
 
 OBJS=mcc.o lexer.o inbuf.o symtab.o objpool.o cpp.o error.o tokinfo.o strbuf.o \
 	hashtab.o mempool.o array.o debug.o list.o
@@ -35,3 +35,6 @@ mempool.o: mempool.c mempool.h strbuf.o debug.h common.h
 
 clean:
 	rm -f -- $(PROG) $(OBJS)
+
+gdb: $(PROG)
+	gdb --args $(PROG) ../tests/pp/ifs.c

@@ -1,6 +1,5 @@
 #include "list.h"
 #include <assert.h>
-#include <stdbool.h>
 
 
 void list_init(struct list *lst)
@@ -13,7 +12,7 @@ void list_init(struct list *lst)
 
 bool list_is_empty(struct list *lst)
 {
-	return lst->head.next != NULL;
+	return lst->last != lst->head.next;
 }
 
 
@@ -33,6 +32,7 @@ void list_insert_first(struct list *lst, struct list_node *node)
 
 	node->next = lst->head.next;
 	lst->head.next = node;
+	lst->len++;
 }
 
 

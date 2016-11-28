@@ -952,7 +952,7 @@ void lexer_dump_token(struct tokinfo *tokinfo)
 		printf("%s", name);
 	}
 
-	putchar(' ');
+	putchar('\n');
 }
 
 
