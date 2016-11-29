@@ -1,6 +1,8 @@
 #ifndef LEXER_H
 #define LEXER_H
 
+#include "cppfile.h"
+
 /*
  * Lexer for translation phases 1-3.
  *
@@ -8,38 +10,6 @@
  * TODO Handle various encoding-related issues
  */
 
-#include <stdbool.h>
-
-#include "inbuf.h"
-#include "mempool.h"
-#include "objpool.h"
-#include "strbuf.h"
-#include "tokinfo.h"
-
-struct lexer
-{
-	struct objpool tokinfo_pool;	/* objpool for struct tokinfo */
-	struct mempool token_data;	/* mempool for token data (strings mostly) */
-	struct inbuf *inbuf;		/* input buffer */
-	struct strbuf strbuf;		/* buffer for string accumulation */
-	char *c;			/* current character pointer (within line) */
-	struct strbuf linebuf;		/* buffer for current logical line */
-	bool inside_include;		/* are we lexing in an #include? */
-	bool next_at_bol;		/* is next token at BOL? */
-	bool first_token;		/* have we produced the first token already? */
-
-	struct symtab *symtab;		/* symbol table */
-
-	/* global data */
-	struct tokinfo eol;		/* tokinfo of an EOL token */
-	struct tokinfo eof;		/* tokinfo of an EOF token */
-};
-
-mcc_error_t lexer_init(struct lexer *lexer);
-void lexer_set_inbuf(struct lexer *lexer, struct inbuf *buf);
-struct tokinfo *lexer_next(struct lexer *lexer);
-void lexer_set_symtab(struct lexer *lexer, struct symtab *symtab);
-void lexer_free(struct lexer *lexer);
-void lexer_dump_token(struct tokinfo *token);
+struct tokinfo *lexer_next(struct cppfile *file);
 
 #endif

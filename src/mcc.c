@@ -9,9 +9,9 @@
 int main(int argc, char *argv[])
 {
 	char *filename;
+	struct cppfile *cppfile;
 	struct tokinfo *tokinfo;
 	struct symtab symtab;
-	struct cpp cpp;
 	mcc_error_t err;
 	struct strbuf buf;
 	size_t i;
@@ -25,19 +25,25 @@ int main(int argc, char *argv[])
 
 	symtab_init(&symtab);
 
-	cpp_init(&cpp);
-	err = cpp_open(&cpp, filename);
+	cppfile = cppfile_new();
+	if (!cppfile)
+		return EXIT_FAILURE;
+
+	err = cppfile_open(cppfile, filename);
 	if (err != MCC_ERROR_OK) {
 		fprintf(stderr, "Cannot open input file '%s': %s\n",
 			filename,
 			error_str(err)
 		);
+
+		cppfile_delete(cppfile);
+		return EXIT_FAILURE;
 	}
 
-	cpp_set_symtab(&cpp, &symtab);
+	cppfile_set_symtab(cppfile, &symtab);
 
 	strbuf_init(&buf, 256);
-	for (i = 0; (tokinfo = cpp_next(&cpp)); i++) {	
+	for (i = 0; (tokinfo = cpp_next(cppfile)); i++) {	
 		if (i > 0)
 			strbuf_putc(&buf, ' ');
 		tokinfo_print(tokinfo, &buf);
@@ -54,8 +60,8 @@ int main(int argc, char *argv[])
 	printf("%s\n", strbuf_get_string(&buf));
 	strbuf_free(&buf);
 
-	cpp_close(&cpp);
-	cpp_free(&cpp);
+	cppfile_close(cppfile);
+	cppfile_delete(cppfile);
 	symtab_free(&symtab);
 
 	return EXIT_SUCCESS;

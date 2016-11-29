@@ -1,3 +1,4 @@
+#include "cpp.h"
 #include "cppfile.h"
 #include <stdlib.h>
 
@@ -33,9 +34,12 @@ mcc_error_t cppfile_open(struct cppfile *file, char *filename)
 	file->inside_include = false;
 	file->next_at_bol = true;
 	file->first_token = true;
+
+	file->cur = NULL;
 	
 	mempool_init(&file->token_data, 2048);
 	objpool_init(&file->tokinfo_pool, sizeof(struct tokinfo), 256);
+	list_init(&file->tokens);
 
 	return MCC_ERROR_OK;
 
@@ -54,4 +58,18 @@ void cppfile_close(struct cppfile *file)
 	inbuf_close(&file->inbuf);
 	mempool_free(&file->token_data);
 	objpool_free(&file->tokinfo_pool);
+	list_free(&file->tokens);
+}
+
+
+void cppfile_delete(struct cppfile *file)
+{
+	free(file);
+}
+
+
+void cppfile_set_symtab(struct cppfile *file, struct symtab *table)
+{
+	file->symtab = table;
+	cpp_setup_symtab(file);
 }

@@ -1,10 +1,6 @@
 #ifndef CPP_H
 #define CPP_H
 
-#include "lexer.h"
-#include "error.h"
-#include "list.h"
-
 enum cpp_directive
 {
 	CPP_DIRECTIVE_IF,
@@ -21,27 +17,17 @@ enum cpp_directive
 	CPP_DIRECTIVE_PRAGMA,
 };
 
+#include "cppfile.h"
+
 struct cpp_if
 {
 	enum cpp_directive directive;	/* if/ifdef/ifndef? */
 	/* TODO add location info */
 };
 
-struct cpp
-{
-	struct lexer lexer;		/* lexer */
-	struct inbuf inbuf;		/* input buffer */
-	struct symtab *table;		/* symbol table */
-	struct list tokens;		/* list of tokens */
-	struct tokinfo *cur;		/* last popped tokinfo */
-	struct list ifs;		/* #if directive stack */
-};
+struct cppfile;
 
-mcc_error_t cpp_init(struct cpp *cpp);
-mcc_error_t cpp_open(struct cpp *cpp, const char *filename);
-void cpp_close(struct cpp *cpp);
-void cpp_set_symtab(struct cpp *cpp, struct symtab *table);
-struct tokinfo *cpp_next(struct cpp *cpp);
-void cpp_free(struct cpp *cpp);
+struct tokinfo *cpp_next(struct cppfile *file);
+void cpp_setup_symtab(struct cppfile *file);
 
 #endif
