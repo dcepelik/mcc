@@ -27,17 +27,20 @@ struct lexer
 {
 	struct objpool tokinfo_pool;	/* objpool for struct tokinfo */
 	struct mempool token_data;	/* mempool for token data (strings mostly) */
-	struct strbuf linebuf;		/* buffer for current logical line */
-	struct strbuf strbuf;		/* buffer for string accumulation */
 	struct inbuf *inbuf;		/* input buffer */
-	struct symtab *symtab;		/* symbol table */
+	struct strbuf strbuf;		/* buffer for string accumulation */
 	char *c;			/* current character pointer (within line) */
+	struct strbuf linebuf;		/* buffer for current logical line */
 	enum lexer_eol_style eol_style;	/* end-of-line style used in inbuf */
-	struct tokinfo eol;		/* tokinfo of an EOL token */
-	struct tokinfo eof;		/* tokinfo of an EOF token */
 	bool inside_include;		/* are we lexing in an #include? */
 	bool next_at_bol;		/* is next token at BOL? */
-	bool first_token;
+	bool first_token;		/* have we produced the first token already? */
+
+	struct symtab *symtab;		/* symbol table */
+
+	/* global data */
+	struct tokinfo eol;		/* tokinfo of an EOL token */
+	struct tokinfo eof;		/* tokinfo of an EOF token */
 };
 
 mcc_error_t lexer_init(struct lexer *lexer);

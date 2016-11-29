@@ -1,6 +1,7 @@
 #include "strbuf.h"
-#include <string.h>
 #include <assert.h>
+#include <stdio.h>
+#include <string.h>
 
 
 #define MAX(a, b) ((a) >= (b) ? (a) : (b))
@@ -89,4 +90,44 @@ void strbuf_reset(struct strbuf *buf)
 void strbuf_free(struct strbuf *buf)
 {
 	free(buf->str);
+}
+
+
+size_t strbuf_vprintf_at(struct strbuf *buf, size_t offset, char *fmt, va_list args)
+{
+	va_list args2;
+	size_t num_written;
+	size_t extra_size_needed;
+
+	va_copy(args2, args);
+
+	num_written = vsnprintf(NULL, 0, fmt, args2);
+	if (num_written < 0)
+		return -1;
+
+	extra_size_needed = buf->size - offset - (num_written + 1);
+	if (extra_size_needed > 0) {
+		strbuf_prepare_write(buf, extra_size_needed);
+		buf->len = MAX(buf->len, offset + num_written);
+	}
+
+	vsnprintf(buf->str + offset, (num_written + 1), fmt, args);
+
+	va_end(args2);
+	va_end(args);
+
+	return num_written;
+}
+
+
+size_t strbuf_printf(struct strbuf *buf, char *fmt, ...)
+{
+	size_t num_written;
+
+	va_list args;
+	va_start(args, fmt);
+	num_written = strbuf_vprintf_at(buf, buf->len, fmt, args);
+	va_end(args);
+
+	return num_written;
 }

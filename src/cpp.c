@@ -172,7 +172,7 @@ static bool cpp_expect(struct cpp *cpp, enum token token)
 		return true;
 
 	cpp_error("%s was expected, got %s",
-		token_name(token), token_name(cpp->cur->token));
+		token_get_name(token), token_get_name(cpp->cur->token));
 
 	return false;
 }

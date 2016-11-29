@@ -13,6 +13,8 @@ int main(int argc, char *argv[])
 	struct symtab symtab;
 	struct cpp cpp;
 	mcc_error_t err;
+	struct strbuf buf;
+	size_t i;
 
 	if (argc != 2) {
 		fprintf(stderr, "Usage: %s FILE\n", argv[0]);
@@ -34,23 +36,23 @@ int main(int argc, char *argv[])
 
 	cpp_set_symtab(&cpp, &symtab);
 
-	int i = 0;
-	while ((tokinfo = cpp_next(&cpp))) {	
-		lexer_dump_token(tokinfo);
+	strbuf_init(&buf, 256);
+	for (i = 0; (tokinfo = cpp_next(&cpp)); i++) {	
+		if (i > 0)
+			strbuf_putc(&buf, ' ');
+		tokinfo_print(tokinfo, &buf);
 
 		if (tokinfo->token == TOKEN_EOF)
 			break;
-
-		if (i > 30)
-			i--;
-
-		i++;
 	}
 
 	if (!tokinfo) {
 		fprintf(stderr, "Out of memory.\n");
 		return EXIT_FAILURE;
 	}
+
+	printf("%s\n", strbuf_get_string(&buf));
+	strbuf_free(&buf);
 
 	cpp_close(&cpp);
 	cpp_free(&cpp);
