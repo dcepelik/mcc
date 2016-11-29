@@ -1,5 +1,7 @@
 #include "cpp.h"
 #include "cppfile.h"
+#include "strbuf.h"
+#include <stdarg.h>
 #include <stdlib.h>
 
 
@@ -36,6 +38,8 @@ mcc_error_t cppfile_open(struct cppfile *file, char *filename)
 	file->first_token = true;
 
 	file->cur = NULL;
+
+	file->line_no = 0;
 	
 	mempool_init(&file->token_data, 2048);
 	objpool_init(&file->tokinfo_pool, sizeof(struct tokinfo), 256);
@@ -72,4 +76,37 @@ void cppfile_set_symtab(struct cppfile *file, struct symtab *table)
 {
 	file->symtab = table;
 	cpp_setup_symtab(file);
+}
+
+
+void cppfile_error(struct cppfile *file, char *fmt, ...)
+{
+	struct strbuf buf;
+	char *line;
+	size_t i;
+
+	(void) file;
+
+	line = strbuf_get_string(&file->linebuf);
+
+	va_list args;
+	va_start(args, fmt);
+	strbuf_init(&buf, 1024);
+
+	strbuf_printf(&buf, "error: ");
+	strbuf_vprintf_at(&buf, strbuf_strlen(&buf), fmt, args);
+	strbuf_printf(&buf, "\n%s\n", line);
+
+	for (i = 0; i < file->column_no; i++)
+		if (line[i] == '\t')
+			strbuf_putc(&buf, '\t');
+		else
+			strbuf_putc(&buf, ' ');
+
+	strbuf_printf(&buf, "^^^");
+
+	fprintf(stderr, "%s\n", strbuf_get_string(&buf));
+
+	va_end(args);
+	strbuf_free(&buf);
 }

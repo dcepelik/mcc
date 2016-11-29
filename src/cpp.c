@@ -91,18 +91,6 @@ static struct tokinfo *cpp_pop(struct cppfile *file)
 }
 
 
-static void cpp_error(const char *fmt, ...)
-{
-	va_list args;
-
-	va_start(args, fmt);
-	printf("error: ");
-	vprintf(fmt, args);
-	putchar('\n');
-	va_end(args);
-}
-
-
 static void cpp_warn(const char *fmt, ...)
 {
 	va_list args;
@@ -171,7 +159,7 @@ static bool cpp_expect(struct cppfile *file, enum token token)
 	if (file->cur->token == token)
 		return true;
 
-	cpp_error("%s was expected, got %s",
+	cppfile_error(file, "%s was expected, got %s",
 		token_get_name(token), token_get_name(file->cur->token));
 
 	return false;
@@ -192,7 +180,7 @@ static void cpp_match_eol_eof(struct cppfile *file)
 
 static void cpp_parse_error(struct cppfile *file)
 {
-	cpp_error("%s", file->cur->str);
+	cppfile_error(file, "%s", file->cur->str);
 	cpp_pop(file);
 	cpp_match_eol_eof(file);
 }
@@ -216,7 +204,7 @@ static bool cpp_expect_directive(struct cppfile *file)
 		return false;
 
 	if (file->cur->symbol->type != SYMBOL_TYPE_CPP_DIRECTIVE) {
-		cpp_error("'%s' is not a C preprocessor directive",
+		cppfile_error(file, "'%s' is not a C preprocessor directive",
 			symbol_get_name(file->cur->symbol));
 
 		return false;
@@ -250,7 +238,7 @@ skip_another_branch:
 	cpp_skip_ifbranch(file);
 
 	if (cpp_got_eof(file)) {
-		cpp_error("unexpected EOF, endif was expected");
+		cppfile_error(file, "unexpected EOF, endif was expected");
 		return;
 	}
 
@@ -350,7 +338,7 @@ static void cpp_parse_if(struct cppfile *file)
 		cpp_skip_ifbranch(file);
 	}
 
-	cpp_error("EOF was unexpected, expected endif");
+	cppfile_error(file, "EOF was unexpected, expected endif");
 }
 
 
@@ -360,6 +348,7 @@ static void cpp_parse_ifdef(struct cppfile *file, bool ifndef)
 
 	if (!cpp_expect(file, TOKEN_NAME)) {
 		cpp_warn("skipping rest of the if directive");
+		cpp_skip_line(file);
 		cpp_skip_if(file);
 	}
 	else if ((file->cur->symbol->type == SYMBOL_TYPE_CPP_MACRO) == !ifndef) {
@@ -452,7 +441,7 @@ static void cpp_parse_directive(struct cppfile *file)
 		break;
 
 	default:
-		cpp_error("directive %s not supported");
+		cppfile_error(file, "directive %s not supported", NULL);
 		cpp_skip_line(file);
 	}
 }
@@ -468,10 +457,6 @@ static void cpp_parse(struct cppfile *file)
 		cpp_parse_directive(file);
 	}
 }
-
-
-
-
 
 
 struct tokinfo *cpp_next(struct cppfile *file)

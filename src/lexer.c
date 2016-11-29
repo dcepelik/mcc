@@ -389,7 +389,7 @@ static mcc_error_t lexer_read_line(struct cppfile *file)
 
 	strbuf_reset(&file->linebuf);
 
-	for (; (c = inbuf_get_char(&file->inbuf)) != INBUF_EOF; ) {
+	for (file->column_no = 0; (c = inbuf_get_char(&file->inbuf)) != INBUF_EOF; file->column_no++) {
 		switch (c) {
 		case ' ':
 		case '\t':
@@ -422,6 +422,8 @@ static mcc_error_t lexer_read_line(struct cppfile *file)
 			escape = false;
 		}
 	}
+
+	file->line_no++;
 
 	if (c == INBUF_EOF)
 		return MCC_ERROR_EOF;

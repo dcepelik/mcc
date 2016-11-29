@@ -9,6 +9,7 @@
 #include "strbuf.h"
 #include "symtab.h"
 #include "tokinfo.h"
+#include <stdlib.h>
 
 /* TODO Make this internal and hidden from the backend and the parser. */
 /* TODO Inits for lexer and cpp may be better off separated. */
@@ -27,6 +28,9 @@ struct cppfile
 
 	struct list tokens;		/* token list */
 	struct tokinfo *cur;		/* last popped tokinfo */
+
+	size_t column_no;
+	size_t line_no;
 };
 
 struct cppfile *cppfile_new();
@@ -36,5 +40,8 @@ mcc_error_t cppfile_open(struct cppfile *file, char *filename);
 void cppfile_close(struct cppfile *file);
 
 void cppfile_set_symtab(struct cppfile *file, struct symtab *table);
+
+void cppfile_error(struct cppfile *file, char *fmt, ...);
+void cppfile_warning(struct cppfile *file, char *fmt, ...);
 
 #endif
