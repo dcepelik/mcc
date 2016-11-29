@@ -395,6 +395,7 @@ mcc_error_t lexer_init(struct lexer *lexer)
 	lexer->inbuf = NULL;
 	lexer->inside_include = false;
 	lexer->next_at_bol = true;
+	lexer->first_token = true;
 
 	return MCC_ERROR_OK;
 }
@@ -522,8 +523,11 @@ next_nonwhite_char:
 		if (err != MCC_ERROR_OK)
 			return NULL;
 
-		return &lexer->eol;
+		if (!lexer->first_token)
+			return &lexer->eol;
 	}
+
+	lexer->first_token = false;
 
 	eat_whitespace(lexer);
 

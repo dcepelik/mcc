@@ -34,19 +34,23 @@ int main(int argc, char *argv[])
 
 	cpp_set_symtab(&cpp, &symtab);
 
+	int i = 0;
 	while ((tokinfo = cpp_next(&cpp))) {	
 		lexer_dump_token(tokinfo);
 
 		if (tokinfo->token == TOKEN_EOF)
 			break;
+
+		if (i > 30)
+			i--;
+
+		i++;
 	}
 
 	if (!tokinfo) {
 		fprintf(stderr, "Out of memory.\n");
 		return EXIT_FAILURE;
 	}
-
-	printf("\n");
 
 	cpp_close(&cpp);
 	cpp_free(&cpp);

@@ -5,17 +5,6 @@
 #include "error.h"
 #include "list.h"
 
-struct cpp
-{
-	struct lexer lexer;		/* lexer */
-	struct inbuf inbuf;		/* input buffer */
-	struct symtab *table;		/* symbol table */
-	struct list tokens;		/* list of tokens */
-	struct tokinfo *cur;		/* last popped tokinfo */
-	struct list ifs;		/* #if directive stack */
-};
-
-
 enum cpp_directive
 {
 	CPP_DIRECTIVE_IF,
@@ -30,6 +19,22 @@ enum cpp_directive
 	CPP_DIRECTIVE_LINE,
 	CPP_DIRECTIVE_ERROR,
 	CPP_DIRECTIVE_PRAGMA,
+};
+
+struct cpp_if
+{
+	enum cpp_directive directive;	/* if/ifdef/ifndef? */
+	/* TODO add location info */
+};
+
+struct cpp
+{
+	struct lexer lexer;		/* lexer */
+	struct inbuf inbuf;		/* input buffer */
+	struct symtab *table;		/* symbol table */
+	struct list tokens;		/* list of tokens */
+	struct tokinfo *cur;		/* last popped tokinfo */
+	struct list ifs;		/* #if directive stack */
 };
 
 mcc_error_t cpp_init(struct cpp *cpp);

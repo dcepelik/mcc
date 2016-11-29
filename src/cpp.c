@@ -71,26 +71,23 @@ static void cpp_setup_symtab(struct cpp *cpp)
 
 
 
-static void cpp_push(struct cpp *cpp, struct tokinfo *tokinfo)
-{
-	list_insert_first(&cpp->tokens, &tokinfo->list_node);
-}
-
 
 static struct tokinfo *cpp_pop(struct cpp *cpp)
 {
 	struct tokinfo *tokinfo;
+	struct tokinfo *tmp;
 
 	if (list_is_empty(&cpp->tokens)) {
 		tokinfo = lexer_next(&cpp->lexer);
-
 		if (tokinfo)
 			list_insert_last(&cpp->tokens, &tokinfo->list_node);
 	}
 
 	assert(list_length(&cpp->tokens) > 0); /* at least TOKEN_EOF/TOKEN_EOL */
 
-	return (cpp->cur = list_remove_first(&cpp->tokens));
+	tmp = cpp->cur;
+	cpp->cur = list_remove_first(&cpp->tokens);
+	return tmp;
 }
 
 
@@ -124,18 +121,9 @@ static bool cpp_got(struct cpp *cpp, enum token token)
 }
 
 
-static bool cpp_directive(struct cpp *cpp, enum cpp_directive directive)
+static bool cpp_got_eol(struct cpp *cpp)
 {
-	return cpp_got(cpp, TOKEN_NAME)
-		&& cpp->cur->symbol->type == SYMBOL_TYPE_CPP_DIRECTIVE
-		&& cpp->cur->symbol->directive == directive;
-}
-
-
-static bool cpp_got_directive(struct cpp *cpp)
-{
-	return cpp_got(cpp, TOKEN_NAME)
-		&& cpp->cur->symbol->type == SYMBOL_TYPE_CPP_DIRECTIVE;
+	return cpp_got(cpp, TOKEN_EOL);
 }
 
 
@@ -151,16 +139,34 @@ static bool cpp_got_hash(struct cpp *cpp)
 }
 
 
+static bool cpp_directive(struct cpp *cpp, enum cpp_directive directive)
+{
+	return cpp_got(cpp, TOKEN_NAME)
+		&& cpp->cur->symbol->type == SYMBOL_TYPE_CPP_DIRECTIVE
+		&& cpp->cur->symbol->directive == directive;
+}
+
+
 static void cpp_skip_line(struct cpp *cpp)
 {
-	while (cpp_pop(cpp)) {
-		if (cpp->cur->token == TOKEN_EOL || cpp->cur->token == TOKEN_EOF)
+	while (!cpp_got_eof(cpp)) {
+		if (cpp_got(cpp, TOKEN_EOL)) {
+			cpp_pop(cpp);
 			break;
+		}
+		cpp_pop(cpp);
 	}
 }
 
 
-static bool cpp_require(struct cpp *cpp, enum token token)
+static inline void cpp_skip_rest_of_directive(struct cpp *cpp)
+{
+	while (!cpp_got_eof(cpp) && !cpp_got_eol(cpp))
+		cpp_pop(cpp);
+}
+
+
+static bool cpp_expect(struct cpp *cpp, enum token token)
 {
 	if (cpp->cur->token == token)
 		return true;
@@ -172,25 +178,23 @@ static bool cpp_require(struct cpp *cpp, enum token token)
 }
 
 
-static bool cpp_require_eol_eof(struct cpp *cpp)
+static void cpp_match_eol_eof(struct cpp *cpp)
 {
-	cpp_pop(cpp);
-
 	if (!cpp_got(cpp, TOKEN_EOL) && !cpp_got_eof(cpp)) {
-		DEBUG_MSG("warning: extra tokens will be skipped");
+		cpp_warn("extra tokens will be skipped");
 		cpp_skip_line(cpp);
-		return false;
 	}
-
-	return true;
+	else if (cpp_got(cpp, TOKEN_EOL)) {
+		cpp_pop(cpp);
+	}
 }
 
 
 static void cpp_parse_error(struct cpp *cpp)
 {
-	cpp_pop(cpp);
 	cpp_error("%s", cpp->cur->str);
-	cpp_require_eol_eof(cpp);
+	cpp_pop(cpp);
+	cpp_match_eol_eof(cpp);
 }
 
 
@@ -198,8 +202,7 @@ static void cpp_parse_include(struct cpp *cpp)
 {
 	cpp->lexer.inside_include = true;
 
-	cpp_pop(cpp);
-	if (cpp_require(cpp, TOKEN_HEADER_NAME)) {
+	if (cpp_expect(cpp, TOKEN_HEADER_NAME)) {
 		DEBUG_PRINTF("#include header file '%s'", cpp->cur->str);
 	}
 
@@ -207,9 +210,9 @@ static void cpp_parse_include(struct cpp *cpp)
 }
 
 
-static bool cpp_require_directive(struct cpp *cpp)
+static bool cpp_expect_directive(struct cpp *cpp)
 {
-	if (!cpp_require(cpp, TOKEN_NAME))
+	if (!cpp_expect(cpp, TOKEN_NAME))
 		return false;
 
 	if (cpp->cur->symbol->type != SYMBOL_TYPE_CPP_DIRECTIVE) {
@@ -228,62 +231,48 @@ static void cpp_skip_ifbranch(struct cpp *cpp);
 
 static void cpp_skip_if(struct cpp *cpp)
 {
-	enum cpp_directive directive;
+	DEBUG_TRACE;
 
 	assert(cpp_directive(cpp, CPP_DIRECTIVE_IF)
 		|| cpp_directive(cpp, CPP_DIRECTIVE_IFDEF)
 		|| cpp_directive(cpp, CPP_DIRECTIVE_IFNDEF)
+		|| cpp_directive(cpp, CPP_DIRECTIVE_ELIF)
 		|| cpp_directive(cpp, CPP_DIRECTIVE_ELSE));
 
-skip_if_or_elif:
-	cpp_skip_line(cpp); /* ignore the condition */
+skip_another_branch:
+	if (!cpp_directive(cpp, CPP_DIRECTIVE_ELSE) && !cpp_directive(cpp, CPP_DIRECTIVE_ENDIF))
+		cpp_skip_rest_of_directive(cpp); /* ignore the condition */
+	else
+		cpp_pop(cpp);
 
-skip_else:
-	cpp_require_eol_eof(cpp);
+	cpp_match_eol_eof(cpp);
 
 	cpp_skip_ifbranch(cpp);
-	cpp_pop(cpp);
-
-	/* cpp_skip_ifbranch returns on elif/else/endif or when EOF is met */
-	assert(cpp_got_eof(cpp) || cpp_got_directive(cpp));
 
 	if (cpp_got_eof(cpp)) {
 		cpp_error("unexpected EOF, endif was expected");
 		return;
 	}
 
-	directive = cpp->cur->symbol->directive;
-
-	assert(directive == CPP_DIRECTIVE_ELIF
-		|| directive == CPP_DIRECTIVE_ELSE
-		|| directive == CPP_DIRECTIVE_ENDIF);
-
-	switch (directive) {
-	case CPP_DIRECTIVE_ELIF:
-		goto skip_if_or_elif;
-
-	case CPP_DIRECTIVE_ELSE:
-		goto skip_else;
-
-	case CPP_DIRECTIVE_ENDIF:
-		cpp_require_eol_eof(cpp);
-		break;
-
-	default:
+	if (cpp_directive(cpp, CPP_DIRECTIVE_ENDIF)) {
+		cpp_pop(cpp);
+		cpp_match_eol_eof(cpp);
 		return;
 	}
+
+	goto skip_another_branch;
 }
 
 
 static void cpp_skip_directive(struct cpp *cpp)
 {
-	if (!cpp_require_directive(cpp))
+	if (!cpp_expect_directive(cpp))
 		cpp_skip_line(cpp);
 
 	switch (cpp->cur->symbol->directive) {
 	case CPP_DIRECTIVE_IF:
-	case CPP_DIRECTIVE_IFNDEF:
 	case CPP_DIRECTIVE_IFDEF:
+	case CPP_DIRECTIVE_IFNDEF:
 		cpp_skip_if(cpp);
 		break;
 
@@ -297,7 +286,7 @@ static void cpp_skip_ifbranch(struct cpp *cpp)
 {
 	DEBUG_TRACE;
 
-	while (cpp_pop(cpp) && !cpp_got_eof(cpp)) {
+	while (!cpp_got_eof(cpp)) {
 		if (!cpp_got_hash(cpp)) {
 			cpp_skip_line(cpp);
 			continue;
@@ -305,17 +294,16 @@ static void cpp_skip_ifbranch(struct cpp *cpp)
 
 		cpp_pop(cpp);
 
-		if (!cpp_require_directive(cpp)) {
+		if (!cpp_expect_directive(cpp)) {
 			cpp_skip_line(cpp);
 			return;
 		}
 
 		switch (cpp->cur->symbol->directive) {
-		case CPP_DIRECTIVE_IF:
-		case CPP_DIRECTIVE_ELSE:
 		case CPP_DIRECTIVE_ELIF:
+		case CPP_DIRECTIVE_ELSE:
 		case CPP_DIRECTIVE_ENDIF:
-			cpp_push(cpp, cpp->cur);
+		case CPP_DIRECTIVE_IF:
 			return;
 
 		default:
@@ -335,18 +323,9 @@ static void cpp_parse_ifbranch(struct cpp *cpp)
 }
 
 
-static bool cpp_test_expr(struct cpp *cpp)
-{
-	cpp_skip_line(cpp);
-	return true; /* TODO */
-}
-
-
 static void cpp_parse_if(struct cpp *cpp)
 {
 	DEBUG_TRACE;
-
-	cpp_pop(cpp);
 
 	assert(cpp_got_eof(cpp)
 		|| cpp_directive(cpp, CPP_DIRECTIVE_IF)
@@ -355,20 +334,23 @@ static void cpp_parse_if(struct cpp *cpp)
 		|| cpp_directive(cpp, CPP_DIRECTIVE_ENDIF));
 
 	while (!cpp_got_eof(cpp)) {
-		if (cpp_directive(cpp, CPP_DIRECTIVE_ENDIF))
+		if (cpp_directive(cpp, CPP_DIRECTIVE_ENDIF)) {
+			cpp_pop(cpp);
+			cpp_skip_line(cpp);
 			return;
+		}
 
-		if (cpp_directive(cpp, CPP_DIRECTIVE_ELSE)
-			|| cpp_test_expr(cpp)) {
-
+		if (cpp_directive(cpp, CPP_DIRECTIVE_ELSE)) {
+			cpp_pop(cpp);
+			cpp_match_eol_eof(cpp);
 			cpp_parse_ifbranch(cpp);
-			break;
+			return;
 		}
 
 		cpp_skip_ifbranch(cpp);
 	}
 
-	cpp_error("endif was expected");
+	cpp_error("EOF was unexpected, expected endif");
 }
 
 
@@ -376,17 +358,18 @@ static void cpp_parse_ifdef(struct cpp *cpp, bool ifndef)
 {
 	DEBUG_TRACE;
 
-	/* this is for the identifier following the if(n)def */
-	cpp_pop(cpp);
-	if (!cpp_require(cpp, TOKEN_NAME)) {
+	if (!cpp_expect(cpp, TOKEN_NAME)) {
 		cpp_warn("skipping rest of the if directive");
 		cpp_skip_if(cpp);
 	}
-
-	if ((cpp->cur->symbol->type == SYMBOL_TYPE_CPP_MACRO) == !ifndef) {
+	else if ((cpp->cur->symbol->type == SYMBOL_TYPE_CPP_MACRO) == !ifndef) {
+		cpp_pop(cpp);
+		cpp_match_eol_eof(cpp);
 		cpp_parse_ifbranch(cpp);
 	}
 	else {
+		cpp_pop(cpp);
+		cpp_match_eol_eof(cpp);
 		cpp_skip_ifbranch(cpp);
 		cpp_parse_if(cpp);
 	}
@@ -397,22 +380,22 @@ static void cpp_parse_define(struct cpp *cpp)
 {
 	DEBUG_TRACE;
 
-	cpp_pop(cpp);
-	if (!cpp_require(cpp, TOKEN_NAME)) {
+	if (!cpp_expect(cpp, TOKEN_NAME)) {
 		cpp_skip_line(cpp);
+		return;
 	}
 
 	cpp->cur->symbol->type = SYMBOL_TYPE_CPP_MACRO;
 
-	cpp_require_eol_eof(cpp);
+	cpp_pop(cpp);
+	cpp_match_eol_eof(cpp);
 }
 
 
 static void cpp_parse_directive(struct cpp *cpp)
 {
-	cpp_pop(cpp);
-
-	if (!cpp_require_directive(cpp)) {
+	if (!cpp_expect_directive(cpp)) {
+		cpp_skip_line(cpp);
 		return;
 	}
 
@@ -423,22 +406,27 @@ static void cpp_parse_directive(struct cpp *cpp)
 
 	switch (cpp->cur->symbol->directive) {
 	case CPP_DIRECTIVE_ERROR:
+		cpp_pop(cpp);
 		cpp_parse_error(cpp);
 		break;
 
 	case CPP_DIRECTIVE_INCLUDE:
+		cpp_pop(cpp);
 		cpp_parse_include(cpp);
 		break;
 
 	case CPP_DIRECTIVE_IFDEF:
+		cpp_pop(cpp);
 		cpp_parse_ifdef(cpp, false);
 		break;
 
 	case CPP_DIRECTIVE_IFNDEF:
+		cpp_pop(cpp);
 		cpp_parse_ifdef(cpp, true);
 		break;
 
 	case CPP_DIRECTIVE_DEFINE:
+		cpp_pop(cpp);
 		cpp_parse_define(cpp);
 		break;
 
@@ -459,11 +447,12 @@ static void cpp_parse_directive(struct cpp *cpp)
 		 *
 		 * TODO Validation.
 		 */
+		cpp_pop(cpp);
+		cpp_match_eol_eof(cpp);
 		break;
 
 	default:
-		cpp_error("directive %s not supported",
-			symbol_get_name(cpp->cur->symbol));
+		cpp_error("directive %s not supported");
 		cpp_skip_line(cpp);
 	}
 }
@@ -471,11 +460,9 @@ static void cpp_parse_directive(struct cpp *cpp)
 
 static void cpp_parse(struct cpp *cpp)
 {
-	cpp_pop(cpp);
-
 	while (cpp_got_hash(cpp)) {
-		cpp_parse_directive(cpp);
 		cpp_pop(cpp);
+		cpp_parse_directive(cpp);
 	}
 }
 
@@ -493,6 +480,7 @@ mcc_error_t cpp_open(struct cpp *cpp, const char *filename)
 		return err;
 
 	lexer_set_inbuf(&cpp->lexer, &cpp->inbuf);
+	cpp_pop(cpp);
 
 	return MCC_ERROR_OK;
 }
@@ -516,7 +504,7 @@ void cpp_set_symtab(struct cpp *cpp, struct symtab *table)
 struct tokinfo *cpp_next(struct cpp *cpp)
 {
 	cpp_parse(cpp);
-	return cpp->cur;
+	return cpp_pop(cpp);
 
 }
 
@@ -540,4 +528,3 @@ void cpp_free(struct cpp *cpp)
 	lexer_free(&cpp->lexer);
 	list_free(&cpp->tokens);
 }
-

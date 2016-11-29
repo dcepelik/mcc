@@ -37,6 +37,7 @@ struct lexer
 	struct tokinfo eof;		/* tokinfo of an EOF token */
 	bool inside_include;		/* are we lexing in an #include? */
 	bool next_at_bol;		/* is next token at BOL? */
+	bool first_token;
 };
 
 mcc_error_t lexer_init(struct lexer *lexer);
