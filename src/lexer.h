@@ -8,20 +8,13 @@
  * TODO Handle various encoding-related issues
  */
 
+#include <stdbool.h>
+
 #include "inbuf.h"
 #include "mempool.h"
 #include "objpool.h"
 #include "strbuf.h"
 #include "tokinfo.h"
-#include <stdbool.h>
-
-enum lexer_eol_style
-{
-	LEXER_EOL_MAC,
-	LEXER_EOL_MSDOS,
-	LEXER_EOL_UNIX,
-	LEXER_EOL_UNKNOWN,
-};
 
 struct lexer
 {
@@ -31,7 +24,6 @@ struct lexer
 	struct strbuf strbuf;		/* buffer for string accumulation */
 	char *c;			/* current character pointer (within line) */
 	struct strbuf linebuf;		/* buffer for current logical line */
-	enum lexer_eol_style eol_style;	/* end-of-line style used in inbuf */
 	bool inside_include;		/* are we lexing in an #include? */
 	bool next_at_bol;		/* is next token at BOL? */
 	bool first_token;		/* have we produced the first token already? */
