@@ -27,6 +27,12 @@ struct cpp_if
 	bool skip_next_branch;
 };
 
+struct cpp_macro
+{
+	char *name;		/* name of the macro */
+	struct list repl_list;	/* replacement list */
+};
+
 #include "cppfile.h"
 
 struct cppfile;

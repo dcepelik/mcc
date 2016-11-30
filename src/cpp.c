@@ -24,7 +24,7 @@ static struct cpp_if ifstack_bottom = {
 
 
 static const struct {
-	const char *name;
+	char *name;
 	enum cpp_directive directive;
 } directives[] = {
 	{ .name = "if", .directive = CPP_DIRECTIVE_IF },
@@ -60,7 +60,7 @@ static void cpp_setup_symtab_builtins(struct cppfile *file)
 	struct symbol *symbol;
 	size_t i;
 
-	const char *builtins[] = {
+	char *builtins[] = {
 		"__""LINE__", // TODO better way to escape this?
 		"__""FILE__",
 		"__""TIME__"
@@ -230,6 +230,9 @@ static void cpp_parse_define(struct cppfile *file)
 
 	if (!cpp_skipping(file))
 		file->cur->symbol->type = SYMBOL_TYPE_CPP_MACRO;
+
+	struct cpp_macro *macro = objpool_alloc(&file->macro_pool);
+	macro->name = symbol_get_name(file->cur->symbol);
 
 	cpp_pop(file);
 }

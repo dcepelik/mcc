@@ -16,6 +16,7 @@
 /* TODO Inits for lexer and cpp may be better off separated. */
 struct cppfile
 {
+	/* former struct lexer members (extended) */
 	struct objpool tokinfo_pool;	/* objpool for struct tokinfo */
 	struct mempool token_data;	/* mempool for token data (strings mostly) */
 	struct strbuf linebuf;		/* buffer for current logical line */
@@ -26,14 +27,13 @@ struct cppfile
 	bool inside_include;		/* are we lexing in an #include? */
 	bool next_at_bol;		/* is next token at BOL? */
 	bool first_token;		/* have we produced the first token already? */
-
-	struct list tokens;		/* token list */
-	struct tokinfo *cur;		/* last popped tokinfo */
-
 	struct location location;	/* current location */
 
+	/* former struct cpp members (extended) */
+	struct objpool macro_pool;	/* objpool for struct cpp_macro */
+	struct list tokens;		/* token list */
+	struct tokinfo *cur;		/* last popped tokinfo */
 	struct list ifs;		/* if directive stack */
-	bool skip;
 	struct cppfile *included_file;	/* currently included file */
 };
 

@@ -6,6 +6,11 @@
 
 #define BUFFER_SIZE	4096
 
+/*
+ * TODO Global task: make interfaces between components separate, (mainly) hide
+ *      implementation of internal structures.
+ */
+
 int main(int argc, char *argv[])
 {
 	char *filename;

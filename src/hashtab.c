@@ -10,7 +10,7 @@
  *
  * Taken from http://www.cse.yorku.ca/~oz/hash.html#sdbm.
  */
-static inline uint64_t hashtab_hash(const char *key)
+static inline uint64_t hashtab_hash(char *key)
 {
 	uint64_t hash = 0;
 	int c;
@@ -84,13 +84,13 @@ size_t hashtab_count(struct hashtab *hashtab)
 }
 
 
-bool hashtab_contains(struct hashtab *hashtab, const char *key)
+bool hashtab_contains(struct hashtab *hashtab, char *key)
 {
 	return hashtab_search(hashtab, key) != NULL;
 }
 
 
-void *hashtab_search(struct hashtab *hashtab, const char *key)
+void *hashtab_search(struct hashtab *hashtab, char *key)
 {
 	uint64_t hash;
 	struct hashnode *node;
@@ -118,7 +118,7 @@ void *hashtab_next(struct hashtab *hashtab, struct hashnode *node)
 }
 
 
-void *hashtab_insert(struct hashtab *hashtab, const char *key)
+void *hashtab_insert(struct hashtab *hashtab, char *key)
 {
 	struct hashnode *new_node;
 	float load;

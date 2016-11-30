@@ -20,6 +20,8 @@ enum symbol_type
 	SYMBOL_TYPE_CPP_DIRECTIVE	/* C preprocessor directive */
 };
 
+struct cpp_macro;
+
 struct symbol
 {
 	struct hashnode hashnode;
@@ -27,6 +29,7 @@ struct symbol
 
 	union {
 		enum cpp_directive directive;
+		struct cpp_macro *macro;
 	};
 };
 
@@ -37,12 +40,12 @@ struct symtab
 };
 
 bool symtab_init(struct symtab *table);
-bool symtab_contains(struct symtab *table, const char *name);
-struct symbol *symtab_search(struct symtab *table, const char *name);
-struct symbol *symtab_insert(struct symtab *table, const char *name);
+bool symtab_contains(struct symtab *table, char *name);
+struct symbol *symtab_search(struct symtab *table, char *name);
+struct symbol *symtab_insert(struct symtab *table, char *name);
 void symtab_free(struct symtab *table);
 
-const char *symbol_get_name(struct symbol *symbol);
+char *symbol_get_name(struct symbol *symbol);
 const char *symbol_get_type(struct symbol *symbol);
 
 #endif

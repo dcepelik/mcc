@@ -13,19 +13,19 @@ bool symtab_init(struct symtab *symtab)
 }
 
 
-struct symbol *symtab_search(struct symtab *symtab, const char *name)
+struct symbol *symtab_search(struct symtab *symtab, char *name)
 {
 	return hashtab_search(&symtab->table, name);
 }
 
 
-bool symtab_contains(struct symtab *symtab, const char *name)
+bool symtab_contains(struct symtab *symtab, char *name)
 {
 	return hashtab_contains(&symtab->table, name);
 }
 
 
-struct symbol *symtab_insert(struct symtab *symtab, const char *name)
+struct symbol *symtab_insert(struct symtab *symtab, char *name)
 {
 	return hashtab_insert(&symtab->table, name);
 }
@@ -38,7 +38,7 @@ void symtab_free(struct symtab *symtab)
 }
 
 
-const char *symbol_get_name(struct symbol *symbol)
+char *symbol_get_name(struct symbol *symbol)
 {
 	return symbol->hashnode.key;
 }
