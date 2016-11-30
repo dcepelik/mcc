@@ -1,5 +1,6 @@
 #include "cpp.h"
 #include "cppfile.h"
+#include "debug.h"
 #include "strbuf.h"
 #include <stdarg.h>
 #include <stdlib.h>
@@ -39,7 +40,7 @@ mcc_error_t cppfile_open(struct cppfile *file, char *filename)
 
 	file->cur = NULL;
 
-	file->line_no = 0;
+	file->location.line_no = 0;
 	
 	mempool_init(&file->token_data, 2048);
 	objpool_init(&file->tokinfo_pool, sizeof(struct tokinfo), 256);
@@ -84,10 +85,12 @@ void cppfile_error(struct cppfile *file, char *fmt, ...)
 	struct strbuf buf;
 	char *line;
 	size_t i;
+	struct location loc;
 
 	(void) file;
 
 	line = strbuf_get_string(&file->linebuf);
+	loc = file->cur->startloc;
 
 	va_list args;
 	va_start(args, fmt);
@@ -97,11 +100,12 @@ void cppfile_error(struct cppfile *file, char *fmt, ...)
 	strbuf_vprintf_at(&buf, strbuf_strlen(&buf), fmt, args);
 	strbuf_printf(&buf, "\n%s\n", line);
 
-	for (i = 0; i < file->column_no; i++)
+	for (i = 0; i < loc.column_no; i++) {
 		if (line[i] == '\t')
 			strbuf_putc(&buf, '\t');
 		else
 			strbuf_putc(&buf, ' ');
+	}
 
 	strbuf_printf(&buf, "^^^");
 

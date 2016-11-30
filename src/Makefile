@@ -3,7 +3,7 @@
 OBJS=mcc.o lexer.o inbuf.o symtab.o objpool.o cpp.o error.o tokinfo.o strbuf.o \
 	hashtab.o mempool.o array.o debug.o list.o cppfile.o
 PROG=mcc
-CFLAGS+=-c -std=gnu11 -Wall --pedantic -ggdb3 -DDEBUG
+CFLAGS+=-c -std=gnu11 -Wall --pedantic# -ggdb3 -DDEBUG
 LDFLAGS=-Wall
 
 

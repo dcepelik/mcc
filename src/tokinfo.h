@@ -27,6 +27,12 @@ enum token
 	TOKEN_EOF, TOKEN_EOL
 };
 
+struct location
+{
+	size_t line_no;
+	size_t column_no;
+};
+
 struct tokinfo
 {
 	struct list_node list_node;
@@ -39,7 +45,12 @@ struct tokinfo
 		int c;
 	};
 
+	struct location startloc;
+	struct location endloc;
+
 	enum token token;
+
+	/* flags */
 	bool preceded_by_whitespace;
 	bool is_at_bol;
 };

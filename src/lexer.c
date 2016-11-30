@@ -389,7 +389,7 @@ static mcc_error_t lexer_read_line(struct cppfile *file)
 
 	strbuf_reset(&file->linebuf);
 
-	for (file->column_no = 0; (c = inbuf_get_char(&file->inbuf)) != INBUF_EOF; file->column_no++) {
+	for (file->location.column_no = 0; (c = inbuf_get_char(&file->inbuf)) != INBUF_EOF; file->location.column_no++) {
 		switch (c) {
 		case ' ':
 		case '\t':
@@ -423,7 +423,7 @@ static mcc_error_t lexer_read_line(struct cppfile *file)
 		}
 	}
 
-	file->line_no++;
+	file->location.line_no++;
 
 	if (c == INBUF_EOF)
 		return MCC_ERROR_EOF;
@@ -499,6 +499,10 @@ next_nonwhite_char:
 
 	tokinfo->is_at_bol = file->next_at_bol;
 	file->next_at_bol = false;
+
+	/* TODO unhack this */
+	file->location.column_no = file->c - strbuf_get_string(&file->linebuf);
+	tokinfo->startloc = file->location;
 
 	file->c++;
 	switch (file->c[-1]) {

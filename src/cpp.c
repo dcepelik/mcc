@@ -188,8 +188,6 @@ static void cpp_parse_error(struct cppfile *file)
 
 static void cpp_parse_include(struct cppfile *file)
 {
-	file->inside_include = true;
-
 	if (cpp_expect(file, TOKEN_HEADER_NAME)) {
 		DEBUG_PRINTF("#include header file '%s'", file->cur->str);
 	}
@@ -348,7 +346,6 @@ static void cpp_parse_ifdef(struct cppfile *file, bool ifndef)
 
 	if (!cpp_expect(file, TOKEN_NAME)) {
 		cpp_warn("skipping rest of the if directive");
-		cpp_skip_line(file);
 		cpp_skip_if(file);
 	}
 	else if ((file->cur->symbol->type == SYMBOL_TYPE_CPP_MACRO) == !ifndef) {
@@ -400,6 +397,7 @@ static void cpp_parse_directive(struct cppfile *file)
 		break;
 
 	case CPP_DIRECTIVE_INCLUDE:
+		file->inside_include = true;
 		cpp_pop(file);
 		cpp_parse_include(file);
 		break;

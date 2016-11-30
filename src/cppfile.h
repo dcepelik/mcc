@@ -29,8 +29,7 @@ struct cppfile
 	struct list tokens;		/* token list */
 	struct tokinfo *cur;		/* last popped tokinfo */
 
-	size_t column_no;
-	size_t line_no;
+	struct location location;	/* current location */
 };
 
 struct cppfile *cppfile_new();
