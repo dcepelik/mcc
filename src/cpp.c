@@ -11,7 +11,7 @@
  * in the code. Imagine the whole cppfile is wrapped between #if 1 and #endif.
  */
 static struct cpp_if ifstack_bottom = {
-	.skip_this_branch = true,
+	.skip_this_branch = false,
 	.skip_other_branches = true /* no other branches */
 };
 
@@ -253,7 +253,8 @@ static void cpp_parse_define(struct cppfile *file)
 		return;
 	}
 
-	file->cur->symbol->type = SYMBOL_TYPE_CPP_MACRO;
+	if (!file->skip)
+		file->cur->symbol->type = SYMBOL_TYPE_CPP_MACRO;
 
 	cpp_pop(file);
 	cpp_match_eol_eof(file);
@@ -278,6 +279,7 @@ static void cpp_parse_directive(struct cppfile *file)
 		cpp_if = cpp_ifstack_push(file, file->cur);
 		cpp_if->skip_other_branches = orig_top->skip_this_branch;
 		cpp_if->skip_this_branch = !(file->cur->symbol->type == SYMBOL_TYPE_CPP_MACRO);
+		cpp_if->skip_other_branches |= !cpp_if->skip_this_branch;
 		file->skip = cpp_if->skip_this_branch;
 		cpp_pop(file);
 		break;
@@ -290,13 +292,15 @@ static void cpp_parse_directive(struct cppfile *file)
 
 		cpp_pop(file);
 		cpp_if = cpp_ifstack_top(file);
-		cpp_if->skip_this_branch = !test_result && !cpp_if->skip_other_branches;
+		cpp_if->skip_this_branch = false || cpp_if->skip_other_branches;
 		cpp_if->skip_other_branches |= !cpp_if->skip_this_branch;
 		file->skip = cpp_if->skip_this_branch;
 		break;
 	
 	case CPP_DIRECTIVE_ELSE:
 		/* TODO check elif after else */
+		cpp_if = cpp_ifstack_top(file);
+		cpp_if->skip_this_branch = cpp_if->skip_other_branches;
 		file->skip = cpp_if->skip_this_branch;
 		cpp_pop(file);
 		break;
