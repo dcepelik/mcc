@@ -105,15 +105,21 @@ static bool cpp_got(struct cppfile *file, enum token token)
 }
 
 
-static bool cpp_got_eol(struct cppfile *file)
+static inline bool cpp_got_eol(struct cppfile *file)
 {
 	return cpp_got(file, TOKEN_EOL);
 }
 
 
-static bool cpp_got_eof(struct cppfile *file)
+static inline bool cpp_got_eof(struct cppfile *file)
 {
 	return cpp_got(file, TOKEN_EOF);
+}
+
+
+static inline bool cpp_got_eol_eof(struct cppfile *file)
+{
+	return cpp_got_eol(file) || cpp_got_eof(file);
 }
 
 
@@ -221,8 +227,81 @@ static inline bool cpp_skipping(struct cppfile *file)
 }
 
 
+static void dump_macro(struct cpp_macro *macro)
+{
+	struct tokinfo *arg;
+	struct tokinfo *repl;
+	struct strbuf buf;
+
+	strbuf_init(&buf, 128);
+	strbuf_printf(&buf, "%s", macro->name);
+
+	if (macro->type == CPP_MACRO_TYPE_FUNCLIKE) {
+		strbuf_putc(&buf, '(');
+		for (arg = list_first(&macro->arglist); arg; arg = list_next(&arg->list_node)) {
+			tokinfo_print(arg, &buf);
+			if (arg != list_last(&macro->arglist))
+				strbuf_printf(&buf, ", ");
+		}
+		strbuf_putc(&buf, ')');
+	}
+
+	strbuf_putc(&buf, ' ');
+
+	for (repl = list_first(&macro->repl_list); repl; repl = list_next(&repl->list_node)) {
+		tokinfo_print(repl, &buf);
+		strbuf_putc(&buf, ' ');
+	}
+
+	printf("%s\n", strbuf_get_string(&buf));
+	strbuf_free(&buf);
+}
+
+
+static void cpp_parse_macro_arglist(struct cppfile *file, struct cpp_macro *macro)
+{
+	bool expect_comma = false;
+	bool arglist_ended = false;
+
+	while (!cpp_got_eol_eof(file)) {
+		if (cpp_got(file, TOKEN_LPAREN)) {
+			cppfile_error(file, "the '(' may not appear inside macro argument list");
+			break;
+		}
+
+		if (cpp_got(file, TOKEN_COMMA)) {
+			if (expect_comma)
+				expect_comma = !expect_comma;
+			else
+				cppfile_error(file, "comma was unexpected here");
+
+			cpp_pop(file);
+			continue;
+		}
+
+		if (cpp_got(file, TOKEN_RPAREN)) {
+			arglist_ended = true;
+			cpp_pop(file);
+			break;
+		}
+
+		if (expect_comma)
+			cppfile_error(file, "comma was expected here");
+
+		list_insert_last(&macro->arglist, &file->cur->list_node);
+		expect_comma = true;
+		cpp_pop(file);
+	}
+
+	if (!arglist_ended)
+		cppfile_error(file, "macro arglist misses terminating parentheses");
+}
+
+
 static void cpp_parse_define(struct cppfile *file)
 {
+	struct tokinfo *tmp;
+
 	if (!cpp_expect(file, TOKEN_NAME)) {
 		cpp_skip_line(file);
 		return;
@@ -233,8 +312,26 @@ static void cpp_parse_define(struct cppfile *file)
 
 	struct cpp_macro *macro = objpool_alloc(&file->macro_pool);
 	macro->name = symbol_get_name(file->cur->symbol);
+	list_init(&macro->arglist);
+	list_init(&macro->repl_list);
 
 	cpp_pop(file);
+
+	if (file->cur->token == TOKEN_LPAREN && !file->cur->preceded_by_whitespace) {
+		cpp_pop(file);
+		cpp_parse_macro_arglist(file, macro);
+		macro->type = CPP_MACRO_TYPE_FUNCLIKE;
+	}
+	else {
+		macro->type = CPP_MACRO_TYPE_VARLIKE;
+	}
+
+	while (!cpp_got_eol_eof(file)) {
+		tmp = cpp_pop(file);
+		list_insert_last(&macro->repl_list, &tmp->list_node);
+	}
+
+	dump_macro(macro);
 }
 
 

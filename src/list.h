@@ -22,6 +22,7 @@ void list_insert_first(struct list *lst, struct list_node *node);
 void *list_remove_first(struct list *lst);
 bool list_is_empty(struct list *lst);
 void *list_first(struct list *lst);
+void *list_last(struct list *lst);
 void *list_next(struct list_node *node);
 size_t list_length(struct list *lst);
 void list_free(struct list *lst);

@@ -27,10 +27,18 @@ struct cpp_if
 	bool skip_next_branch;
 };
 
+enum cpp_macro_type
+{
+	CPP_MACRO_TYPE_VARLIKE,
+	CPP_MACRO_TYPE_FUNCLIKE,
+};
+
 struct cpp_macro
 {
-	char *name;		/* name of the macro */
-	struct list repl_list;	/* replacement list */
+	char *name;			/* name of the macro */
+	struct list arglist;		/* argument list */
+	struct list repl_list;		/* replacement list */
+	enum cpp_macro_type type;	/* type of the macro */
 };
 
 #include "cppfile.h"
