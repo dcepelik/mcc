@@ -1,0 +1,6 @@
+int a = 41 + 17;
+// line comment\
+   on two lines
+for (i = 0; i < 7; i++) {
+	i %= 2;
+}

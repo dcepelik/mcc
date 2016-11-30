@@ -1,1 +1,1 @@
-#define FILE_INCLUDED_OK
+#include "inc.c"

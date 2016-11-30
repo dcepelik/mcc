@@ -1,1 +1,2 @@
-[int] [a] ; <<EOL>> <<EOF>>
+[int] [a] ;
+<<EOF>>
