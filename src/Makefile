@@ -6,8 +6,6 @@ PROG=mcc
 CFLAGS+=-c -std=gnu11 -Wall --pedantic -ggdb3 -DDEBUG
 LDFLAGS=-Wall
 
-all: $(PROG) tests
-
 $(PROG): $(OBJS)
 	$(CC) $(LDFALGS) -o $@ $^
 

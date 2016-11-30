@@ -11,6 +11,7 @@
 #include "tokinfo.h"
 #include <stdlib.h>
 
+
 /* TODO Make this internal and hidden from the backend and the parser. */
 /* TODO Inits for lexer and cpp may be better off separated. */
 struct cppfile
@@ -30,6 +31,9 @@ struct cppfile
 	struct tokinfo *cur;		/* last popped tokinfo */
 
 	struct location location;	/* current location */
+
+	struct list ifs;		/* if directive stack */
+	bool skip;
 };
 
 struct cppfile *cppfile_new();

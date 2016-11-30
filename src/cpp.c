@@ -7,6 +7,16 @@
 
 
 /*
+ * Artificial item at the bottom of the if-stack to avoid special cases
+ * in the code. Imagine the whole cppfile is wrapped between #if 1 and #endif.
+ */
+static struct cpp_if ifstack_bottom = {
+	.skip_this_branch = true,
+	.skip_other_branches = true /* no other branches */
+};
+
+
+/*
  * TODO Assuming that list_node is first member of struct tokinfo.
  *      Define a container_of macro to drop this requirement.
  */
@@ -67,9 +77,6 @@ void cpp_setup_symtab(struct cppfile *file)
 	cpp_setup_symtab_directives(file);
 	cpp_setup_symtab_builtins(file);
 }
-
-
-
 
 
 static struct tokinfo *cpp_pop(struct cppfile *file)
@@ -212,153 +219,28 @@ static bool cpp_expect_directive(struct cppfile *file)
 }
 
 
-static void cpp_skip_ifbranch(struct cppfile *file);
-
-
-static void cpp_skip_if(struct cppfile *file)
+static struct cpp_if *cpp_ifstack_push(struct cppfile *file, struct tokinfo *tokinfo)
 {
-	DEBUG_TRACE;
+	struct cpp_if *cpp_if = mempool_alloc(&file->token_data, sizeof(*cpp_if));
+	cpp_if->tokinfo = tokinfo;
+	cpp_if->skip_this_branch = false;
+	cpp_if->skip_other_branches = false;
 
-	assert(cpp_directive(file, CPP_DIRECTIVE_IF)
-		|| cpp_directive(file, CPP_DIRECTIVE_IFDEF)
-		|| cpp_directive(file, CPP_DIRECTIVE_IFNDEF)
-		|| cpp_directive(file, CPP_DIRECTIVE_ELIF)
-		|| cpp_directive(file, CPP_DIRECTIVE_ELSE));
+	list_insert_first(&file->ifs, &cpp_if->list_node);
 
-skip_another_branch:
-	if (!cpp_directive(file, CPP_DIRECTIVE_ELSE) && !cpp_directive(file, CPP_DIRECTIVE_ENDIF))
-		cpp_skip_rest_of_directive(file); /* ignore the condition */
-	else
-		cpp_pop(file);
-
-	cpp_match_eol_eof(file);
-
-	cpp_skip_ifbranch(file);
-
-	if (cpp_got_eof(file)) {
-		cppfile_error(file, "unexpected EOF, endif was expected");
-		return;
-	}
-
-	if (cpp_directive(file, CPP_DIRECTIVE_ENDIF)) {
-		cpp_pop(file);
-		cpp_match_eol_eof(file);
-		return;
-	}
-
-	goto skip_another_branch;
+	return cpp_if;
 }
 
 
-static void cpp_skip_directive(struct cppfile *file)
+static struct cpp_if *cpp_ifstack_pop(struct cppfile *file)
 {
-	if (!cpp_expect_directive(file))
-		cpp_skip_line(file);
-
-	switch (file->cur->symbol->directive) {
-	case CPP_DIRECTIVE_IF:
-	case CPP_DIRECTIVE_IFDEF:
-	case CPP_DIRECTIVE_IFNDEF:
-		cpp_skip_if(file);
-		break;
-
-	default:
-		cpp_skip_line(file);
-	}
+	return list_remove_first(&file->ifs);
 }
 
 
-static void cpp_skip_ifbranch(struct cppfile *file)
+static struct cpp_if *cpp_ifstack_top(struct cppfile *file)
 {
-	DEBUG_TRACE;
-
-	while (!cpp_got_eof(file)) {
-		if (!cpp_got_hash(file)) {
-			cpp_skip_line(file);
-			continue;
-		}
-
-		cpp_pop(file);
-
-		if (!cpp_expect_directive(file)) {
-			cpp_skip_line(file);
-			return;
-		}
-
-		switch (file->cur->symbol->directive) {
-		case CPP_DIRECTIVE_ELIF:
-		case CPP_DIRECTIVE_ELSE:
-		case CPP_DIRECTIVE_ENDIF:
-		case CPP_DIRECTIVE_IF:
-			return;
-
-		default:
-			cpp_skip_directive(file);
-		}
-	}
-}
-
-
-static void cpp_parse(struct cppfile *file);
-
-
-static void cpp_parse_ifbranch(struct cppfile *file)
-{
-	DEBUG_TRACE;
-	cpp_parse(file);
-}
-
-
-static void cpp_parse_if(struct cppfile *file)
-{
-	DEBUG_TRACE;
-
-	assert(cpp_got_eof(file)
-		|| cpp_directive(file, CPP_DIRECTIVE_IF)
-		|| cpp_directive(file, CPP_DIRECTIVE_ELIF)
-		|| cpp_directive(file, CPP_DIRECTIVE_ELSE)
-		|| cpp_directive(file, CPP_DIRECTIVE_ENDIF));
-
-	while (!cpp_got_eof(file)) {
-		if (cpp_directive(file, CPP_DIRECTIVE_ENDIF)) {
-			cpp_pop(file);
-			cpp_skip_line(file);
-			return;
-		}
-
-		if (cpp_directive(file, CPP_DIRECTIVE_ELSE)) {
-			cpp_pop(file);
-			cpp_match_eol_eof(file);
-			cpp_parse_ifbranch(file);
-			return;
-		}
-
-		cpp_skip_ifbranch(file);
-	}
-
-	cppfile_error(file, "EOF was unexpected, expected endif");
-}
-
-
-static void cpp_parse_ifdef(struct cppfile *file, bool ifndef)
-{
-	DEBUG_TRACE;
-
-	if (!cpp_expect(file, TOKEN_NAME)) {
-		cpp_warn("skipping rest of the if directive");
-		cpp_skip_if(file);
-	}
-	else if ((file->cur->symbol->type == SYMBOL_TYPE_CPP_MACRO) == !ifndef) {
-		cpp_pop(file);
-		cpp_match_eol_eof(file);
-		cpp_parse_ifbranch(file);
-	}
-	else {
-		cpp_pop(file);
-		cpp_match_eol_eof(file);
-		cpp_skip_ifbranch(file);
-		cpp_parse_if(file);
-	}
+	return list_first(&file->ifs);
 }
 
 
@@ -380,79 +262,82 @@ static void cpp_parse_define(struct cppfile *file)
 
 static void cpp_parse_directive(struct cppfile *file)
 {
+	struct cpp_if *cpp_if;
+	struct cpp_if *orig_top;
+	bool test_result = true;
+
 	if (!cpp_expect_directive(file)) {
 		cpp_skip_line(file);
 		return;
 	}
 
-	/*
-	 * TODO Right now, I am assuming correct #if..#elif..#else..#endif
-	 *      constructs. Add error-handling.
-	 */
-
 	switch (file->cur->symbol->directive) {
-	case CPP_DIRECTIVE_ERROR:
-		cpp_pop(file);
-		cpp_parse_error(file);
-		break;
-
-	case CPP_DIRECTIVE_INCLUDE:
-		file->inside_include = true;
-		cpp_pop(file);
-		cpp_parse_include(file);
-		break;
-
 	case CPP_DIRECTIVE_IFDEF:
 		cpp_pop(file);
-		cpp_parse_ifdef(file, false);
+		orig_top = cpp_ifstack_top(file);
+		cpp_if = cpp_ifstack_push(file, file->cur);
+		cpp_if->skip_other_branches = orig_top->skip_this_branch;
+		cpp_if->skip_this_branch = !(file->cur->symbol->type == SYMBOL_TYPE_CPP_MACRO);
+		file->skip = cpp_if->skip_this_branch;
+		cpp_pop(file);
 		break;
 
-	case CPP_DIRECTIVE_IFNDEF:
+	case CPP_DIRECTIVE_ELIF:
+		//if (cpp_ifstack_empty(file)) {
+		//	cppfile_error(file, "elif without preceding if/ifdef/ifndef");
+		//	assert(false);
+		//}
+
 		cpp_pop(file);
-		cpp_parse_ifdef(file, true);
+		cpp_if = cpp_ifstack_top(file);
+		cpp_if->skip_this_branch = !test_result && !cpp_if->skip_other_branches;
+		cpp_if->skip_other_branches |= !cpp_if->skip_this_branch;
+		file->skip = cpp_if->skip_this_branch;
+		break;
+	
+	case CPP_DIRECTIVE_ELSE:
+		/* TODO check elif after else */
+		file->skip = cpp_if->skip_this_branch;
+		cpp_pop(file);
+		break;
+
+	case CPP_DIRECTIVE_ENDIF:
+		assert(cpp_ifstack_top(file) != &ifstack_bottom); /* TODO */
+
+		//if (!cpp_ifstack_empty(file))
+			cpp_ifstack_pop(file);
+		//else
+		//	cppfile_error(file, "endif without matching if/ifdef/ifndef");
+		file->skip = cpp_ifstack_top(file)->skip_this_branch;
+		cpp_pop(file);
 		break;
 
 	case CPP_DIRECTIVE_DEFINE:
 		cpp_pop(file);
 		cpp_parse_define(file);
 		break;
-
-	case CPP_DIRECTIVE_ELIF:
-	case CPP_DIRECTIVE_ELSE:
-		/*
-		 * OK, so we must have been parsing an if-branch. If that
-		 * branch was activated, others are to be skipped. 
-		 *
-		 * TODO Validation.
-		 */
-		cpp_skip_if(file);
-		break;
-
-	case CPP_DIRECTIVE_ENDIF:
-		/*
-		 * Same as above.
-		 *
-		 * TODO Validation.
-		 */
-		cpp_pop(file);
-		cpp_match_eol_eof(file);
-		break;
-
-	default:
-		cppfile_error(file, "directive %s not supported", NULL);
-		cpp_skip_line(file);
 	}
 }
 
 
 static void cpp_parse(struct cppfile *file)
 {
-	if (file->cur == NULL)
-		cpp_pop(file); /* TODO Get rid of this special case */
+	if (file->cur == NULL) { /* TODO Get rid of this special case */
+		cpp_pop(file); 
+		list_insert_first(&file->ifs, &ifstack_bottom.list_node);
+	}
 
-	while (cpp_got_hash(file)) {
-		cpp_pop(file);
-		cpp_parse_directive(file);
+	while (!cpp_got_eof(file)) {
+		if (!cpp_got_hash(file)) {
+			if (!file->skip)
+				break;
+
+			cpp_pop(file);
+		}
+		else {
+			cpp_pop(file);
+			cpp_parse_directive(file);
+		}
 	}
 }
 
