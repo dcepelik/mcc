@@ -42,6 +42,7 @@ mcc_error_t cppfile_open(struct cppfile *file, char *filename)
 
 	file->location.line_no = 0;
 	file->skip = false;
+	file->included_file = NULL;
 	
 	mempool_init(&file->token_data, 2048);
 	objpool_init(&file->tokinfo_pool, sizeof(struct tokinfo), 256);

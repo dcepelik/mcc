@@ -155,7 +155,7 @@ struct symbol *lexer_upsert_symbol(struct cppfile *file, char *name)
 	symbol = symtab_search(file->symtab, name);
 	if (!symbol) {
 		symbol = symtab_insert(file->symtab, name);
-		symbol->type = SYMBOL_TYPE_UNKNOWN;
+		symbol->type = SYMBOL_TYPE_UNDEF;
 	}
 
 	return symbol;
@@ -166,7 +166,10 @@ struct tokinfo *lex_name(struct cppfile *file, struct tokinfo *tokinfo)
 {
 	strbuf_reset(&file->strbuf);
 
-	while (is_letter(*file->c) || is_digit(*file->c) || *file->c == '_' || *file->c == '\\') {
+	while (is_letter(*file->c)
+		|| is_digit(*file->c)
+		|| *file->c == '_'
+		|| *file->c == '\\') {
 		strbuf_putc(&file->strbuf, *file->c); // TODO UCN support affects this
 		file->c++;
 	}

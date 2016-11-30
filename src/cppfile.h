@@ -34,6 +34,7 @@ struct cppfile
 
 	struct list ifs;		/* if directive stack */
 	bool skip;
+	struct cppfile *included_file;	/* currently included file */
 };
 
 struct cppfile *cppfile_new();

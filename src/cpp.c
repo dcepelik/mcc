@@ -1,3 +1,9 @@
+/*
+ * TODO Assuming that list_node is first member of struct tokinfo.
+ *      Define a container_of macro to drop this requirement.
+ * TODO Add #pragma and #line support.
+ */
+
 #include "common.h"
 #include "debug.h"
 #include "lexer.h"
@@ -7,19 +13,14 @@
 
 
 /*
- * Artificial item at the bottom of the if-stack to avoid special cases
- * in the code. Imagine the whole cppfile is wrapped between #if 1 and #endif.
+ * Artificial item to be kept at the bottom of the if-stack to avoid special
+ * cases in the code. Its presence is equivalent to the whole cppfile being
+ * wrapped in a big #if 1...#endif block.
  */
 static struct cpp_if ifstack_bottom = {
 	.skip_this_branch = false,
 	.skip_next_branch = true /* no other branches */
 };
-
-
-/*
- * TODO Assuming that list_node is first member of struct tokinfo.
- *      Define a container_of macro to drop this requirement.
- */
 
 
 static const struct {
@@ -173,24 +174,6 @@ static void cpp_match_eol_eof(struct cppfile *file)
 }
 
 
-static void cpp_parse_error(struct cppfile *file)
-{
-	cppfile_error(file, "%s", file->cur->str);
-	cpp_pop(file);
-	cpp_match_eol_eof(file);
-}
-
-
-static void cpp_parse_include(struct cppfile *file)
-{
-	if (cpp_expect(file, TOKEN_HEADER_NAME)) {
-		DEBUG_PRINTF("#include header file '%s'", file->cur->str);
-	}
-
-	file->inside_include = false;
-}
-
-
 static bool cpp_expect_directive(struct cppfile *file)
 {
 	if (!cpp_expect(file, TOKEN_NAME))
@@ -240,8 +223,6 @@ static inline bool cpp_skipping(struct cppfile *file)
 
 static void cpp_parse_define(struct cppfile *file)
 {
-	DEBUG_TRACE;
-
 	if (!cpp_expect(file, TOKEN_NAME)) {
 		cpp_skip_line(file);
 		return;
@@ -251,6 +232,61 @@ static void cpp_parse_define(struct cppfile *file)
 		file->cur->symbol->type = SYMBOL_TYPE_CPP_MACRO;
 
 	cpp_pop(file);
+}
+
+
+static void cpp_parse_undef(struct cppfile *file)
+{
+	if (!cpp_expect(file, TOKEN_NAME)) {
+		cpp_skip_line(file);
+		return;
+	}
+
+	if (!cpp_skipping(file))
+		file->cur->symbol->type = SYMBOL_TYPE_UNDEF;
+
+	cpp_pop(file);
+}
+
+
+static void cpp_parse_error(struct cppfile *file)
+{
+	cppfile_error(file, "%s", file->cur->str);
+	cpp_pop(file);
+	cpp_match_eol_eof(file);
+}
+
+
+/*
+ * TODO #include <header> vs #include "header".
+ */
+static void cpp_parse_include(struct cppfile *file)
+{
+	char *filename;
+	struct cppfile *included_file;
+
+	if (cpp_expect(file, TOKEN_HEADER_NAME))
+		DEBUG_PRINTF("#include header file '%s'", file->cur->str);
+
+	if (!cpp_skipping(file)) {
+		filename = file->cur->str;
+		included_file = cppfile_new();
+		if (!included_file)
+			return;
+
+		if (cppfile_open(included_file, filename) != MCC_ERROR_OK) {
+			cppfile_error(file, "cannot include file %s: access denied",
+				filename);
+			cppfile_delete(included_file);
+		}
+		else {
+			file->included_file = included_file;
+			cppfile_set_symtab(file->included_file, file->symtab);
+		}
+	}
+
+	cpp_pop(file);
+	file->inside_include = false;
 }
 
 
@@ -323,7 +359,21 @@ conclude:
 		break;
 
 	case CPP_DIRECTIVE_INCLUDE:
-		
+		cpp_parse_include(file);
+
+		/*
+		 * TODO To keep tokens after the #include "filename" (if any).
+		 *      How to get rid of this?
+		 */
+		return;
+
+	case CPP_DIRECTIVE_ERROR:
+		cpp_parse_error(file);
+		break;
+
+	case CPP_DIRECTIVE_UNDEF:
+		cpp_parse_undef(file);
+		break;
 
 	default:
 		return;
@@ -357,7 +407,25 @@ static void cpp_parse(struct cppfile *file)
 
 struct tokinfo *cpp_next(struct cppfile *file)
 {
-	cpp_parse(file);
-	return cpp_pop(file);
+	struct tokinfo *next;
 
+included:
+	if (file->included_file) {
+		next = cpp_next(file->included_file);
+
+		if (next->token == TOKEN_EOF) {
+			cppfile_close(file->included_file);
+			cppfile_delete(file->included_file);
+			file->included_file = NULL;
+		}
+		else {
+			return next;
+		}
+	}
+
+	cpp_parse(file);
+	if (file->included_file)
+		goto included;
+
+	return cpp_pop(file);
 }

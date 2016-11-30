@@ -14,7 +14,7 @@
 
 enum symbol_type
 {
-	SYMBOL_TYPE_UNKNOWN,		/* type was not determined yet */
+	SYMBOL_TYPE_UNDEF,		/* not a defined symbol */
 	SYMBOL_TYPE_CPP_MACRO,		/* C preprocessor macro */
 	SYMBOL_TYPE_CPP_BUILTIN,	/* C preprocessor's built-in macro */
 	SYMBOL_TYPE_CPP_DIRECTIVE	/* C preprocessor directive */

@@ -48,7 +48,7 @@ const char *symbol_get_type(struct symbol *symbol)
 {
 	switch (symbol->type)
 	{
-	case SYMBOL_TYPE_UNKNOWN:
+	case SYMBOL_TYPE_UNDEF:
 		return "unknown";
 
 	case SYMBOL_TYPE_CPP_MACRO:
