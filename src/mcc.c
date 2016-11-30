@@ -43,8 +43,14 @@ int main(int argc, char *argv[])
 	cppfile_set_symtab(cppfile, &symtab);
 
 	strbuf_init(&buf, 256);
-	for (i = 0; (tokinfo = cpp_next(cppfile)); i++) {	
-		if (i > 0)
+	for (i = 1; (tokinfo = cpp_next(cppfile)); i++) {	
+		if (tokinfo->token  == TOKEN_EOL) {
+			strbuf_putc(&buf, '\n');
+			i = 0;
+			continue;
+		}
+
+		if (i > 1)
 			strbuf_putc(&buf, ' ');
 		tokinfo_print(tokinfo, &buf);
 

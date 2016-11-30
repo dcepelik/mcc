@@ -652,7 +652,7 @@ next_nonwhite_char:
 		break;
 
 	case '~':
-		tokinfo->token = TOKEN_NEQ;
+		tokinfo->token = TOKEN_NEG;
 		break;
 
 	case '!':
@@ -704,6 +704,14 @@ next_nonwhite_char:
 				file->c++;
 			}
 		}
+		else if (*file->c == '>') {
+			tokinfo->token = TOKEN_RBRACE;
+			file->c++;
+		}
+		else {
+			tokinfo->token = TOKEN_MOD;
+		}
+		break;
 
 	case '<':
 		if (!file->inside_include) {
@@ -712,30 +720,30 @@ next_nonwhite_char:
 			}
 			else if (*file->c == '<') {
 				if (file->c[1] == '=') {
-					tokinfo->token = TOKEN_SHR_EQ;
+					tokinfo->token = TOKEN_SHL_EQ;
 					file->c += 2;
 				}
 				else {
-					tokinfo->token = TOKEN_SHR;
+					tokinfo->token = TOKEN_SHL;
 					file->c++;
 				}
 			}
-			else if (file->c[1] == '%') {
+			else if (*file->c == '%') {
 				tokinfo->token = TOKEN_LBRACE;
 				file->c++;
 			}
-			else if (file->c[1] == ':') {
+			else if (*file->c == ':') {
 				tokinfo->token = TOKEN_LBRACKET;
 				file->c++;
 			}
 			else {
 				tokinfo->token = TOKEN_LT;
 			}
-			break;
 		}
 		else {
 			return lex_header_hname(file, tokinfo);
 		}
+		break;
 
 	case '>':
 		if (*file->c == '=') {
@@ -764,7 +772,7 @@ next_nonwhite_char:
 			file->c++;
 		}
 		else {
-			tokinfo->token = TOKEN_EQ;
+			tokinfo->token = TOKEN_XOR;
 		}
 
 		break;
@@ -819,9 +827,9 @@ next_nonwhite_char:
 		break;
 
 	case '#':
-		if (file->c[1] == '#') {
+		if (*file->c == '#') {
 			tokinfo->token = TOKEN_HASH_HASH;
-			file->c += 2;
+			file->c++;
 		}
 		else {
 			tokinfo->token = TOKEN_HASH;
