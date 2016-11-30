@@ -97,7 +97,7 @@ size_t strbuf_vprintf_at(struct strbuf *buf, size_t offset, char *fmt, va_list a
 {
 	va_list args2;
 	size_t num_written;
-	size_t extra_size_needed;
+	size_t size_needed;
 
 	va_copy(args2, args);
 
@@ -105,13 +105,13 @@ size_t strbuf_vprintf_at(struct strbuf *buf, size_t offset, char *fmt, va_list a
 	if (num_written < 0)
 		return -1;
 
-	extra_size_needed = buf->size - offset - (num_written + 1);
-	if (extra_size_needed > 0) {
-		strbuf_prepare_write(buf, extra_size_needed);
-		buf->len = MAX(buf->len, offset + num_written);
-	}
+	size_needed = offset + num_written + 1;
+	if (size_needed > buf->size)
+		if (!strbuf_resize(buf, MAX(2 * buf->size, size_needed)))
+			return -1;
 
 	vsnprintf(buf->str + offset, (num_written + 1), fmt, args);
+	buf->len = MAX(buf->len, offset + num_written);
 
 	va_end(args2);
 	va_end(args);
