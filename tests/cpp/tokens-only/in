@@ -1,6 +1,11 @@
-int a = 41 + 17;
-// line comment\
-   on two lines
-for (i = 0; i < 7; i++) {
-	i %= 2;
-}
+// identifiers
+ident _ident ident2 void
+// strings
+"string" u"string" u8"string" L"string" U"string"
+// chars
+'c'
+// pp-numbers
+12.7e+3
+/* punctuators */
+& &= -> * : , -- / /= .  ...  = == >= > # ## ++ { [ < && || ( < - -= % %= *= ~
+!= !  | |= + += ?  } ]) ; << <<= >> >>= ^ ^=

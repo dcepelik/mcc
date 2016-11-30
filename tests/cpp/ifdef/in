@@ -1,34 +1,13 @@
-#ifndef A
+#ifdef A
 int a;
+#elif
+int c;
+#define A
+#else
+int d;
 #define A
 #endif
-#ifndef A
-#error "Error"
-#else
-#endif
 #ifdef A
-#else
-#error "Error"
-#endif
-#ifdef B
-#ifdef C
-#ifdef D
-#ifdef E
-#ifdef F
-#ifdef G
-#ifdef H
-#ifdef I
-#ifdef J
-#ifdef K
-#ifdef L
-#endif
-#endif
-#endif
-#endif
-#endif
-#endif
-#endif
-#endif
-#endif
-#endif
+int b;
+#define A
 #endif

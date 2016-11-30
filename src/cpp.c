@@ -12,7 +12,7 @@
  */
 static struct cpp_if ifstack_bottom = {
 	.skip_this_branch = false,
-	.skip_other_branches = true /* no other branches */
+	.skip_next_branch = true /* no other branches */
 };
 
 
@@ -98,18 +98,6 @@ static struct tokinfo *cpp_pop(struct cppfile *file)
 }
 
 
-static void cpp_warn(const char *fmt, ...)
-{
-	va_list args;
-
-	va_start(args, fmt);
-	printf("warning: ");
-	vprintf(fmt, args);
-	putchar('\n');
-	va_end(args);
-}
-
-
 static bool cpp_got(struct cppfile *file, enum token token)
 {
 	return file->cur->token == token;
@@ -176,7 +164,7 @@ static bool cpp_expect(struct cppfile *file, enum token token)
 static void cpp_match_eol_eof(struct cppfile *file)
 {
 	if (!cpp_got(file, TOKEN_EOL) && !cpp_got_eof(file)) {
-		cpp_warn("extra tokens will be skipped");
+		cppfile_error(file, "extra tokens will be skipped");
 		cpp_skip_line(file);
 	}
 	else if (cpp_got(file, TOKEN_EOL)) {
@@ -224,7 +212,7 @@ static struct cpp_if *cpp_ifstack_push(struct cppfile *file, struct tokinfo *tok
 	struct cpp_if *cpp_if = mempool_alloc(&file->token_data, sizeof(*cpp_if));
 	cpp_if->tokinfo = tokinfo;
 	cpp_if->skip_this_branch = false;
-	cpp_if->skip_other_branches = false;
+	cpp_if->skip_next_branch = false;
 
 	list_insert_first(&file->ifs, &cpp_if->list_node);
 
@@ -244,6 +232,12 @@ static struct cpp_if *cpp_ifstack_top(struct cppfile *file)
 }
 
 
+static inline bool cpp_skipping(struct cppfile *file)
+{
+	return cpp_ifstack_top(file)->skip_this_branch;
+}
+
+
 static void cpp_parse_define(struct cppfile *file)
 {
 	DEBUG_TRACE;
@@ -253,74 +247,89 @@ static void cpp_parse_define(struct cppfile *file)
 		return;
 	}
 
-	if (!file->skip)
+	if (!cpp_skipping(file))
 		file->cur->symbol->type = SYMBOL_TYPE_CPP_MACRO;
 
 	cpp_pop(file);
-	cpp_match_eol_eof(file);
 }
 
 
 static void cpp_parse_directive(struct cppfile *file)
 {
 	struct cpp_if *cpp_if;
-	struct cpp_if *orig_top;
-	bool test_result = true;
+	enum cpp_directive dir;
+	bool skipping;
+	bool test_cond;
 
 	if (!cpp_expect_directive(file)) {
 		cpp_skip_line(file);
 		return;
 	}
 
-	switch (file->cur->symbol->directive) {
+	dir = file->cur->symbol->directive;
+
+	file->inside_include = cpp_directive(file, CPP_DIRECTIVE_INCLUDE);
+	cpp_pop(file);
+
+	switch (dir) {
 	case CPP_DIRECTIVE_IFDEF:
+		test_cond = file->cur->symbol->type == SYMBOL_TYPE_CPP_MACRO;
 		cpp_pop(file);
-		orig_top = cpp_ifstack_top(file);
+		goto push_if;
+
+	case CPP_DIRECTIVE_IFNDEF:
+		test_cond = file->cur->symbol->type != SYMBOL_TYPE_CPP_MACRO;
+		cpp_pop(file);
+		goto push_if;
+
+	case CPP_DIRECTIVE_IF:
+		test_cond = true; /* TODO */
+
+push_if:
+		skipping = cpp_skipping(file);
 		cpp_if = cpp_ifstack_push(file, file->cur);
-		cpp_if->skip_other_branches = orig_top->skip_this_branch;
-		cpp_if->skip_this_branch = !(file->cur->symbol->type == SYMBOL_TYPE_CPP_MACRO);
-		cpp_if->skip_other_branches |= !cpp_if->skip_this_branch;
-		file->skip = cpp_if->skip_this_branch;
-		cpp_pop(file);
-		break;
+		cpp_if->skip_next_branch = skipping;
+
+		goto conclude;
 
 	case CPP_DIRECTIVE_ELIF:
-		//if (cpp_ifstack_empty(file)) {
-		//	cppfile_error(file, "elif without preceding if/ifdef/ifndef");
-		//	assert(false);
-		//}
-
-		cpp_pop(file);
+		test_cond = true; /* TODO */
 		cpp_if = cpp_ifstack_top(file);
-		cpp_if->skip_this_branch = false || cpp_if->skip_other_branches;
-		cpp_if->skip_other_branches |= !cpp_if->skip_this_branch;
-		file->skip = cpp_if->skip_this_branch;
+
+conclude:
+		cpp_if->skip_this_branch = !test_cond || cpp_if->skip_next_branch;
+		cpp_if->skip_next_branch |= !cpp_if->skip_this_branch;
+
 		break;
 	
 	case CPP_DIRECTIVE_ELSE:
 		/* TODO check elif after else */
 		cpp_if = cpp_ifstack_top(file);
-		cpp_if->skip_this_branch = cpp_if->skip_other_branches;
-		file->skip = cpp_if->skip_this_branch;
-		cpp_pop(file);
+		cpp_if->skip_this_branch = cpp_if->skip_next_branch;
 		break;
 
 	case CPP_DIRECTIVE_ENDIF:
 		assert(cpp_ifstack_top(file) != &ifstack_bottom); /* TODO */
 
-		//if (!cpp_ifstack_empty(file))
+		if (cpp_ifstack_top(file) == &ifstack_bottom)
+			cppfile_error(file, "endif without matching if/ifdef/ifndef");
+		else
 			cpp_ifstack_pop(file);
-		//else
-		//	cppfile_error(file, "endif without matching if/ifdef/ifndef");
-		file->skip = cpp_ifstack_top(file)->skip_this_branch;
-		cpp_pop(file);
+
 		break;
 
 	case CPP_DIRECTIVE_DEFINE:
-		cpp_pop(file);
 		cpp_parse_define(file);
 		break;
+
+	case CPP_DIRECTIVE_INCLUDE:
+		
+
+	default:
+		return;
 	}
+
+	cpp_match_eol_eof(file);
 }
 
 
@@ -333,7 +342,7 @@ static void cpp_parse(struct cppfile *file)
 
 	while (!cpp_got_eof(file)) {
 		if (!cpp_got_hash(file)) {
-			if (!file->skip)
+			if (!cpp_skipping(file))
 				break;
 
 			cpp_pop(file);

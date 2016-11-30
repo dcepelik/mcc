@@ -24,7 +24,7 @@ struct cpp_if
 	struct list_node list_node;
 	struct tokinfo *tokinfo;
 	bool skip_this_branch;
-	bool skip_other_branches;
+	bool skip_next_branch;
 };
 
 #include "cppfile.h"

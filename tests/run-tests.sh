@@ -30,6 +30,6 @@ for test in *; do
 		fi
 	fi
 
-	rm -f $out_test
+	#rm -f $out_test
 	cd ..
 done
