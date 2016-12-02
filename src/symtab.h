@@ -14,7 +14,7 @@
 
 enum symbol_type
 {
-	SYMBOL_TYPE_UNDEF,		/* not a defined symbol */
+	SYMBOL_TYPE_UNDEF,		/* symbol is not defined yet */
 	SYMBOL_TYPE_CPP_MACRO,		/* C preprocessor macro */
 	SYMBOL_TYPE_CPP_MACRO_ARG,	/* macro's argument */
 	SYMBOL_TYPE_CPP_BUILTIN,	/* C preprocessor's built-in macro */
@@ -23,11 +23,10 @@ enum symbol_type
 
 struct cpp_macro;
 
-struct symbol
+struct symdef
 {
-	struct hashnode hashnode;
+	struct list_node list_node;
 	enum symbol_type type;
-
 	union {
 		enum cpp_directive directive;
 		struct cpp_macro *macro;
@@ -35,9 +34,16 @@ struct symbol
 	};
 };
 
+struct symbol
+{
+	struct hashnode hashnode;	/* allows hashing */
+	struct symdef *def;		/* current scope definition */
+	struct list defs;		/* definition stack */
+};
+
 struct symtab
 {
-	struct objpool symbol_pool;	/* object pool for the symbols */
+	struct objpool symbol_pool;	/* objpool for the symbols */
 	struct hashtab table;		/* a hash table */
 };
 
@@ -49,5 +55,7 @@ void symtab_free(struct symtab *table);
 
 char *symbol_get_name(struct symbol *symbol);
 const char *symbol_get_type(struct symbol *symbol);
+struct symdef *symbol_push_definition(struct symbol *symbol, struct symdef *symdef);
+struct symdef *symbol_pop_definition(struct symbol *symbol);
 
 #endif

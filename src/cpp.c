@@ -45,12 +45,17 @@ static const struct {
 static void cpp_setup_symtab_directives(struct cppfile *file)
 {
 	struct symbol *symbol;
+	struct symdef *symdef;
 	size_t i;
 
 	for (i = 0; i < ARRAY_SIZE(directives); i++) {
 		symbol = symtab_insert(file->symtab, directives[i].name);
-		symbol->type = SYMBOL_TYPE_CPP_DIRECTIVE;
-		symbol->directive = directives[i].directive;
+
+		symdef = objpool_alloc(&file->symdef_pool);
+		symdef->type = SYMBOL_TYPE_CPP_DIRECTIVE;
+		symdef->directive = directives[i].directive;
+
+		symbol_push_definition(symbol, symdef);
 	}
 }
 
@@ -58,6 +63,7 @@ static void cpp_setup_symtab_directives(struct cppfile *file)
 static void cpp_setup_symtab_builtins(struct cppfile *file)
 {
 	struct symbol *symbol;
+	struct symdef *symdef;
 	size_t i;
 
 	char *builtins[] = {
@@ -68,7 +74,11 @@ static void cpp_setup_symtab_builtins(struct cppfile *file)
 
 	for (i = 0; i < ARRAY_SIZE(builtins); i++) {
 		symbol = symtab_insert(file->symtab, builtins[i]);
-		symbol->type = SYMBOL_TYPE_CPP_BUILTIN;
+
+		symdef = objpool_alloc(&file->symdef_pool);
+		symdef->type = SYMBOL_TYPE_CPP_BUILTIN;
+
+		symbol_push_definition(symbol, symdef);
 	}
 }
 
@@ -142,8 +152,8 @@ static bool cpp_got_hash(struct cppfile *file)
 static bool cpp_directive(struct cppfile *file, enum cpp_directive directive)
 {
 	return cpp_got(file, TOKEN_NAME)
-		&& file->cur->symbol->type == SYMBOL_TYPE_CPP_DIRECTIVE
-		&& file->cur->symbol->directive == directive;
+		&& file->cur->symbol->def->type == SYMBOL_TYPE_CPP_DIRECTIVE
+		&& file->cur->symbol->def->directive == directive;
 }
 
 
@@ -183,7 +193,7 @@ static bool cpp_expect_directive(struct cppfile *file)
 	if (!cpp_expect(file, TOKEN_NAME))
 		return false;
 
-	if (file->cur->symbol->type != SYMBOL_TYPE_CPP_DIRECTIVE) {
+	if (file->cur->symbol->def->type != SYMBOL_TYPE_CPP_DIRECTIVE) {
 		cppfile_error(file, "'%s' is not a C preprocessor directive",
 			symbol_get_name(file->cur->symbol));
 
@@ -311,7 +321,7 @@ static void cpp_parse_macro_args(struct cppfile *file, struct cpp_macro *macro)
 {
 	unsigned parens_balance = 0;
 	struct tokinfo *arg;
-	struct symbol *argsym;
+	struct symdef *argdef;
 	bool args_ended = false;
 	struct strbuf buf;
 
@@ -321,13 +331,13 @@ static void cpp_parse_macro_args(struct cppfile *file, struct cpp_macro *macro)
 	cpp_pop(file); /* ( */
 
 	for (arg = list_first(&macro->arglist); arg; arg = list_next(&arg->list_node)) {
-		DEBUG_PRINTF("Parsing argument '%s'", symbol_get_name(arg->symbol));
-		argsym = symtab_insert(file->symtab, symbol_get_name(arg->symbol));
-		argsym->type = SYMBOL_TYPE_CPP_MACRO_ARG;
-		list_init(&argsym->tokens);
+		argdef = objpool_alloc(&file->symdef_pool);
+		argdef->type = SYMBOL_TYPE_CPP_MACRO_ARG;
+		list_init(&argdef->tokens);
 
-		assert(symtab_search(file->symtab, symbol_get_name(arg->symbol))
-			== argsym);
+		symbol_push_definition(arg->symbol, argdef);
+
+		DEBUG_PRINTF("Parsing argument '%s'", symbol_get_name(arg->symbol));
 
 		while (!cpp_got_eof(file)) {
 			tokinfo_print(file->cur, &buf);
@@ -350,7 +360,7 @@ static void cpp_parse_macro_args(struct cppfile *file, struct cpp_macro *macro)
 					break;
 			}
 
-			list_insert_first(&argsym->tokens, &cpp_pop(file)->list_node);
+			list_insert_first(&argdef->tokens, &cpp_pop(file)->list_node);
 		}
 
 		cpp_pop(file);
@@ -366,6 +376,7 @@ static void cpp_parse_macro_args(struct cppfile *file, struct cpp_macro *macro)
 
 static void cpp_parse_define(struct cppfile *file)
 {
+	struct symdef *symdef;
 	struct cpp_macro *macro;
 	struct tokinfo *tmp;
 
@@ -382,8 +393,10 @@ static void cpp_parse_define(struct cppfile *file)
 	list_init(&macro->arglist);
 	list_init(&macro->repl_list);
 
-	file->cur->symbol->type = SYMBOL_TYPE_CPP_MACRO;
-	file->cur->symbol->macro = macro;
+	symdef = objpool_alloc(&file->symdef_pool);
+	symdef->type = SYMBOL_TYPE_CPP_MACRO;
+	symdef->macro = macro;
+	symbol_push_definition(file->cur->symbol, symdef);
 
 	cpp_pop(file);
 
@@ -413,7 +426,7 @@ static void cpp_parse_undef(struct cppfile *file)
 	}
 
 	if (!cpp_skipping(file))
-		file->cur->symbol->type = SYMBOL_TYPE_UNDEF;
+		symbol_pop_definition(file->cur->symbol); /* check it's defined */
 
 	cpp_pop(file);
 }
@@ -469,19 +482,19 @@ static void cpp_parse_directive(struct cppfile *file)
 		return;
 	}
 
-	dir = file->cur->symbol->directive;
+	dir = file->cur->symbol->def->directive;
 
 	file->inside_include = cpp_directive(file, CPP_DIRECTIVE_INCLUDE);
 	cpp_pop(file);
 
 	switch (dir) {
 	case CPP_DIRECTIVE_IFDEF:
-		test_cond = file->cur->symbol->type == SYMBOL_TYPE_CPP_MACRO;
+		test_cond = file->cur->symbol->def->type == SYMBOL_TYPE_CPP_MACRO;
 		cpp_pop(file);
 		goto push_if;
 
 	case CPP_DIRECTIVE_IFNDEF:
-		test_cond = file->cur->symbol->type != SYMBOL_TYPE_CPP_MACRO;
+		test_cond = file->cur->symbol->def->type != SYMBOL_TYPE_CPP_MACRO;
 		cpp_pop(file);
 		goto push_if;
 
@@ -556,8 +569,8 @@ static bool cpp_cur_is_expandable(struct cppfile *file)
 	struct tokinfo *peek;
 
 	if (cpp_got(file, TOKEN_NAME)) {
-		if (file->cur->symbol->type == SYMBOL_TYPE_CPP_MACRO) {
-			macro = file->cur->symbol->macro;
+		if (file->cur->symbol->def->type == SYMBOL_TYPE_CPP_MACRO) {
+			macro = file->cur->symbol->def->macro;
 
 			if (macro->type == CPP_MACRO_TYPE_OBJLIKE) {
 				peek = cpp_peek(file);
@@ -568,7 +581,7 @@ static bool cpp_cur_is_expandable(struct cppfile *file)
 				return true;
 			}
 		}
-		else if (file->cur->symbol->type == SYMBOL_TYPE_CPP_MACRO_ARG) {
+		else if (file->cur->symbol->def->type == SYMBOL_TYPE_CPP_MACRO_ARG) {
 			DEBUG_TRACE;
 		}
 	}
@@ -582,7 +595,7 @@ static void cpp_expand_macro(struct cppfile *file)
 	struct cpp_macro *macro;
 
 	assert(cpp_cur_is_expandable(file));
-	macro = file->cur->symbol->macro;
+	macro = file->cur->symbol->def->macro;
 
 	cpp_pop(file);
 	if (macro->type == CPP_MACRO_TYPE_FUNCLIKE)

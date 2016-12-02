@@ -17,8 +17,8 @@ struct list
 };
 
 void list_init(struct list *lst);
-void list_insert_last(struct list *lst, struct list_node *node);
-void list_insert_first(struct list *lst, struct list_node *node);
+struct list_node *list_insert_last(struct list *lst, struct list_node *node);
+struct list_node *list_insert_first(struct list *lst, struct list_node *node);
 void *list_remove_first(struct list *lst);
 bool list_is_empty(struct list *lst);
 void *list_first(struct list *lst);

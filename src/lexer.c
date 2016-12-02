@@ -154,10 +154,8 @@ struct symbol *lexer_search_or_insert_symbol(struct cppfile *file, char *name)
 	struct symbol *symbol;
 	
 	symbol = symtab_search(file->symtab, name);
-	if (!symbol) {
+	if (!symbol)
 		symbol = symtab_insert(file->symtab, name);
-		symbol->type = SYMBOL_TYPE_UNDEF;
-	}
 
 	return symbol;
 }
@@ -178,9 +176,6 @@ struct tokinfo *lex_name(struct cppfile *file, struct tokinfo *tokinfo)
 
 	tokinfo->token = TOKEN_NAME;
 	tokinfo->symbol = lexer_search_or_insert_symbol(file, strbuf_get_string(&file->strbuf));
-
-	if (strcmp(strbuf_get_string(&file->strbuf), "expr") == 0)
-		DEBUG_PRINTF("expr, symbol type is %s", symbol_get_type(tokinfo->symbol));
 
 	if (!tokinfo->symbol)
 		return NULL;

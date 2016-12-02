@@ -23,16 +23,18 @@ bool list_is_empty(struct list *lst)
 }
 
 
-void list_insert_last(struct list *lst, struct list_node *node)
+struct list_node *list_insert_last(struct list *lst, struct list_node *node)
 {
 	node->next = NULL;
 	lst->last->next = node;
 	lst->last = node;
 	lst->len++;
+
+	return node;
 }
 
 
-void list_insert_first(struct list *lst, struct list_node *node)
+struct list_node *list_insert_first(struct list *lst, struct list_node *node)
 {
 	if (list_is_empty(lst))
 		lst->last = node;
@@ -40,6 +42,8 @@ void list_insert_first(struct list *lst, struct list_node *node)
 	node->next = lst->head.next;
 	lst->head.next = node;
 	lst->len++;
+
+	return node;
 }
 
 

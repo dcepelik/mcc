@@ -141,8 +141,7 @@ void tokinfo_print(struct tokinfo *tokinfo, struct strbuf *buf)
 		break;
 
 	case TOKEN_NAME:
-		strbuf_printf(buf, "%s[%s]", symbol_get_name(tokinfo->symbol),
-			symbol_get_type(tokinfo->symbol));
+		strbuf_printf(buf, "[%s]", symbol_get_name(tokinfo->symbol));
 		break;
 
 	case TOKEN_NUMBER:

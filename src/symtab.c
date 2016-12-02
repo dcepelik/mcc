@@ -6,6 +6,16 @@
 #include <string.h>
 
 
+/*
+ * Artificial symbol definition to be kept at the bottom of the symbol
+ * definition stack. It represents a symbol which is not defined in
+ * current context.
+ */
+static struct symdef undef_symbol_definition = {
+	.type = SYMBOL_TYPE_UNDEF
+};
+
+
 bool symtab_init(struct symtab *symtab)
 {
 	objpool_init(&symtab->symbol_pool, sizeof(struct symbol), 1024);
@@ -27,7 +37,12 @@ bool symtab_contains(struct symtab *symtab, char *name)
 
 struct symbol *symtab_insert(struct symtab *symtab, char *name)
 {
-	return hashtab_insert(&symtab->table, name);
+	struct symbol *symbol;
+	
+	symbol = hashtab_insert(&symtab->table, name);
+	symbol->def = symbol_push_definition(symbol, &undef_symbol_definition);
+
+	return symbol;
 }
 
 
@@ -44,9 +59,23 @@ char *symbol_get_name(struct symbol *symbol)
 }
 
 
-const char *symbol_get_type(struct symbol *symbol)
+struct symdef *symbol_push_definition(struct symbol *symbol, struct symdef *symdef)
 {
-	switch (symbol->type)
+	return (struct symdef *)list_insert_first(&symbol->defs, &symdef->list_node);
+}
+
+
+struct symdef *symbol_pop_definition(struct symbol *symbol)
+{
+	assert(list_first(&symbol->defs) != &undef_symbol_definition);
+
+	return (symbol->def = list_remove_first(&symbol->defs));
+}
+
+
+const char *symdef_get_type(struct symdef *symdef)
+{
+	switch (symdef->type)
 	{
 	case SYMBOL_TYPE_UNDEF:
 		return "unknown";

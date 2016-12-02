@@ -19,6 +19,7 @@ struct cppfile
 	/* former struct lexer members (extended) */
 	struct objpool tokinfo_pool;	/* objpool for struct tokinfo */
 	struct mempool token_data;	/* mempool for token data (strings mostly) */
+
 	struct strbuf linebuf;		/* buffer for current logical line */
 	struct strbuf strbuf;		/* buffer for string accumulation */
 	struct inbuf inbuf;		/* input buffer */
@@ -32,6 +33,8 @@ struct cppfile
 
 	/* former struct cpp members (extended) */
 	struct objpool macro_pool;	/* objpool for struct cpp_macro */
+	struct objpool symdef_pool;	/* mempool for symbol definitions */
+
 	struct list tokens;		/* token list */
 	struct tokinfo *cur;		/* last popped tokinfo */
 	struct list ifs;		/* if directive stack */

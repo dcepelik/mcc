@@ -47,6 +47,7 @@ mcc_error_t cppfile_open(struct cppfile *file, char *filename)
 	mempool_init(&file->token_data, 2048);
 	objpool_init(&file->tokinfo_pool, sizeof(struct tokinfo), 256);
 	objpool_init(&file->macro_pool, sizeof(struct cpp_macro), 256);
+	objpool_init(&file->symdef_pool, sizeof(struct symdef), 256);
 	list_init(&file->tokens);
 	list_init(&file->ifs);
 
