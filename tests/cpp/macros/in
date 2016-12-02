@@ -1,0 +1,6 @@
+#define MAGIC_NUMBER (-42)
+#define SWAP_SIGN(expr)	(-(expr))
+#define F1(x, y) x ## y
+#define F2()
+
+SWAP_SIGN(1)

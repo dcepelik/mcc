@@ -40,6 +40,7 @@ struct symbol *symtab_insert(struct symtab *symtab, char *name)
 	struct symbol *symbol;
 	
 	symbol = hashtab_insert(&symtab->table, name);
+	list_init(&symbol->defs);
 	symbol->def = symbol_push_definition(symbol, &undef_symbol_definition);
 
 	return symbol;
@@ -61,7 +62,8 @@ char *symbol_get_name(struct symbol *symbol)
 
 struct symdef *symbol_push_definition(struct symbol *symbol, struct symdef *symdef)
 {
-	return (struct symdef *)list_insert_first(&symbol->defs, &symdef->list_node);
+	return symbol->def = (struct symdef *)
+		list_insert_first(&symbol->defs, &symdef->list_node);
 }
 
 
@@ -69,7 +71,7 @@ struct symdef *symbol_pop_definition(struct symbol *symbol)
 {
 	assert(list_first(&symbol->defs) != &undef_symbol_definition);
 
-	return (symbol->def = list_remove_first(&symbol->defs));
+	return symbol->def = list_remove_first(&symbol->defs);
 }
 
 
@@ -78,7 +80,7 @@ const char *symdef_get_type(struct symdef *symdef)
 	switch (symdef->type)
 	{
 	case SYMBOL_TYPE_UNDEF:
-		return "unknown";
+		return "undef";
 
 	case SYMBOL_TYPE_CPP_MACRO:
 		return "CPP macro";
