@@ -26,5 +26,6 @@ void *list_last(struct list *lst);
 void *list_next(struct list_node *node);
 size_t list_length(struct list *lst);
 void list_free(struct list *lst);
+void list_prepend(struct list *lst, struct list *lst_to_prepend);
 
 #endif

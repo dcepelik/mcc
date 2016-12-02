@@ -91,13 +91,23 @@ static struct tokinfo *cpp_pop(struct cppfile *file)
 			list_insert_last(&file->tokens, &tokinfo->list_node);
 	}
 
-	assert(list_length(&file->tokens) > 0); /* at least TOKEN_EOF/TOKEN_EOL */
+	assert(!list_is_empty(&file->tokens)); /* at least TOKEN_EOF/TOKEN_EOL */
 
 	tmp = file->cur;
 	file->cur = list_remove_first(&file->tokens);
 	return tmp;
 }
 
+
+static struct tokinfo *cpp_peek(struct cppfile *file)
+{
+	struct tokinfo *peek;
+
+	peek = list_first(&file->tokens);
+	assert(peek != NULL);
+
+	return peek;
+}
 
 static bool cpp_got(struct cppfile *file, enum token token)
 {
@@ -168,18 +178,6 @@ static bool cpp_expect(struct cppfile *file, enum token token)
 }
 
 
-static void cpp_match_eol_eof(struct cppfile *file)
-{
-	if (!cpp_got(file, TOKEN_EOL) && !cpp_got_eof(file)) {
-		cppfile_error(file, "extra tokens will be skipped");
-		cpp_skip_line(file);
-	}
-	else if (cpp_got(file, TOKEN_EOL)) {
-		cpp_pop(file);
-	}
-}
-
-
 static bool cpp_expect_directive(struct cppfile *file)
 {
 	if (!cpp_expect(file, TOKEN_NAME))
@@ -193,6 +191,17 @@ static bool cpp_expect_directive(struct cppfile *file)
 	}
 
 	return true;
+}
+
+static void cpp_match_eol_eof(struct cppfile *file)
+{
+	if (!cpp_got(file, TOKEN_EOL) && !cpp_got_eof(file)) {
+		cppfile_error(file, "extra tokens will be skipped");
+		cpp_skip_line(file);
+	}
+	else if (cpp_got(file, TOKEN_EOL)) {
+		cpp_pop(file);
+	}
 }
 
 
@@ -246,7 +255,7 @@ static void dump_macro(struct cpp_macro *macro)
 		strbuf_putc(&buf, ')');
 	}
 
-	strbuf_putc(&buf, '\t');
+	strbuf_printf(&buf, " -> ");
 
 	for (repl = list_first(&macro->repl_list); repl; repl = list_next(&repl->list_node)) {
 		tokinfo_print(repl, &buf);
@@ -294,12 +303,70 @@ static void cpp_parse_macro_arglist(struct cppfile *file, struct cpp_macro *macr
 	}
 
 	if (!arglist_ended)
-		cppfile_error(file, "macro arglist misses terminating parentheses");
+		cppfile_error(file, "macro arglist misses terminating )");
+}
+
+
+static void cpp_parse_macro_args(struct cppfile *file, struct cpp_macro *macro)
+{
+	unsigned parens_balance = 0;
+	struct tokinfo *arg;
+	struct symbol *argsym;
+	bool args_ended = false;
+	struct strbuf buf;
+
+	strbuf_init(&buf, 1024);
+
+	assert(macro->type != CPP_MACRO_TYPE_FUNCLIKE || file->cur->token == TOKEN_LPAREN);
+	cpp_pop(file); /* ( */
+
+	for (arg = list_first(&macro->arglist); arg; arg = list_next(&arg->list_node)) {
+		DEBUG_PRINTF("Parsing argument '%s'", symbol_get_name(arg->symbol));
+		argsym = symtab_insert(file->symtab, symbol_get_name(arg->symbol));
+		argsym->type = SYMBOL_TYPE_CPP_MACRO_ARG;
+		list_init(&argsym->tokens);
+
+		assert(symtab_search(file->symtab, symbol_get_name(arg->symbol))
+			== argsym);
+
+		while (!cpp_got_eof(file)) {
+			tokinfo_print(file->cur, &buf);
+			DEBUG_PRINTF("Argument item: %s", strbuf_get_string(&buf));
+			strbuf_reset(&buf);
+			if (cpp_got(file, TOKEN_LPAREN)) {
+				parens_balance++;
+			}
+			else if (cpp_got(file, TOKEN_RPAREN)) {
+				if (parens_balance == 0) {
+					args_ended = true;
+					break;
+				}
+				else {
+					parens_balance--;
+				}
+			}
+			else if (cpp_got(file, TOKEN_COMMA)) {
+				if (parens_balance == 0)
+					break;
+			}
+
+			list_insert_first(&argsym->tokens, &cpp_pop(file)->list_node);
+		}
+
+		cpp_pop(file);
+
+		if (args_ended)
+			break;
+	}
+
+	if (!args_ended)
+		cppfile_error(file, "too many arguments or unterminated arglist");
 }
 
 
 static void cpp_parse_define(struct cppfile *file)
 {
+	struct cpp_macro *macro;
 	struct tokinfo *tmp;
 
 	if (!cpp_expect(file, TOKEN_NAME)) {
@@ -307,26 +374,26 @@ static void cpp_parse_define(struct cppfile *file)
 		return;
 	}
 
-	if (!cpp_skipping(file))
-		file->cur->symbol->type = SYMBOL_TYPE_CPP_MACRO;
+	if (cpp_skipping(file))
+		cpp_skip_line(file);
 
-	struct cpp_macro *macro = objpool_alloc(&file->macro_pool);
+	macro = objpool_alloc(&file->macro_pool);
 	macro->name = symbol_get_name(file->cur->symbol);
 	list_init(&macro->arglist);
 	list_init(&macro->repl_list);
 
+	file->cur->symbol->type = SYMBOL_TYPE_CPP_MACRO;
+	file->cur->symbol->macro = macro;
+
 	cpp_pop(file);
 
-	if (file->cur->token == TOKEN_LPAREN) {
-		DEBUG_EXPR("%i", file->cur->preceded_by_whitespace);
-		if (!file->cur->preceded_by_whitespace) {
-			cpp_pop(file);
-			cpp_parse_macro_arglist(file, macro);
-			macro->type = CPP_MACRO_TYPE_FUNCLIKE;
-		}
+	if (file->cur->token == TOKEN_LPAREN && !file->cur->preceded_by_whitespace) {
+		cpp_pop(file);
+		cpp_parse_macro_arglist(file, macro);
+		macro->type = CPP_MACRO_TYPE_FUNCLIKE;
 	}
 	else {
-		macro->type = CPP_MACRO_TYPE_VARLIKE;
+		macro->type = CPP_MACRO_TYPE_OBJLIKE;
 	}
 
 	while (!cpp_got_eol_eof(file)) {
@@ -368,10 +435,7 @@ static void cpp_parse_include(struct cppfile *file)
 	char *filename;
 	struct cppfile *included_file;
 
-	if (cpp_expect(file, TOKEN_HEADER_NAME))
-		DEBUG_PRINTF("#include header file '%s'", file->cur->str);
-
-	if (!cpp_skipping(file)) {
+	if (cpp_expect(file, TOKEN_HEADER_NAME) && !cpp_skipping(file)) {
 		filename = file->cur->str;
 		included_file = cppfile_new();
 		if (!included_file)
@@ -486,6 +550,50 @@ conclude:
 }
 
 
+static bool cpp_cur_is_expandable(struct cppfile *file)
+{
+	struct cpp_macro *macro;
+	struct tokinfo *peek;
+
+	if (cpp_got(file, TOKEN_NAME)) {
+		if (file->cur->symbol->type == SYMBOL_TYPE_CPP_MACRO) {
+			macro = file->cur->symbol->macro;
+
+			if (macro->type == CPP_MACRO_TYPE_OBJLIKE) {
+				peek = cpp_peek(file);
+				return peek->token == TOKEN_LPAREN
+					&& !peek->preceded_by_whitespace;
+			}
+			else {
+				return true;
+			}
+		}
+		else if (file->cur->symbol->type == SYMBOL_TYPE_CPP_MACRO_ARG) {
+			DEBUG_TRACE;
+		}
+	}
+
+	return false;
+}
+
+
+static void cpp_expand_macro(struct cppfile *file)
+{
+	struct cpp_macro *macro;
+
+	assert(cpp_cur_is_expandable(file));
+	macro = file->cur->symbol->macro;
+
+	cpp_pop(file);
+	if (macro->type == CPP_MACRO_TYPE_FUNCLIKE)
+		cpp_parse_macro_args(file, macro);
+
+	list_insert_last(&file->tokens, &file->cur->list_node);
+	list_prepend(&file->tokens, &macro->repl_list);
+	cpp_pop(file);
+}
+
+
 static void cpp_parse(struct cppfile *file)
 {
 	if (file->cur == NULL) { /* TODO Get rid of this special case */
@@ -494,15 +602,20 @@ static void cpp_parse(struct cppfile *file)
 	}
 
 	while (!cpp_got_eof(file)) {
-		if (!cpp_got_hash(file)) {
+		if (cpp_got_hash(file)) {
+			cpp_pop(file);
+			cpp_parse_directive(file);
+
+		}
+		else if (cpp_cur_is_expandable(file)) {
+			/* no cpp_pop(file) here */
+			cpp_expand_macro(file);
+		}
+		else {
 			if (!cpp_skipping(file))
 				break;
 
 			cpp_pop(file);
-		}
-		else {
-			cpp_pop(file);
-			cpp_parse_directive(file);
 		}
 	}
 }

@@ -1,6 +1,7 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 

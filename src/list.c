@@ -1,4 +1,5 @@
 #include "list.h"
+#include "debug.h"
 #include <assert.h>
 
 
@@ -10,9 +11,15 @@ void list_init(struct list *lst)
 }
 
 
+size_t list_length(struct list *lst)
+{
+	return lst->len;
+}
+
+
 bool list_is_empty(struct list *lst)
 {
-	return lst->last != lst->head.next;
+	return lst->last == &lst->head;
 }
 
 
@@ -73,12 +80,33 @@ void *list_next(struct list_node *node)
 }
 
 
-size_t list_length(struct list *lst)
+void list_free(struct list *lst)
 {
-	return lst->len;
 }
 
 
-void list_free(struct list *lst)
+void list_prepend(struct list *lst, struct list *lst_to_prepend)
 {
+	struct list_node *first_prepend;
+	struct list_node *last_prepend;
+
+	first_prepend = list_first(lst_to_prepend);
+	last_prepend = list_last(lst_to_prepend);
+
+	last_prepend->next = list_first(lst);
+	lst->head.next = first_prepend;
+
+	lst->len += list_length(lst_to_prepend);
+
+	if (lst->last == &lst->head)
+		lst->last = last_prepend;
+
+	assert(list_is_empty(lst_to_prepend) || !list_is_empty(lst));
+	assert(list_length(lst) >= list_length(lst_to_prepend));
+}
+
+
+void list_dump(struct list *lst)
+{
+	printf("List, num_nodes=%lu\n", list_length(lst));
 }

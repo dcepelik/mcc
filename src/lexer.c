@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include <inttypes.h>
 #include <stdlib.h>
+#include <string.h>
 
 
 static struct tokinfo eol = { .token = TOKEN_EOL };
@@ -148,7 +149,7 @@ static uint32_t read_escape_sequence(struct cppfile *file)
 }
 
 
-struct symbol *lexer_upsert_symbol(struct cppfile *file, char *name)
+struct symbol *lexer_search_or_insert_symbol(struct cppfile *file, char *name)
 {
 	struct symbol *symbol;
 	
@@ -174,8 +175,12 @@ struct tokinfo *lex_name(struct cppfile *file, struct tokinfo *tokinfo)
 		file->c++;
 	}
 
+
 	tokinfo->token = TOKEN_NAME;
-	tokinfo->symbol = lexer_upsert_symbol(file, strbuf_get_string(&file->strbuf));
+	tokinfo->symbol = lexer_search_or_insert_symbol(file, strbuf_get_string(&file->strbuf));
+
+	if (strcmp(strbuf_get_string(&file->strbuf), "expr") == 0)
+		DEBUG_PRINTF("expr, symbol type is %s", symbol_get_type(tokinfo->symbol));
 
 	if (!tokinfo->symbol)
 		return NULL;

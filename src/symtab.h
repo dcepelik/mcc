@@ -16,6 +16,7 @@ enum symbol_type
 {
 	SYMBOL_TYPE_UNDEF,		/* not a defined symbol */
 	SYMBOL_TYPE_CPP_MACRO,		/* C preprocessor macro */
+	SYMBOL_TYPE_CPP_MACRO_ARG,	/* macro's argument */
 	SYMBOL_TYPE_CPP_BUILTIN,	/* C preprocessor's built-in macro */
 	SYMBOL_TYPE_CPP_DIRECTIVE	/* C preprocessor directive */
 };
@@ -30,6 +31,7 @@ struct symbol
 	union {
 		enum cpp_directive directive;
 		struct cpp_macro *macro;
+		struct list tokens;
 	};
 };
 

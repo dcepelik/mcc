@@ -59,6 +59,9 @@ const char *symbol_get_type(struct symbol *symbol)
 
 	case SYMBOL_TYPE_CPP_DIRECTIVE:
 		return "CPP directive";
+
+	case SYMBOL_TYPE_CPP_MACRO_ARG:
+		return "CPP macro arg";
 	}
 
 	return NULL;

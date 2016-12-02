@@ -29,7 +29,7 @@ struct cpp_if
 
 enum cpp_macro_type
 {
-	CPP_MACRO_TYPE_VARLIKE,
+	CPP_MACRO_TYPE_OBJLIKE,
 	CPP_MACRO_TYPE_FUNCLIKE,
 };
 
