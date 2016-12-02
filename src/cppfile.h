@@ -27,6 +27,7 @@ struct cppfile
 	bool inside_include;		/* are we lexing in an #include? */
 	bool next_at_bol;		/* is next token at BOL? */
 	bool first_token;		/* have we produced the first token already? */
+	bool had_whitespace;		/* have we read any whitespace just before lexing current token? */
 	struct location location;	/* current location */
 
 	/* former struct cpp members (extended) */

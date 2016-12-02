@@ -246,7 +246,7 @@ static void dump_macro(struct cpp_macro *macro)
 		strbuf_putc(&buf, ')');
 	}
 
-	strbuf_putc(&buf, ' ');
+	strbuf_putc(&buf, '\t');
 
 	for (repl = list_first(&macro->repl_list); repl; repl = list_next(&repl->list_node)) {
 		tokinfo_print(repl, &buf);
@@ -271,7 +271,7 @@ static void cpp_parse_macro_arglist(struct cppfile *file, struct cpp_macro *macr
 
 		if (cpp_got(file, TOKEN_COMMA)) {
 			if (expect_comma)
-				expect_comma = !expect_comma;
+				expect_comma = false;
 			else
 				cppfile_error(file, "comma was unexpected here");
 
@@ -317,10 +317,13 @@ static void cpp_parse_define(struct cppfile *file)
 
 	cpp_pop(file);
 
-	if (file->cur->token == TOKEN_LPAREN && !file->cur->preceded_by_whitespace) {
-		cpp_pop(file);
-		cpp_parse_macro_arglist(file, macro);
-		macro->type = CPP_MACRO_TYPE_FUNCLIKE;
+	if (file->cur->token == TOKEN_LPAREN) {
+		DEBUG_EXPR("%i", file->cur->preceded_by_whitespace);
+		if (!file->cur->preceded_by_whitespace) {
+			cpp_pop(file);
+			cpp_parse_macro_arglist(file, macro);
+			macro->type = CPP_MACRO_TYPE_FUNCLIKE;
+		}
 	}
 	else {
 		macro->type = CPP_MACRO_TYPE_VARLIKE;

@@ -37,6 +37,7 @@ mcc_error_t cppfile_open(struct cppfile *file, char *filename)
 	file->inside_include = false;
 	file->next_at_bol = true;
 	file->first_token = true;
+	file->had_whitespace = false;
 
 	file->cur = NULL;
 

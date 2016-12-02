@@ -38,7 +38,7 @@ inline static bool is_digit(int c)
 
 inline static bool is_whitespace(int c)
 {
-	return c == '\n' || c == '\r' || c == '\t' || c == 0x0C || c == ' ';
+	return c == '\t' || c == 0x0C || c == ' ';
 }
 
 
@@ -440,8 +440,10 @@ eol_or_eof:
 
 static inline void eat_whitespace(struct cppfile *file)
 {
-	while (is_whitespace(*file->c))
+	while (is_whitespace(*file->c)) {
+		file->had_whitespace = true;
 		file->c++;
+	}
 }
 
 
@@ -501,7 +503,10 @@ next_nonwhite_char:
 		return NULL;
 
 	tokinfo->is_at_bol = file->next_at_bol;
+	tokinfo->preceded_by_whitespace = file->had_whitespace;
+
 	file->next_at_bol = false;
+	file->had_whitespace = false;
 
 	/* TODO unhack this */
 	file->location.column_no = file->c - strbuf_get_string(&file->linebuf);
