@@ -66,6 +66,33 @@ void *list_remove_first(struct list *lst)
 }
 
 
+static void *list_find_predecessor(struct list *lst, struct list_node *node)
+{
+	struct list_node *cur;
+
+	for (cur = list_first(lst); cur != NULL; cur = list_next(cur)) {
+		if (cur->next == node)
+			break;
+	}
+
+	return cur;
+}
+
+
+void *list_remove(struct list *lst, struct list_node *node)
+{
+	struct list_node *pred;
+
+	pred = list_find_predecessor(lst, node);
+	assert(pred != NULL);
+
+	pred->next = node->next;
+	node->next = NULL;
+
+	return node;
+}
+
+
 void *list_first(struct list *lst)
 {
 	return lst->head.next;
@@ -93,6 +120,8 @@ void list_prepend(struct list *lst, struct list *lst_to_prepend)
 {
 	struct list_node *first_prepend;
 	struct list_node *last_prepend;
+
+	assert(first_prepend != list_first(lst)); /* avoid obvious cycle */
 
 	first_prepend = list_first(lst_to_prepend);
 	last_prepend = list_last(lst_to_prepend);

@@ -37,6 +37,7 @@ struct symdef
 struct symbol
 {
 	struct hashnode hashnode;	/* allows hashing */
+	struct list_node list_node;	/* for the list of defined symbols */
 	struct symdef *def;		/* current scope definition */
 	struct list defs;		/* definition stack */
 };
@@ -44,18 +45,25 @@ struct symbol
 struct symtab
 {
 	struct objpool symbol_pool;	/* objpool for the symbols */
+	struct objpool scope_pool;	/* objpool for the scopes */
 	struct hashtab table;		/* a hash table */
+	struct list scopes;		/* list of active scopes */
 };
 
 bool symtab_init(struct symtab *table);
+void symtab_free(struct symtab *table);
+
 bool symtab_contains(struct symtab *table, char *name);
 struct symbol *symtab_search(struct symtab *table, char *name);
 struct symbol *symtab_insert(struct symtab *table, char *name);
-void symtab_free(struct symtab *table);
+
+void symbol_scope_begin(struct symtab *table);
+void symbol_scope_end(struct symtab *table);
 
 char *symbol_get_name(struct symbol *symbol);
 const char *symbol_get_type(struct symbol *symbol);
-struct symdef *symbol_push_definition(struct symbol *symbol, struct symdef *symdef);
-struct symdef *symbol_pop_definition(struct symbol *symbol);
+struct symdef *symbol_push_definition(struct symtab *table,
+	struct symbol *symbol, struct symdef *symdef);
+struct symdef *symbol_pop_definition(struct symtab *table, struct symbol *symbol);
 
 #endif
