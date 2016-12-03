@@ -360,7 +360,7 @@ static void cpp_parse_macro_args(struct cppfile *file, struct cpp_macro *macro)
 					break;
 			}
 
-			list_insert_first(&argdef->tokens, &cpp_pop(file)->list_node);
+			list_insert_last(&argdef->tokens, &cpp_pop(file)->list_node);
 		}
 
 		cpp_pop(file);
@@ -599,12 +599,12 @@ static void cpp_expand_macro(struct cppfile *file)
 
 	if (file->cur->symbol->def->type == SYMBOL_TYPE_CPP_MACRO) {
 		macro = file->cur->symbol->def->macro;
-
 		cpp_pop(file);
+
 		if (macro->type == CPP_MACRO_TYPE_FUNCLIKE)
 			cpp_parse_macro_args(file, macro);
 
-		list_insert_last(&file->tokens, &file->cur->list_node);
+		list_insert_first(&file->tokens, &file->cur->list_node);
 		list_prepend(&file->tokens, &macro->repl_list);
 		cpp_pop(file);
 	}
@@ -612,7 +612,7 @@ static void cpp_expand_macro(struct cppfile *file)
 		toklist = &file->cur->symbol->def->tokens;
 		cpp_pop(file);
 
-		list_insert_last(&file->tokens, &file->cur->list_node);
+		list_insert_first(&file->tokens, &file->cur->list_node);
 		list_prepend(&file->tokens, toklist);
 		cpp_pop(file);
 	}
