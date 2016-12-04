@@ -49,7 +49,7 @@ static mcc_error_t alloc_new_block(struct objpool *pool)
 		new_unused->next = pool->first_unused;
 		pool->first_unused = new_unused;
 
-		mem += pool->obj_size;
+		mem = (unsigned char *)mem + pool->obj_size;
 	}
 
 	pool->num_blocks++;

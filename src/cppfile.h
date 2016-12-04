@@ -32,7 +32,7 @@ struct cppfile
 	struct location location;	/* current location */
 
 	/* former struct cpp members (extended) */
-	struct objpool macro_pool;	/* objpool for struct cpp_macro */
+	struct objpool macro_pool;	/* objpool for struct macro */
 	struct objpool symdef_pool;	/* mempool for symbol definitions */
 
 	struct list tokens;		/* token list */

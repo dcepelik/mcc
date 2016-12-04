@@ -1,25 +1,26 @@
 #include "debug.h"
 #include "mempool.h"
 #include "symtab.h"
+#include "macro.h"
 #include <assert.h>
 #include <inttypes.h>
+#include <stddef.h>
 #include <string.h>
 
 
 /*
- * Default symbol definition to be kept at the bottom of the symbol
- * definition stack. It represents a symbol which is not defined in
- * current scope (ie. not in any of the parent scopes either).
- */
-static struct symdef undef_symbol_definition = {
+* Artificial symbol definition. It's the definition that every symbol->def
+* points to prior to being defined properly. It's never put onto the
+* definition stack. It simplifies conditionals.
+*/
+static struct symdef symbol_undef = {
 	.type = SYMBOL_TYPE_UNDEF
 };
 
-
 struct symtab_scope
 {
-	struct list_node list_node;	/* for the scope stack */
-	struct list defined_symbols;	/* symbols defined within this scope */
+	struct list_node scope_stack_node;
+	struct list defs;	/* symbol definitions in this scope */
 };
 
 
@@ -30,26 +31,26 @@ struct symtab_scope
 static struct symtab_scope global_scope;
 
 
-static void scope_init(struct symtab_scope *scope)
+static inline void symtab_scope_init(struct symtab_scope *scope)
 {
-	list_init(&scope->defined_symbols);
+	list_init(&scope->defs);
 }
 
 
-static void scope_free(struct symtab_scope *scope)
+static inline void symtab_scope_free(struct symtab_scope *scope)
 {
-	list_free(&scope->defined_symbols);
+	list_free(&scope->defs);
 }
 
 
 bool symtab_init(struct symtab *symtab)
 {
-	objpool_init(&symtab->symbol_pool, sizeof(struct symbol), 1024);
+	objpool_init(&symtab->symbol_pool, sizeof(struct symbol), 256);
 	objpool_init(&symtab->scope_pool, sizeof(struct symtab_scope), 64);
 	list_init(&symtab->scopes);
 
-	scope_init(&global_scope);
-	list_insert_first(&symtab->scopes, &global_scope.list_node);
+	symtab_scope_init(&global_scope);
+	list_insert_first(&symtab->scopes, &global_scope.scope_stack_node);
 
 	return hashtab_init(&symtab->table, &symtab->symbol_pool, 256);
 }
@@ -57,8 +58,22 @@ bool symtab_init(struct symtab *symtab)
 
 void symtab_free(struct symtab *symtab)
 {
+	/*
+	struct symbol *ahoj = symtab_search(symtab, "ahoj");
+	assert(ahoj);
+	assert(ahoj->def);
+	assert(ahoj->def->type == SYMBOL_TYPE_UNDEF);
+
+	struct list_node *n;
+	for (n = list_first(&global_scope.defined_symbols);
+		n; n = list_next(n)) {
+		struct symbol *s = container_of(n, struct symbol, list_node);
+		printf("%s\n", symbol_get_name(s));
+	}
+	*/
 	hashtab_free(&symtab->table);
 	objpool_free(&symtab->symbol_pool);
+	objpool_free(&symtab->scope_pool);
 }
 
 
@@ -74,13 +89,22 @@ bool symtab_contains(struct symtab *symtab, char *name)
 }
 
 
+static void symbol_init(struct symbol *symbol)
+{
+	list_init(&symbol->defs);
+	symbol->def = &symbol_undef;
+}
+
+
 struct symbol *symtab_insert(struct symtab *symtab, char *name)
 {
 	struct symbol *symbol;
 	
 	symbol = hashtab_insert(&symtab->table, name);
-	list_init(&symbol->defs);
-	symbol->def = symbol_push_definition(symtab, symbol, &undef_symbol_definition);
+	symbol_init(symbol);
+
+	//if (strcmp(name, "ahoj") == 0)
+		//symtab_dump(symtab);
 
 	return symbol;
 }
@@ -92,29 +116,40 @@ char *symbol_get_name(struct symbol *symbol)
 }
 
 
-void symbol_scope_begin(struct symtab *table)
+void symtab_scope_begin(struct symtab *table)
 {
+	//DEBUG_MSG("Scope begun");
+
 	struct symtab_scope *scope = objpool_alloc(&table->scope_pool);
-	scope_init(scope);
-	list_insert_last(&table->scopes, &scope->list_node);
+	symtab_scope_init(scope);
+	list_insert_first(&table->scopes, &scope->scope_stack_node);
 }
 
 
-void symbol_scope_end(struct symtab *table)
+void symtab_scope_end(struct symtab *table)
 {
 	assert(list_first(&table->scopes) != &global_scope);
 
-	struct symtab_scope *scope;
 	struct symbol *symbol;
+	struct symtab_scope *scope = list_first(&table->scopes);
 
-	scope = list_remove_first(&table->scopes);
+	list_foreach(struct symdef, def, &scope->defs, scope_list_node) {
+		symbol = def->symbol;
+		list_remove(&symbol->defs, &def->def_stack_node);
 
-	for (symbol = list_first(&scope->defined_symbols); symbol;
-		symbol = list_next(&symbol->list_node)) {
+		symbol->def = list_first(&symbol->defs);
+		if (!symbol->def)
+			symbol->def = &symbol_undef;
 
-		/* TODO free this memory (but I didn't allocate it, rats) */
-		symbol_pop_definition(table, symbol);
+		/* TODO free def */
 	}
+
+	list_remove_first(&table->scopes);
+
+	symtab_scope_free(scope);
+	objpool_dealloc(&table->scope_pool, scope);
+
+	//DEBUG_MSG("Scope ended");
 }
 
 
@@ -123,24 +158,13 @@ struct symdef *symbol_push_definition(struct symtab *table,
 {
 	struct symtab_scope *scope;
 
+	symdef->symbol = symbol;
 	scope = list_first(&table->scopes);
-	list_insert_last(&scope->defined_symbols, &symbol->list_node);
+	list_insert_last(&scope->defs, &symdef->scope_list_node);
 
-	return symbol->def = (struct symdef *)
-		list_insert_first(&symbol->defs, &symdef->list_node);
-}
+	list_insert_first(&symbol->defs, &symdef->def_stack_node);
 
-
-struct symdef *symbol_pop_definition(struct symtab *table, struct symbol *symbol)
-{
-	assert(list_first(&symbol->defs) != &undef_symbol_definition);
-
-	struct symtab_scope *scope;
-
-	scope = list_first(&table->scopes);
-	list_remove(&scope->defined_symbols, &symbol->list_node);
-
-	return symbol->def = list_remove_first(&symbol->defs);
+	return symbol->def = symdef;
 }
 
 
@@ -159,10 +183,38 @@ const char *symdef_get_type(struct symdef *symdef)
 
 	case SYMBOL_TYPE_CPP_DIRECTIVE:
 		return "CPP directive";
-
-	case SYMBOL_TYPE_CPP_MACRO_ARG:
-		return "CPP macro arg";
 	}
 
 	return NULL;
+}
+
+
+void symtab_dump(struct symtab *table)
+{
+	size_t i = 0;
+
+	printf("Symbol table:\n");
+	list_foreach(struct symtab_scope, scope, &table->scopes, scope_stack_node) {
+		printf("Scope %lu:\n", i);
+
+		list_foreach(struct symdef, def, &scope->defs, scope_list_node) {
+			printf(
+				"\t%-16s\t%-16s\t%s",
+				symbol_get_name(def->symbol),
+				symdef_get_type(def),
+				""
+			);
+
+			if (def->type == SYMBOL_TYPE_CPP_MACRO) {
+				cpp_dump_toklist(&def->macro->expansion);
+			}
+			else {
+				putchar('\n');
+			}
+		}
+
+		i++;
+	}
+
+	printf("---\n");
 }

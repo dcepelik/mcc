@@ -158,3 +158,13 @@ void tokinfo_print(struct tokinfo *tokinfo, struct strbuf *buf)
 		strbuf_printf(buf, "%s", name);
 	}
 }
+
+
+void tokinfo_dump(struct tokinfo *tokinfo)
+{
+	struct strbuf buf;
+	strbuf_init(&buf, 1024);
+	tokinfo_print(tokinfo, &buf);
+	printf("%s\n", strbuf_get_string(&buf));
+	strbuf_free(&buf);
+}

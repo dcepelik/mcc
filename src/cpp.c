@@ -6,6 +6,7 @@
 
 #include "common.h"
 #include "debug.h"
+#include "macro.h"
 #include "lexer.h"
 #include "symtab.h"
 #include <assert.h>
@@ -108,25 +109,6 @@ static struct tokinfo *cpp_pop(struct cppfile *file)
 	return tmp;
 }
 
-
-static struct tokinfo *cpp_peek(struct cppfile *file)
-{
-	struct tokinfo *tmp;
-	struct tokinfo *peek;
-
-	/* TODO Rewrite this, this ain't nice. */
-
-	tmp = file->cur;
-	cpp_pop(file);
-	peek = file->cur;
-
-	list_insert_first(&file->tokens, &peek->list_node);
-	file->cur = tmp;
-
-	assert(peek != NULL);
-
-	return peek;
-}
 
 static bool cpp_got(struct cppfile *file, enum token token)
 {
@@ -255,38 +237,7 @@ static inline bool cpp_skipping(struct cppfile *file)
 }
 
 
-static void dump_macro(struct cpp_macro *macro)
-{
-	struct tokinfo *arg;
-	struct tokinfo *repl;
-	struct strbuf buf;
-
-	strbuf_init(&buf, 128);
-	strbuf_printf(&buf, "%s", macro->name);
-
-	if (macro->type == CPP_MACRO_TYPE_FUNCLIKE) {
-		strbuf_putc(&buf, '(');
-		for (arg = list_first(&macro->arglist); arg; arg = list_next(&arg->list_node)) {
-			tokinfo_print(arg, &buf);
-			if (arg != list_last(&macro->arglist))
-				strbuf_printf(&buf, ", ");
-		}
-		strbuf_putc(&buf, ')');
-	}
-
-	strbuf_printf(&buf, " -> ");
-
-	for (repl = list_first(&macro->repl_list); repl; repl = list_next(&repl->list_node)) {
-		tokinfo_print(repl, &buf);
-		strbuf_putc(&buf, ' ');
-	}
-
-	printf("%s\n", strbuf_get_string(&buf));
-	strbuf_free(&buf);
-}
-
-
-static void cpp_parse_macro_arglist(struct cppfile *file, struct cpp_macro *macro)
+static void cpp_parse_macro_arglist(struct cppfile *file, struct macro *macro)
 {
 	bool expect_comma = false;
 	bool arglist_ended = false;
@@ -316,7 +267,7 @@ static void cpp_parse_macro_arglist(struct cppfile *file, struct cpp_macro *macr
 		if (expect_comma)
 			cppfile_error(file, "comma was expected here");
 
-		list_insert_last(&macro->arglist, &file->cur->list_node);
+		list_insert_last(&macro->args, &file->cur->list_node);
 		expect_comma = true;
 		cpp_pop(file);
 	}
@@ -326,67 +277,10 @@ static void cpp_parse_macro_arglist(struct cppfile *file, struct cpp_macro *macr
 }
 
 
-static void cpp_parse_macro_args(struct cppfile *file, struct cpp_macro *macro)
-{
-	unsigned parens_balance = 0;
-	struct tokinfo *arg;
-	struct symdef *argdef;
-	bool args_ended = false;
-	struct strbuf buf;
-
-	strbuf_init(&buf, 1024);
-
-	assert(macro->type != CPP_MACRO_TYPE_FUNCLIKE || file->cur->token == TOKEN_LPAREN);
-	cpp_pop(file); /* ( */
-
-	for (arg = list_first(&macro->arglist); arg; arg = list_next(&arg->list_node)) {
-		argdef = objpool_alloc(&file->symdef_pool);
-		argdef->type = SYMBOL_TYPE_CPP_MACRO_ARG;
-		list_init(&argdef->tokens);
-
-		symbol_push_definition(file->symtab, arg->symbol, argdef);
-
-		DEBUG_PRINTF("Parsing argument '%s'", symbol_get_name(arg->symbol));
-
-		while (!cpp_got_eof(file)) {
-			tokinfo_print(file->cur, &buf);
-			DEBUG_PRINTF("Argument item: %s", strbuf_get_string(&buf));
-			strbuf_reset(&buf);
-			if (cpp_got(file, TOKEN_LPAREN)) {
-				parens_balance++;
-			}
-			else if (cpp_got(file, TOKEN_RPAREN)) {
-				if (parens_balance == 0) {
-					args_ended = true;
-					break;
-				}
-				else {
-					parens_balance--;
-				}
-			}
-			else if (cpp_got(file, TOKEN_COMMA)) {
-				if (parens_balance == 0)
-					break;
-			}
-
-			list_insert_last(&argdef->tokens, &cpp_pop(file)->list_node);
-		}
-
-		cpp_pop(file);
-
-		if (args_ended)
-			break;
-	}
-
-	if (!args_ended)
-		cppfile_error(file, "too many arguments or unterminated arglist");
-}
-
-
 static void cpp_parse_define(struct cppfile *file)
 {
 	struct symdef *symdef;
-	struct cpp_macro *macro;
+	struct macro *macro;
 	struct tokinfo *tmp;
 
 	if (!cpp_expect(file, TOKEN_NAME)) {
@@ -398,9 +292,8 @@ static void cpp_parse_define(struct cppfile *file)
 		cpp_skip_line(file);
 
 	macro = objpool_alloc(&file->macro_pool);
+	macro_init(macro);
 	macro->name = symbol_get_name(file->cur->symbol);
-	list_init(&macro->arglist);
-	list_init(&macro->repl_list);
 
 	symdef = objpool_alloc(&file->symdef_pool);
 	symdef->type = SYMBOL_TYPE_CPP_MACRO;
@@ -412,18 +305,18 @@ static void cpp_parse_define(struct cppfile *file)
 	if (file->cur->token == TOKEN_LPAREN && !file->cur->preceded_by_whitespace) {
 		cpp_pop(file);
 		cpp_parse_macro_arglist(file, macro);
-		macro->type = CPP_MACRO_TYPE_FUNCLIKE;
+		macro->type = MACRO_TYPE_FUNCLIKE;
 	}
 	else {
-		macro->type = CPP_MACRO_TYPE_OBJLIKE;
+		macro->type = MACRO_TYPE_OBJLIKE;
 	}
 
 	while (!cpp_got_eol_eof(file)) {
 		tmp = cpp_pop(file);
-		list_insert_last(&macro->repl_list, &tmp->list_node);
+		list_insert_last(&macro->expansion, &tmp->list_node);
 	}
 
-	dump_macro(macro);
+	//macro_dump(macro);
 }
 
 
@@ -436,7 +329,7 @@ static void cpp_parse_undef(struct cppfile *file)
 
 	if (!cpp_skipping(file)) {
 		/* TODO check it's defined */
-		symbol_pop_definition(file->symtab, file->cur->symbol); 
+		//TODO symbol_pop_definition(file->symtab, file->cur->symbol); 
 	}
 
 	cpp_pop(file);
@@ -574,114 +467,75 @@ conclude:
 }
 
 
-static bool cpp_cur_is_expandable(struct cppfile *file)
+void cpp_dump_toklist(struct list *lst)
 {
-	struct cpp_macro *macro;
-	struct tokinfo *peek;
-
-	if (cpp_got(file, TOKEN_NAME)) {
-		if (file->cur->symbol->def->type == SYMBOL_TYPE_CPP_MACRO) {
-			macro = file->cur->symbol->def->macro;
-
-			if (macro->type == CPP_MACRO_TYPE_FUNCLIKE) {
-				peek = cpp_peek(file);
-				return peek->token == TOKEN_LPAREN
-					&& !peek->preceded_by_whitespace;
-			}
-			else {
-				return true;
-			}
-		}
-		else if (file->cur->symbol->def->type == SYMBOL_TYPE_CPP_MACRO_ARG) {
-			return true;
-		}
-	}
-
-	return false;
-}
-
-
-static void cpp_dump_toklist(struct cppfile *file, struct list *lst)
-{
-	struct tokinfo *token;
 	struct strbuf buf;
 
 	strbuf_init(&buf, 1024);
-	strbuf_printf(&buf, "Toklist: ");
-	tokinfo_print(file->cur, &buf);
-	strbuf_putc(&buf, ' ');
+	strbuf_printf(&buf, "TL: ");
 
 	int c = 0;
 
-	for (token = list_first(lst); token; token = list_next(&token->list_node)) {
+	list_foreach(struct tokinfo, token, lst, list_node) {
 		c++;
 		tokinfo_print(token, &buf);
 		if (token != list_last(lst))
 			strbuf_putc(&buf, ' ');
-
-		if (c > 100) {
-			fprintf(stderr, "Breaking out\n");
-			break;
-		}
-
 	}
 
-	fprintf(stderr, "%s\n", strbuf_get_string(&buf));
+	printf("%s\n", strbuf_get_string(&buf));
+
 	strbuf_free(&buf);
-}
-
-
-static void cpp_copy_toklist(struct cppfile *file, struct list *src, struct list *dst)
-{
-	/* TODO handle alloc errors */
-	struct tokinfo *src_token;
-	struct tokinfo *dst_token;
-
-	for (src_token = list_first(src); src_token;
-		src_token = list_next(&src_token->list_node)) {
-
-		dst_token = objpool_alloc(&file->tokinfo_pool);
-
-		*dst_token = *src_token;
-		list_insert_last(dst, &dst_token->list_node);
-	}
-
-	assert(list_length(src) == list_length(dst));
 }
 
 
 static void cpp_expand_macro(struct cppfile *file)
 {
-	struct cpp_macro *macro;
-	struct list toklist;
+	struct list invocation;
+	struct list expansion;
+	unsigned parens_balance = 0;
 
-	assert(cpp_cur_is_expandable(file));
-	list_init(&toklist);
+	list_init(&invocation);
+	list_init(&expansion);
 
-	if (file->cur->symbol->def->type == SYMBOL_TYPE_CPP_MACRO) {
-		DEBUG_PRINTF("Expanding macro '%s'", symbol_get_name(file->cur->symbol));
-		macro = file->cur->symbol->def->macro;
-		cpp_pop(file);
+	assert(cpp_got(file, TOKEN_NAME));
+	assert(file->cur->symbol->def->type == SYMBOL_TYPE_CPP_MACRO);
 
-		if (macro->type == CPP_MACRO_TYPE_FUNCLIKE)
-			cpp_parse_macro_args(file, macro);
+	list_insert_last(&invocation, &cpp_pop(file)->list_node);
 
-		cpp_copy_toklist(file, &macro->repl_list, &toklist);
+	/*
+	 * For invocations that are a macro name followed by left opening paren,
+	 * this cycle will grab the whole arglist quickly. If the arglist is
+	 * malformed, this will be later reported and recovered by the macro
+	 * module, so no errors are handled here. This is to avoid duplication
+	 * of the arglist parsing logic contained in the macro module.
+	 */
+	while (!cpp_got_eof(file)) {
+		if (cpp_got(file, TOKEN_LPAREN)) {
+			parens_balance++;
+		}
+		else if (cpp_got(file, TOKEN_RPAREN)) {
+			parens_balance--;
 
-		list_insert_first(&file->tokens, &file->cur->list_node);
-		list_prepend(&file->tokens, &toklist);
-		cpp_pop(file);
+			if (parens_balance == 0) {
+				list_insert_last(&invocation, &cpp_pop(file)->list_node);
+				break;
+			}
+		}
+
+		list_insert_last(&invocation, &cpp_pop(file)->list_node);
 	}
-	else if (file->cur->symbol->def->type == SYMBOL_TYPE_CPP_MACRO_ARG) {
-		cpp_copy_toklist(file, &file->cur->symbol->def->tokens, &toklist);
-		cpp_pop(file);
 
-		list_insert_first(&file->tokens, &file->cur->list_node);
-		list_prepend(&file->tokens, &toklist);
-		cpp_pop(file);
-	}
+	/* TODO */
+	struct tokinfo *eof = objpool_alloc(&file->tokinfo_pool);
+	eof->token = TOKEN_EOF;
+	list_insert_last(&invocation, &eof->list_node);
 
-	cpp_dump_toklist(file, &file->tokens);
+	cpp_dump_toklist(&invocation);
+	macro_expand(file, &invocation, &expansion);
+	cpp_dump_toklist(&expansion);
+
+	//list_prepend(&file->tokens, &invocation);
 }
 
 
@@ -698,7 +552,8 @@ static void cpp_parse(struct cppfile *file)
 			cpp_parse_directive(file);
 
 		}
-		else if (cpp_cur_is_expandable(file)) {
+		else if (file->cur->token == TOKEN_NAME
+			&& file->cur->symbol->def->type == SYMBOL_TYPE_CPP_MACRO) {
 			/* no cpp_pop(file) here */
 			cpp_expand_macro(file);
 		}

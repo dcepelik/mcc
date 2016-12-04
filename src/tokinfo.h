@@ -57,5 +57,6 @@ struct tokinfo
 
 const char *token_get_name(enum token token);
 void tokinfo_print(struct tokinfo *tokinfo, struct strbuf *buf);
+void tokinfo_dump(struct tokinfo *tokinfo);
 
 #endif

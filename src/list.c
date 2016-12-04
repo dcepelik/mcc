@@ -66,11 +66,11 @@ void *list_remove_first(struct list *lst)
 }
 
 
-static void *list_find_predecessor(struct list *lst, struct list_node *node)
+void *list_find_predecessor(struct list *lst, struct list_node *node)
 {
 	struct list_node *cur;
 
-	for (cur = list_first(lst); cur != NULL; cur = list_next(cur)) {
+	for (cur = &lst->head; cur != NULL; cur = list_next(cur)) {
 		if (cur->next == node)
 			break;
 	}

@@ -1,6 +1,7 @@
 #include "cpp.h"
 #include "cppfile.h"
 #include "debug.h"
+#include "macro.h"
 #include "strbuf.h"
 #include <stdarg.h>
 #include <stdlib.h>
@@ -46,7 +47,7 @@ mcc_error_t cppfile_open(struct cppfile *file, char *filename)
 	
 	mempool_init(&file->token_data, 2048);
 	objpool_init(&file->tokinfo_pool, sizeof(struct tokinfo), 256);
-	objpool_init(&file->macro_pool, sizeof(struct cpp_macro), 256);
+	objpool_init(&file->macro_pool, sizeof(struct macro), 256);
 	objpool_init(&file->symdef_pool, sizeof(struct symdef), 256);
 	list_init(&file->tokens);
 	list_init(&file->ifs);
@@ -68,6 +69,8 @@ void cppfile_close(struct cppfile *file)
 	inbuf_close(&file->inbuf);
 	mempool_free(&file->token_data);
 	objpool_free(&file->tokinfo_pool);
+	objpool_free(&file->macro_pool);
+	objpool_free(&file->symdef_pool);
 	list_free(&file->tokens);
 }
 
