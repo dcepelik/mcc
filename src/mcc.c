@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
 {
 	char *filename;
 	struct cppfile *cppfile;
-	struct tokinfo *tokinfo;
+	struct token *token;
 	struct symtab symtab;
 	mcc_error_t err;
 	struct strbuf buf;
@@ -48,8 +48,8 @@ int main(int argc, char *argv[])
 	cppfile_set_symtab(cppfile, &symtab);
 
 	strbuf_init(&buf, 256);
-	for (i = 1; (tokinfo = cpp_next(cppfile)); i++) {	
-		if (tokinfo->token  == TOKEN_EOL) {
+	for (i = 1; (token = cpp_next(cppfile)); i++) {	
+		if (token->type  == TOKEN_EOL) {
 			strbuf_putc(&buf, '\n');
 			i = 0;
 			continue;
@@ -57,13 +57,13 @@ int main(int argc, char *argv[])
 
 		if (i > 1)
 			strbuf_putc(&buf, ' ');
-		tokinfo_print(tokinfo, &buf);
+		token_print(token, &buf);
 
-		if (tokinfo->token == TOKEN_EOF)
+		if (token->type == TOKEN_EOF)
 			break;
 	}
 
-	if (!tokinfo) {
+	if (!token) {
 		fprintf(stderr, "Out of memory.\n");
 		return EXIT_FAILURE;
 	}

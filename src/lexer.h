@@ -10,6 +10,6 @@
  * TODO Handle various encoding-related issues
  */
 
-struct tokinfo *lexer_next(struct cppfile *file);
+struct token *lexer_next(struct cppfile *file);
 
 #endif

@@ -1,5 +1,5 @@
 #include "symtab.h"
-#include "tokinfo.h"
+#include "token.h"
 #include <ctype.h>
 
 
@@ -62,7 +62,7 @@ const char *token_names[] = {
 };
 
 
-const char *token_get_name(enum token token)
+const char *token_get_name(enum token_type token)
 {
 	return token_names[token];
 }
@@ -123,34 +123,34 @@ static inline void print_string(char *str, struct strbuf *buf)
 }
 
 
-void tokinfo_print(struct tokinfo *tokinfo, struct strbuf *buf)
+void token_print(struct token *token, struct strbuf *buf)
 {
 	const char *name;
 
-	name = token_get_name(tokinfo->token);
+	name = token_get_name(token->type);
 
-	switch (tokinfo->token) {
+	switch (token->type) {
 	case TOKEN_CHAR_CONST:
 		strbuf_putc(buf, '\'');
-		print_char(tokinfo->value, buf);
+		print_char(token->value, buf);
 		strbuf_putc(buf, '\'');
 		break;
 
 	case TOKEN_HEADER_NAME:
-		strbuf_printf(buf, "<<%s:%s>>", name, tokinfo->str);
+		strbuf_printf(buf, "<<%s:%s>>", name, token->str);
 		break;
 
 	case TOKEN_NAME:
-		strbuf_printf(buf, "[%s]", symbol_get_name(tokinfo->symbol));
+		strbuf_printf(buf, "[%s]", symbol_get_name(token->symbol));
 		break;
 
 	case TOKEN_NUMBER:
-		strbuf_printf(buf, "%s", tokinfo->str);
+		strbuf_printf(buf, "%s", token->str);
 		break;
 
 	case TOKEN_STRING:
 		strbuf_putc(buf, '\"');
-		print_string(tokinfo->str, buf);
+		print_string(token->str, buf);
 		strbuf_putc(buf, '\"');
 		break;
 
@@ -160,11 +160,11 @@ void tokinfo_print(struct tokinfo *tokinfo, struct strbuf *buf)
 }
 
 
-void tokinfo_dump(struct tokinfo *tokinfo)
+void token_dump(struct token *token)
 {
 	struct strbuf buf;
 	strbuf_init(&buf, 1024);
-	tokinfo_print(tokinfo, &buf);
+	token_print(token, &buf);
 	printf("%s\n", strbuf_get_string(&buf));
 	strbuf_free(&buf);
 }

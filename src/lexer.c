@@ -7,8 +7,8 @@
 #include <string.h>
 
 
-static struct tokinfo eol = { .token = TOKEN_EOL };
-static struct tokinfo eof = { .token = TOKEN_EOF };
+static struct token eol = { .type = TOKEN_EOL };
+static struct token eof = { .type = TOKEN_EOF };
 
 static const char simple_escape_seq[256] = {
 	['a'] = '\a',
@@ -161,7 +161,7 @@ struct symbol *lexer_search_or_insert_symbol(struct cppfile *file, char *name)
 }
 
 
-struct tokinfo *lex_name(struct cppfile *file, struct tokinfo *tokinfo)
+struct token *lex_name(struct cppfile *file, struct token *token)
 {
 	strbuf_reset(&file->strbuf);
 
@@ -174,17 +174,17 @@ struct tokinfo *lex_name(struct cppfile *file, struct tokinfo *tokinfo)
 	}
 
 
-	tokinfo->token = TOKEN_NAME;
-	tokinfo->symbol = lexer_search_or_insert_symbol(file, strbuf_get_string(&file->strbuf));
+	token->type = TOKEN_NAME;
+	token->symbol = lexer_search_or_insert_symbol(file, strbuf_get_string(&file->strbuf));
 
-	if (!tokinfo->symbol)
+	if (!token->symbol)
 		return NULL;
 
-	return tokinfo;
+	return token;
 }
 
 
-static struct tokinfo *lex_char(struct cppfile *file, struct tokinfo *tokinfo)
+static struct token *lex_char(struct cppfile *file, struct token *token)
 {
 	uint32_t val;
 	bool seen_delimiter = false;
@@ -218,10 +218,10 @@ static struct tokinfo *lex_char(struct cppfile *file, struct tokinfo *tokinfo)
 	if (!seen_delimiter)
 		DEBUG_MSG("error: missing the final \'");
 
-	tokinfo->token = TOKEN_CHAR_CONST;
-	tokinfo->value = val;
+	token->type = TOKEN_CHAR_CONST;
+	token->value = val;
 
-	return tokinfo;
+	return token;
 }
 
 
@@ -232,7 +232,7 @@ static inline bool lexer_is_eol(struct cppfile *file)
 }
 
 
-struct tokinfo *lex_pp_number(struct cppfile *file, struct tokinfo *tokinfo)
+struct token *lex_pp_number(struct cppfile *file, struct token *token)
 {
 	char c;
 
@@ -261,17 +261,17 @@ struct tokinfo *lex_pp_number(struct cppfile *file, struct tokinfo *tokinfo)
 		file->c++;
 	}
 
-	tokinfo->token = TOKEN_NUMBER;
-	tokinfo->str = strbuf_copy_to_mempool(&file->strbuf, &file->token_data);
+	token->type = TOKEN_NUMBER;
+	token->str = strbuf_copy_to_mempool(&file->strbuf, &file->token_data);
 
-	if (!tokinfo->str)
+	if (!token->str)
 		return NULL;
 
-	return tokinfo;
+	return token;
 }
 
 
-struct tokinfo *lex_string(struct cppfile *file, struct tokinfo *tokinfo)
+struct token *lex_string(struct cppfile *file, struct token *token)
 {
 	strbuf_reset(&file->strbuf);
 
@@ -301,13 +301,13 @@ struct tokinfo *lex_string(struct cppfile *file, struct tokinfo *tokinfo)
 		DEBUG_MSG("error: missing the final \"");
 	}
 
-	tokinfo->token = TOKEN_STRING;
-	tokinfo->str = strbuf_copy_to_mempool(&file->strbuf, &file->token_data);
+	token->type = TOKEN_STRING;
+	token->str = strbuf_copy_to_mempool(&file->strbuf, &file->token_data);
 
-	if (!tokinfo->str)
+	if (!token->str)
 		return NULL;
 
-	return tokinfo;
+	return token;
 }
 
 
@@ -333,7 +333,7 @@ static bool is_valid_hchar(char c)
 }
 
 
-struct tokinfo *lex_header_name(struct cppfile *file, struct tokinfo *tokinfo,
+struct token *lex_header_name(struct cppfile *file, struct token *token,
 	bool (*is_valid_char)(char c), char delim)
 {
 	char c;
@@ -360,25 +360,25 @@ struct tokinfo *lex_header_name(struct cppfile *file, struct tokinfo *tokinfo,
 
 	// TODO Check (and warn about) presence of // and /* comments within header name
 
-	tokinfo->token = TOKEN_HEADER_NAME;
-	tokinfo->str = strbuf_copy_to_mempool(&file->strbuf, &file->token_data);
+	token->type = TOKEN_HEADER_NAME;
+	token->str = strbuf_copy_to_mempool(&file->strbuf, &file->token_data);
 
-	if (!tokinfo->str)
+	if (!token->str)
 		return NULL;
 
-	return tokinfo;
+	return token;
 }
 
 
-struct tokinfo *lex_header_hname(struct cppfile *file, struct tokinfo *tokinfo)
+struct token *lex_header_hname(struct cppfile *file, struct token *token)
 {
-	return lex_header_name(file, tokinfo, is_valid_hchar, '>');
+	return lex_header_name(file, token, is_valid_hchar, '>');
 }
 
 
-struct tokinfo *lex_header_qname(struct cppfile *file, struct tokinfo *tokinfo)
+struct token *lex_header_qname(struct cppfile *file, struct token *token)
 {
-	return lex_header_name(file, tokinfo, is_valid_qchar, '\"');
+	return lex_header_name(file, token, is_valid_qchar, '\"');
 }
 
 
@@ -474,9 +474,9 @@ search_comment_terminator:
 }
 
 
-struct tokinfo *lexer_next(struct cppfile *file)
+struct token *lexer_next(struct cppfile *file)
 {
-	struct tokinfo *tokinfo;
+	struct token *token;
 	mcc_error_t err;
 
 next_nonwhite_char:
@@ -498,19 +498,19 @@ next_nonwhite_char:
 
 	eat_whitespace(file);
 
-	tokinfo = objpool_alloc(&file->tokinfo_pool);
-	if (!tokinfo)
+	token = objpool_alloc(&file->token_pool);
+	if (!token)
 		return NULL;
 
-	tokinfo->is_at_bol = file->next_at_bol;
-	tokinfo->preceded_by_whitespace = file->had_whitespace;
+	token->is_at_bol = file->next_at_bol;
+	token->preceded_by_whitespace = file->had_whitespace;
 
 	file->next_at_bol = false;
 	file->had_whitespace = false;
 
 	/* TODO unhack this */
 	file->location.column_no = file->c - strbuf_get_string(&file->linebuf);
-	tokinfo->startloc = file->location;
+	token->startloc = file->location;
 
 	file->c++;
 	switch (file->c[-1]) {
@@ -518,7 +518,7 @@ next_nonwhite_char:
 		/* u8"string" */
 		if (*file->c == '8' && file->c[1] == '\"') {
 			file->c += 2;
-			return lex_string(file, tokinfo);
+			return lex_string(file, token);
 		}
 
 	case 'U':
@@ -526,13 +526,13 @@ next_nonwhite_char:
 		/* L'char' or U'char' or u'char' */
 		if (*file->c == '\'') {
 			file->c++;
-			return lex_char(file, tokinfo);
+			return lex_char(file, token);
 		}
 		
 		/* L"string" or U"string" or u"string" */
 		if (*file->c == '\"') {
 			file->c++;
-			return lex_string(file, tokinfo);
+			return lex_string(file, token);
 		}
 
 	case '_': case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
@@ -544,25 +544,25 @@ next_nonwhite_char:
 	case 'R': case 'S': case 'T': case 'V': case 'W': case 'X': case 'Y':
 	case 'Z': case '\\':
 		file->c--;
-		return lex_name(file, tokinfo);
+		return lex_name(file, token);
 
 	case '\"':
 		if (file->inside_include)
-			return lex_header_qname(file, tokinfo);
+			return lex_header_qname(file, token);
 		else
-			return lex_string(file, tokinfo);
+			return lex_string(file, token);
 
 	case '\'':
-		return lex_char(file, tokinfo);
+		return lex_char(file, token);
 
 	case '.':
 		if (!is_digit(*file->c)) {
 			if (*file->c == '.' && file->c[1] == '.') {
-				tokinfo->token = TOKEN_ELLIPSIS;
+				token->type = TOKEN_ELLIPSIS;
 				file->c += 2;
 			}
 			else {
-				tokinfo->token = TOKEN_DOT;
+				token->type = TOKEN_DOT;
 			}
 
 			break;
@@ -573,103 +573,103 @@ next_nonwhite_char:
 	case '0': case '1': case '2': case '3': case '4': case '5':
 	case '6': case '7': case '8': case '9':
 		file->c--;
-		return lex_pp_number(file, tokinfo);
+		return lex_pp_number(file, token);
 
 	case '[':
-		tokinfo->token = TOKEN_LBRACKET;
+		token->type = TOKEN_LBRACKET;
 		break;
 
 	case ']':
-		tokinfo->token = TOKEN_RBRACKET;
+		token->type = TOKEN_RBRACKET;
 		break;
 
 	case '(':
-		tokinfo->token = TOKEN_LPAREN;
+		token->type = TOKEN_LPAREN;
 		break;
 
 	case ')':
-		tokinfo->token = TOKEN_RPAREN;
+		token->type = TOKEN_RPAREN;
 		break;
 
 	case '{':
-		tokinfo->token = TOKEN_LBRACE;
+		token->type = TOKEN_LBRACE;
 		break;
 
 	case '}':
-		tokinfo->token = TOKEN_RBRACE;
+		token->type = TOKEN_RBRACE;
 		break;
 
 	case '-':
 		if (*file->c == '>') {
-			tokinfo->token = TOKEN_ARROW;
+			token->type = TOKEN_ARROW;
 			file->c++;
 		}
 		else if (*file->c == '-') {
-			tokinfo->token = TOKEN_DEC;
+			token->type = TOKEN_DEC;
 			file->c++;
 		}
 		else if (*file->c == '=') {
-			tokinfo->token = TOKEN_MINUS_EQ;
+			token->type = TOKEN_MINUS_EQ;
 			file->c++;
 		}
 		else {
-			tokinfo->token = TOKEN_MINUS;
+			token->type = TOKEN_MINUS;
 		}
 
 		break;
 
 	case '+':
 		if (*file->c == '+') {
-			tokinfo->token = TOKEN_INC;
+			token->type = TOKEN_INC;
 			file->c++;
 		}
 		else if (*file->c == '=') {
-			tokinfo->token = TOKEN_PLUS_EQ;
+			token->type = TOKEN_PLUS_EQ;
 			file->c++;
 		}
 		else {
-			tokinfo->token = TOKEN_PLUS;
+			token->type = TOKEN_PLUS;
 		}
 
 		break;
 
 	case '&':
 		if (*file->c == '=') {
-			tokinfo->token = TOKEN_AND_EQ;
+			token->type = TOKEN_AND_EQ;
 			file->c++;
 		}
 		else if (*file->c == '&') {
-			tokinfo->token = TOKEN_LOGICAL_AND;
+			token->type = TOKEN_LOGICAL_AND;
 			file->c++;
 		}
 		else {
-			tokinfo->token = TOKEN_AMPERSAND;
+			token->type = TOKEN_AMPERSAND;
 		}
 
 		break;
 
 	case '*':
 		if (*file->c == '=') {
-			tokinfo->token = TOKEN_MUL_EQ;
+			token->type = TOKEN_MUL_EQ;
 			file->c++;
 		}
 		else {
-			tokinfo->token = TOKEN_ASTERISK;
+			token->type = TOKEN_ASTERISK;
 		}
 
 		break;
 
 	case '~':
-		tokinfo->token = TOKEN_NEG;
+		token->type = TOKEN_NEG;
 		break;
 
 	case '!':
 		if (*file->c == '=') {
-			tokinfo->token = TOKEN_NEQ;
+			token->type = TOKEN_NEQ;
 			file->c++;
 		}
 		else {
-			tokinfo->token = TOKEN_NOT;
+			token->type = TOKEN_NOT;
 		}
 
 		break;
@@ -688,159 +688,159 @@ next_nonwhite_char:
 		}
 
 		if (*file->c == '=') {
-			tokinfo->token = TOKEN_DIV_EQ;
+			token->type = TOKEN_DIV_EQ;
 			file->c++;
 		}
 		else {
-			tokinfo->token = TOKEN_DIV;
+			token->type = TOKEN_DIV;
 		}
 
 		break;
 
 	case '%':
 		if (*file->c == '=') {
-			tokinfo->token = TOKEN_MOD_EQ;
+			token->type = TOKEN_MOD_EQ;
 			file->c++;
 		}
 		else if (*file->c == ':') {
 			if (file->c[1] == '%' && file->c[2] == ':') {
-				tokinfo->token = TOKEN_HASH_HASH;
+				token->type = TOKEN_HASH_HASH;
 				file->c += 3;
 			}
 			else {
-				tokinfo->token = TOKEN_HASH;
+				token->type = TOKEN_HASH;
 				file->c++;
 			}
 		}
 		else if (*file->c == '>') {
-			tokinfo->token = TOKEN_RBRACE;
+			token->type = TOKEN_RBRACE;
 			file->c++;
 		}
 		else {
-			tokinfo->token = TOKEN_MOD;
+			token->type = TOKEN_MOD;
 		}
 		break;
 
 	case '<':
 		if (!file->inside_include) {
 			if (*file->c == '=') {
-				tokinfo->token = TOKEN_LE;
+				token->type = TOKEN_LE;
 			}
 			else if (*file->c == '<') {
 				if (file->c[1] == '=') {
-					tokinfo->token = TOKEN_SHL_EQ;
+					token->type = TOKEN_SHL_EQ;
 					file->c += 2;
 				}
 				else {
-					tokinfo->token = TOKEN_SHL;
+					token->type = TOKEN_SHL;
 					file->c++;
 				}
 			}
 			else if (*file->c == '%') {
-				tokinfo->token = TOKEN_LBRACE;
+				token->type = TOKEN_LBRACE;
 				file->c++;
 			}
 			else if (*file->c == ':') {
-				tokinfo->token = TOKEN_LBRACKET;
+				token->type = TOKEN_LBRACKET;
 				file->c++;
 			}
 			else {
-				tokinfo->token = TOKEN_LT;
+				token->type = TOKEN_LT;
 			}
 		}
 		else {
-			return lex_header_hname(file, tokinfo);
+			return lex_header_hname(file, token);
 		}
 		break;
 
 	case '>':
 		if (*file->c == '=') {
-			tokinfo->token = TOKEN_GE;
+			token->type = TOKEN_GE;
 			file->c++;
 		}
 		else if (*file->c == '>') {
 			if (file->c[1] == '=') {
-				tokinfo->token = TOKEN_SHR_EQ;
+				token->type = TOKEN_SHR_EQ;
 				file->c += 2;
 			}
 			else {
-				tokinfo->token = TOKEN_SHR;
+				token->type = TOKEN_SHR;
 				file->c++;
 			}
 		}
 		else {
-			tokinfo->token = TOKEN_GT;
+			token->type = TOKEN_GT;
 		}
 
 		break;
 
 	case '^':
 		if (*file->c == '=') {
-			tokinfo->token = TOKEN_XOR_EQ;
+			token->type = TOKEN_XOR_EQ;
 			file->c++;
 		}
 		else {
-			tokinfo->token = TOKEN_XOR;
+			token->type = TOKEN_XOR;
 		}
 
 		break;
 
 	case '|':
 		if (*file->c == '|') {
-			tokinfo->token = TOKEN_LOGICAL_OR;
+			token->type = TOKEN_LOGICAL_OR;
 			file->c++;
 		}
 		else if (*file->c == '=') {
-			tokinfo->token = TOKEN_OR_EQ;
+			token->type = TOKEN_OR_EQ;
 			file->c++;
 		}
 		else {
-			tokinfo->token = TOKEN_OR;
+			token->type = TOKEN_OR;
 		}
 
 		break;
 	
 	case '?':
-		tokinfo->token = TOKEN_QUESTION_MARK;
+		token->type = TOKEN_QUESTION_MARK;
 		break;
 
 	case ':':
 		if (*file->c == '>') {
-			tokinfo->token = TOKEN_RBRACKET;
+			token->type = TOKEN_RBRACKET;
 			file->c++;
 		}
 		else {
-			tokinfo->token = TOKEN_COLON;
+			token->type = TOKEN_COLON;
 		}
 
 		break;
 
 	case ';':
-		tokinfo->token = TOKEN_SEMICOLON;
+		token->type = TOKEN_SEMICOLON;
 		break;
 
 	case '=':
 		if (*file->c == '=') {
-			tokinfo->token = TOKEN_EQ_EQ;
+			token->type = TOKEN_EQ_EQ;
 			file->c++;
 		}
 		else {
-			tokinfo->token = TOKEN_EQ;
+			token->type = TOKEN_EQ;
 		}
 
 		break;
 
 	case ',':
-		tokinfo->token = TOKEN_COMMA;
+		token->type = TOKEN_COMMA;
 		break;
 
 	case '#':
 		if (*file->c == '#') {
-			tokinfo->token = TOKEN_HASH_HASH;
+			token->type = TOKEN_HASH_HASH;
 			file->c++;
 		}
 		else {
-			tokinfo->token = TOKEN_HASH;
+			token->type = TOKEN_HASH;
 		}
 
 		break;
@@ -851,5 +851,5 @@ next_nonwhite_char:
 		goto next_nonwhite_char;
 	}
 
-	return tokinfo;
+	return token;
 }

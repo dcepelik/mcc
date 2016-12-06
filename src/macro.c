@@ -22,8 +22,8 @@ void macro_free(struct macro *macro)
 
 void macro_dump(struct macro *macro)
 {
-	struct tokinfo *arg;
-	struct tokinfo *repl;
+	struct token *arg;
+	struct token *repl;
 	struct strbuf buf;
 
 	strbuf_init(&buf, 128);
@@ -32,7 +32,7 @@ void macro_dump(struct macro *macro)
 	if (macro->type == MACRO_TYPE_FUNCLIKE) {
 		strbuf_putc(&buf, '(');
 		for (arg = list_first(&macro->args); arg; arg = list_next(&arg->list_node)) {
-			tokinfo_print(arg, &buf);
+			token_print(arg, &buf);
 			if (arg != list_last(&macro->args))
 				strbuf_printf(&buf, ", ");
 		}
@@ -42,7 +42,7 @@ void macro_dump(struct macro *macro)
 	strbuf_printf(&buf, " -> ");
 
 	for (repl = list_first(&macro->expansion); repl; repl = list_next(&repl->list_node)) {
-		tokinfo_print(repl, &buf);
+		token_print(repl, &buf);
 		strbuf_putc(&buf, ' ');
 	}
 
@@ -51,20 +51,20 @@ void macro_dump(struct macro *macro)
 }
 
 
-static inline bool token_is_expandable(struct tokinfo *token)
+static inline bool token_is_expandable(struct token *token)
 {
 	struct macro *macro;
-	struct tokinfo *next;
+	struct token *next;
 	bool funclike;
 
-	if (token->token != TOKEN_NAME
+	if (token->type != TOKEN_NAME
 		|| token->symbol->def->type != SYMBOL_TYPE_CPP_MACRO)
 		return false;
 
 	macro = token->symbol->def->macro;
 
 	next = list_next(&token->list_node);
-	funclike = (next && next->token == TOKEN_LPAREN && !next->preceded_by_whitespace);
+	funclike = (next && next->type == TOKEN_LPAREN && !next->preceded_by_whitespace);
 	if (funclike && macro->type == MACRO_TYPE_FUNCLIKE)
 		return true;
 
@@ -77,10 +77,10 @@ static inline bool token_is_expandable(struct tokinfo *token)
 
 static void copy_token_list(struct cppfile *file, struct list *src, struct list *dst)
 {
-	struct tokinfo *dst_token;
+	struct token *dst_token;
 
-	list_foreach(struct tokinfo, src_token, src, list_node) {
-		dst_token = objpool_alloc(&file->tokinfo_pool);
+	list_foreach(struct token, src_token, src, list_node) {
+		dst_token = objpool_alloc(&file->token_pool);
 		*dst_token = *src_token;
 		list_insert_last(dst, &dst_token->list_node);
 	}
@@ -91,11 +91,11 @@ static void copy_token_list(struct cppfile *file, struct list *src, struct list 
 }
 
 
-static struct tokinfo *macro_parse_args(struct cppfile *file,
+static struct token *macro_parse_args(struct cppfile *file,
 	struct macro *macro, struct list *invocation)
 {
-	struct tokinfo *token = list_first(invocation);
-	struct tokinfo *next;
+	struct token *token = list_first(invocation);
+	struct token *next;
 	struct symdef *argdef;
 	unsigned parens_balance = 0;
 	bool args_ended = false;
@@ -105,7 +105,7 @@ static struct tokinfo *macro_parse_args(struct cppfile *file,
 	token = list_next(&token->list_node); /* macro name */
 	token = list_next(&token->list_node); /* ( */
 
-	list_foreach(struct tokinfo, arg, &macro->args, list_node) {
+	list_foreach(struct token, arg, &macro->args, list_node) {
 		argdef = objpool_alloc(&file->symdef_pool);
 		argdef->type = SYMBOL_TYPE_CPP_MACRO;
 		argdef->macro = objpool_alloc(&file->macro_pool);
@@ -113,11 +113,11 @@ static struct tokinfo *macro_parse_args(struct cppfile *file,
 
 		symbol_push_definition(file->symtab, arg->symbol, argdef);
 
-		while (token->token != TOKEN_EOF) {
-			if (token->token == TOKEN_LPAREN) {
+		while (token->type != TOKEN_EOF) {
+			if (token->type == TOKEN_LPAREN) {
 				parens_balance++;
 			}
-			else if (token->token == TOKEN_RPAREN) {
+			else if (token->type == TOKEN_RPAREN) {
 				if (parens_balance > 0) {
 					parens_balance--;
 				}
@@ -126,7 +126,7 @@ static struct tokinfo *macro_parse_args(struct cppfile *file,
 					break;
 				}
 			}
-			else if (token->token == TOKEN_COMMA && parens_balance == 0) {
+			else if (token->type == TOKEN_COMMA && parens_balance == 0) {
 				token = list_next(&token->list_node);
 				break;
 			}
@@ -172,8 +172,8 @@ static struct list list_range(struct list_node *first, struct list_node *last)
 // {
 // 	struct list list_exp;
 // 	struct list expansion;
-// 	struct tokinfo *start;
-// 	struct tokinfo *end;
+// 	struct token *start;
+// 	struct token *end;
 // 	struct macro *macro;
 // 	bool had_expansion = false;
 // 
@@ -182,12 +182,12 @@ static struct list list_range(struct list_node *first, struct list_node *last)
 // 
 // 	list_init(&list_exp);
 // 
-// 	while ((start = list_first(in)) && start->token != TOKEN_EOF) {
+// 	while ((start = list_first(in)) && start->type != TOKEN_EOF) {
 // 		if (!token_is_expandable(start)) {
 // 			printf("Token not expandable: ");
-// 			tokinfo_dump(start);
+// 			token_dump(start);
 // 
-// 			if (start->token == TOKEN_NAME) {
+// 			if (start->type == TOKEN_NAME) {
 // 				DEBUG_EXPR("type is %s", symdef_get_type(start->symbol->def));
 // 			}
 // 
@@ -249,13 +249,13 @@ static struct list list_range(struct list_node *first, struct list_node *last)
 // 	struct list *expansion)
 // {
 // 	struct macro *macro;
-// 	struct tokinfo *start;
+// 	struct token *start;
 // 
 // 	printf("macro_expand_internal invocation: ");
 // 	cpp_dump_toklist(invocation);
 // 
 // 	start = list_first(invocation);
-// 	printf("Start: "); tokinfo_dump(start);
+// 	printf("Start: "); token_dump(start);
 // 	assert(token_is_expandable(start));
 // 
 // 	macro = start->symbol->def->macro;
@@ -278,13 +278,13 @@ static struct list list_range(struct list_node *first, struct list_node *last)
 // }
 
 
-struct tokinfo *macro_expand_internal(struct cppfile *file, struct list *in, struct list *out);
+struct token *macro_expand_internal(struct cppfile *file, struct list *in, struct list *out);
 
 
 void macro_expand_recursive(struct cppfile *file, struct list *in, struct list *out)
 {
-	struct tokinfo *token;
-	struct tokinfo *end;
+	struct token *token;
+	struct token *end;
 	struct list expansion;
 
 	while ((token = list_first(in)) != NULL) {
@@ -301,11 +301,11 @@ void macro_expand_recursive(struct cppfile *file, struct list *in, struct list *
 }
 
 
-struct tokinfo *macro_expand_internal(struct cppfile *file, struct list *in, struct list *out)
+struct token *macro_expand_internal(struct cppfile *file, struct list *in, struct list *out)
 {
 	struct macro *macro;
-	struct tokinfo *token;
-	struct tokinfo *end;	/* end of macro invocation */
+	struct token *token;
+	struct token *end;	/* end of macro invocation */
 	struct list expansion;
 
 	token = list_first(in);

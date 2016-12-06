@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-enum token
+enum token_type
 {
 	/* pp-token categories (except punctuators) */
 	TOKEN_CHAR_CONST, TOKEN_HEADER_NAME, TOKEN_NAME, TOKEN_NUMBER,
@@ -33,7 +33,7 @@ struct location
 	size_t column_no;
 };
 
-struct tokinfo
+struct token
 {
 	struct list_node list_node;
 
@@ -48,15 +48,15 @@ struct tokinfo
 	struct location startloc;
 	struct location endloc;
 
-	enum token token;
+	enum token_type type;
 
 	/* flags */
 	bool preceded_by_whitespace;
 	bool is_at_bol;
 };
 
-const char *token_get_name(enum token token);
-void tokinfo_print(struct tokinfo *tokinfo, struct strbuf *buf);
-void tokinfo_dump(struct tokinfo *tokinfo);
+const char *token_get_name(enum token_type token);
+void token_print(struct token *token, struct strbuf *buf);
+void token_dump(struct token *token);
 
 #endif

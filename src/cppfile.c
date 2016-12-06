@@ -40,13 +40,13 @@ mcc_error_t cppfile_open(struct cppfile *file, char *filename)
 	file->first_token = true;
 	file->had_whitespace = false;
 
-	file->cur = NULL;
+	file->token = NULL;
 
 	file->location.line_no = 0;
 	file->included_file = NULL;
 	
 	mempool_init(&file->token_data, 2048);
-	objpool_init(&file->tokinfo_pool, sizeof(struct tokinfo), 256);
+	objpool_init(&file->token_pool, sizeof(struct token), 256);
 	objpool_init(&file->macro_pool, sizeof(struct macro), 256);
 	objpool_init(&file->symdef_pool, sizeof(struct symdef), 256);
 	list_init(&file->tokens);
@@ -68,7 +68,7 @@ void cppfile_close(struct cppfile *file)
 	strbuf_free(&file->strbuf);
 	inbuf_close(&file->inbuf);
 	mempool_free(&file->token_data);
-	objpool_free(&file->tokinfo_pool);
+	objpool_free(&file->token_pool);
 	objpool_free(&file->macro_pool);
 	objpool_free(&file->symdef_pool);
 	list_free(&file->tokens);
@@ -98,7 +98,7 @@ void cppfile_error(struct cppfile *file, char *fmt, ...)
 	(void) file;
 
 	line = strbuf_get_string(&file->linebuf);
-	loc = file->cur->startloc;
+	loc = file->token->startloc;
 
 	va_list args;
 	va_start(args, fmt);

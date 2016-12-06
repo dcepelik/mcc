@@ -8,7 +8,7 @@
 #include "objpool.h"
 #include "strbuf.h"
 #include "symtab.h"
-#include "tokinfo.h"
+#include "token.h"
 #include <stdlib.h>
 
 
@@ -17,7 +17,7 @@
 struct cppfile
 {
 	/* former struct lexer members (extended) */
-	struct objpool tokinfo_pool;	/* objpool for struct tokinfo */
+	struct objpool token_pool;	/* objpool for struct token */
 	struct mempool token_data;	/* mempool for token data (strings mostly) */
 
 	struct strbuf linebuf;		/* buffer for current logical line */
@@ -36,7 +36,7 @@ struct cppfile
 	struct objpool symdef_pool;	/* mempool for symbol definitions */
 
 	struct list tokens;		/* token list */
-	struct tokinfo *cur;		/* last popped tokinfo */
+	struct token *token;		/* last popped token */
 	struct list ifs;		/* if directive stack */
 	struct cppfile *included_file;	/* currently included file */
 };

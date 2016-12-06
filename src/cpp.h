@@ -22,7 +22,7 @@ enum cpp_directive
 struct cpp_if
 {
 	struct list_node list_node;
-	struct tokinfo *tokinfo;
+	struct token *token;
 	bool skip_this_branch;
 	bool skip_next_branch;
 };
@@ -31,7 +31,7 @@ struct cpp_if
 
 struct cppfile;
 
-struct tokinfo *cpp_next(struct cppfile *file);
+struct token *cpp_next(struct cppfile *file);
 void cpp_setup_symtab(struct cppfile *file);
 
 #endif
