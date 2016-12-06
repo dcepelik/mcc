@@ -481,6 +481,11 @@ void cpp_dump_toklist(struct list *lst)
 		tokinfo_print(token, &buf);
 		if (token != list_last(lst))
 			strbuf_putc(&buf, ' ');
+
+		if (c > 100) {
+			fprintf(stderr, "*** MAYBE RECURSION ***\n");
+			break;
+		}
 	}
 
 	printf("%s\n", strbuf_get_string(&buf));
@@ -491,6 +496,7 @@ void cpp_dump_toklist(struct list *lst)
 
 static void cpp_expand_macro(struct cppfile *file)
 {
+	struct macro *macro;
 	struct list invocation;
 	struct list expansion;
 	unsigned parens_balance = 0;
@@ -501,41 +507,41 @@ static void cpp_expand_macro(struct cppfile *file)
 	assert(cpp_got(file, TOKEN_NAME));
 	assert(file->cur->symbol->def->type == SYMBOL_TYPE_CPP_MACRO);
 
-	list_insert_last(&invocation, &cpp_pop(file)->list_node);
+	macro = file->cur->symbol->def->macro;
+	list_insert_last(&invocation, &cpp_pop(file)->list_node); /* macro name */
 
 	/*
-	 * For invocations that are a macro name followed by left opening paren,
-	 * this cycle will grab the whole arglist quickly. If the arglist is
-	 * malformed, this will be later reported and recovered by the macro
-	 * module, so no errors are handled here. This is to avoid duplication
-	 * of the arglist parsing logic contained in the macro module.
+	 * For invocations of function-like macros, this code block will grab
+	 * the whole arglist quickly. If the arglist is malformed, this will
+	 * be later reported by the macro module, so no errors are handled here.
+	 * This is to avoid duplication of the arglist parsing logic contained
+	 * in the macro module.
 	 */
-	while (!cpp_got_eof(file)) {
-		if (cpp_got(file, TOKEN_LPAREN)) {
-			parens_balance++;
-		}
-		else if (cpp_got(file, TOKEN_RPAREN)) {
-			parens_balance--;
-
-			if (parens_balance == 0) {
-				list_insert_last(&invocation, &cpp_pop(file)->list_node);
-				break;
+	if (macro->type == MACRO_TYPE_FUNCLIKE) {
+		while (!cpp_got_eof(file)) {
+			if (cpp_got(file, TOKEN_LPAREN)) {
+				parens_balance++;
 			}
-		}
+			else if (cpp_got(file, TOKEN_RPAREN)) {
+				parens_balance--;
 
-		list_insert_last(&invocation, &cpp_pop(file)->list_node);
+				if (parens_balance == 0) {
+					list_insert_last(&invocation, &cpp_pop(file)->list_node);
+					break;
+				}
+			}
+
+			list_insert_last(&invocation, &cpp_pop(file)->list_node);
+		}
 	}
 
-	/* TODO */
-	struct tokinfo *eof = objpool_alloc(&file->tokinfo_pool);
-	eof->token = TOKEN_EOF;
-	list_insert_last(&invocation, &eof->list_node);
-
-	cpp_dump_toklist(&invocation);
+	//cpp_dump_toklist(&invocation);
 	macro_expand(file, &invocation, &expansion);
-	cpp_dump_toklist(&expansion);
+	//cpp_dump_toklist(&expansion);
 
-	//list_prepend(&file->tokens, &invocation);
+	list_insert_first(&file->tokens, &file->cur->list_node);
+	list_prepend(&file->tokens, &expansion);
+	cpp_pop(file);
 }
 
 

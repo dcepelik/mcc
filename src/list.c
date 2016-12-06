@@ -93,6 +93,25 @@ void *list_remove(struct list *lst, struct list_node *node)
 }
 
 
+struct list list_remove_range(struct list *lst, struct list_node *start, struct list_node *end)
+{
+	struct list rem_list;
+	struct list_node *pred;
+
+	pred = list_find_predecessor(lst, start);
+	assert(pred != NULL);
+
+	list_init(&rem_list);
+
+	rem_list.head.next = start;
+	rem_list.last = end;
+	pred->next = end->next;
+	end->next = NULL;
+
+	return rem_list;
+}
+
+
 void *list_first(struct list *lst)
 {
 	return lst->head.next;
@@ -136,6 +155,15 @@ void list_prepend(struct list *lst, struct list *lst_to_prepend)
 
 	assert(list_is_empty(lst_to_prepend) || !list_is_empty(lst));
 	assert(list_length(lst) >= list_length(lst_to_prepend));
+}
+
+
+void list_append(struct list *lst, struct list *lst_to_append)
+{
+	assert(!list_is_empty(lst_to_append));
+
+	lst->last->next = list_first(lst_to_append);
+	lst->last = list_last(lst_to_append);
 }
 
 

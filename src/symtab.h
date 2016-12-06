@@ -58,9 +58,9 @@ void symtab_scope_begin(struct symtab *table);
 void symtab_scope_end(struct symtab *table);
 
 char *symbol_get_name(struct symbol *symbol);
-const char *symbol_get_type(struct symbol *symbol);
+const char *symdef_get_type(struct symdef *symdef);
 struct symdef *symbol_push_definition(struct symtab *table,
-	struct symbol *symbol, struct symdef *symdef);
+struct symbol *symbol, struct symdef *symdef);
 struct symdef *symbol_pop_definition(struct symtab *table, struct symbol *symbol);
 
 #endif

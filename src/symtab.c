@@ -137,7 +137,7 @@ void symtab_scope_end(struct symtab *table)
 		symbol = def->symbol;
 		list_remove(&symbol->defs, &def->def_stack_node);
 
-		symbol->def = list_first(&symbol->defs);
+		symbol->def = container_of(list_first(&symbol->defs), struct symdef, def_stack_node);
 		if (!symbol->def)
 			symbol->def = &symbol_undef;
 

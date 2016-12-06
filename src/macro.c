@@ -9,6 +9,7 @@ void macro_init(struct macro *macro)
 {
 	list_init(&macro->args);
 	list_init(&macro->expansion);
+	macro->type = MACRO_TYPE_OBJLIKE;
 }
 
 
@@ -63,7 +64,7 @@ static inline bool token_is_expandable(struct tokinfo *token)
 	macro = token->symbol->def->macro;
 
 	next = list_next(&token->list_node);
-	funclike = (next->token == TOKEN_LPAREN && !next->preceded_by_whitespace);
+	funclike = (next && next->token == TOKEN_LPAREN && !next->preceded_by_whitespace);
 	if (funclike && macro->type == MACRO_TYPE_FUNCLIKE)
 		return true;
 
@@ -159,66 +160,171 @@ static struct list list_range(struct list_node *first, struct list_node *last)
 }
 
 
-static void macro_expand_internal(struct cppfile *file, struct list *invocation,
-	struct list *expansion);
+// static void macro_expand_internal(struct cppfile *file, struct list *invocation,
+// 	struct list *expansion);
+// 
+// 
+// static int rec_limit = 0;
+// 
+// 
+// static void macro_expand_list(struct cppfile *file, struct list *in,
+// 	struct list *out)
+// {
+// 	struct list list_exp;
+// 	struct list expansion;
+// 	struct tokinfo *start;
+// 	struct tokinfo *end;
+// 	struct macro *macro;
+// 	bool had_expansion = false;
+// 
+// 	printf("macro_expand_list in: ");
+// 	cpp_dump_toklist(in);
+// 
+// 	list_init(&list_exp);
+// 
+// 	while ((start = list_first(in)) && start->token != TOKEN_EOF) {
+// 		if (!token_is_expandable(start)) {
+// 			printf("Token not expandable: ");
+// 			tokinfo_dump(start);
+// 
+// 			if (start->token == TOKEN_NAME) {
+// 				DEBUG_EXPR("type is %s", symdef_get_type(start->symbol->def));
+// 			}
+// 
+// 			list_insert_last(&list_exp, list_remove_first(in));
+// 			continue;
+// 		}
+// 
+// 		had_expansion = true;
+// 
+// 		symtab_scope_begin(file->symtab);
+// 		macro = start->symbol->def->macro;
+// 
+// 		if (macro->type == MACRO_TYPE_FUNCLIKE)
+// 			end = macro_parse_args(file, macro, in);
+// 		else
+// 			end = start;
+// 
+// 		list_remove_range(in, &start->list_node, &end->list_node);
+// 
+// 
+// 		list_init(&expansion);
+// 		/* let's expand here */
+// 		// macro_expand_internal(file, &invocation, &expansion);
+// 
+// 		copy_token_list(file, &macro->expansion, &expansion);
+// 
+// 		printf("macro_expand_list &list_exp before append: ");
+// 		cpp_dump_toklist(&list_exp);
+// 
+// 		printf("macro_expand_list expansion: ");
+// 		cpp_dump_toklist(&expansion);
+// 
+// 		list_append(&list_exp, &expansion);
+// 
+// 		printf("macro_expand_list &list_exp after append: ");
+// 		cpp_dump_toklist(&list_exp);
+// 
+// 		symtab_dump(file->symtab);
+// 		symtab_scope_end(file->symtab);
+// 	}
+// 
+// 	struct list out2;
+// 	list_init(&out2);
+// 
+// 	if (had_expansion) {
+// 		macro_expand_list(file, &list_exp, &out2);
+// 		*out = out2;
+// 	}
+// 	else {
+// 		*out = list_exp;
+// 	}
+// 
+// 	printf("macro_expand_list out: ");
+// 	cpp_dump_toklist(out);
+// }
+// 
+// 
+// static void macro_expand_internal(struct cppfile *file, struct list *invocation,
+// 	struct list *expansion)
+// {
+// 	struct macro *macro;
+// 	struct tokinfo *start;
+// 
+// 	printf("macro_expand_internal invocation: ");
+// 	cpp_dump_toklist(invocation);
+// 
+// 	start = list_first(invocation);
+// 	printf("Start: "); tokinfo_dump(start);
+// 	assert(token_is_expandable(start));
+// 
+// 	macro = start->symbol->def->macro;
+// 
+// 	symtab_scope_begin(file->symtab);
+// 
+// 	if (macro->type == MACRO_TYPE_FUNCLIKE)
+// 		macro_parse_args(file, macro, invocation);
+// 
+// 	copy_token_list(file, &macro->expansion, expansion);
+// 
+// 	printf("macro_expand_internal expansion: ");
+// 	cpp_dump_toklist(expansion);
+// 
+// 	struct list out;
+// 	list_init(&out);
+// 	macro_expand_list(file, expansion, &out);
+// 
+// 	symtab_scope_end(file->symtab);
+// }
 
 
-static void macro_expand_list(struct cppfile *file, struct list *in,
-	struct list *out)
+struct tokinfo *macro_expand_internal(struct cppfile *file, struct list *in, struct list *out);
+
+
+void macro_expand_recursive(struct cppfile *file, struct list *in, struct list *out)
 {
-	struct list invocation;
-	struct list tmp;
-	struct list expansion;
+	struct tokinfo *token;
 	struct tokinfo *end;
-	struct macro *macro;
+	struct list expansion;
 
-	list_foreach(struct tokinfo, token, in, list_node) {
+	while ((token = list_first(in)) != NULL) {
 		if (!token_is_expandable(token)) {
-			list_insert_last(out, &token->list_node);
+			list_insert_last(out, list_remove_first(in));
 			continue;
 		}
 
-		macro = token->symbol->def->macro;
-
-		if (macro->type == MACRO_TYPE_FUNCLIKE) {
-			tmp = list_range(&token->list_node, list_last(in));
-			end = macro_parse_args(file, macro, &tmp);
-		}
-		else {
-			end = token;
-		}
-
 		list_init(&expansion);
-		invocation = list_range(&token->list_node, &end->list_node);
-		macro_expand_internal(file, &invocation, &expansion);
+		end = macro_expand_internal(file, in, &expansion);
+		list_remove_range(in, &token->list_node, &end->list_node);
+		list_append(out, &expansion);
 	}
 }
 
 
-static void macro_expand_internal(struct cppfile *file, struct list *invocation,
-	struct list *expansion)
+struct tokinfo *macro_expand_internal(struct cppfile *file, struct list *in, struct list *out)
 {
 	struct macro *macro;
-	struct tokinfo *start;
+	struct tokinfo *token;
+	struct tokinfo *end;	/* end of macro invocation */
+	struct list expansion;
 
-	start = list_first(invocation);
-	assert(token_is_expandable(start));
-
-	macro = start->symbol->def->macro;
+	token = list_first(in);
+	macro = token->symbol->def->macro;
 
 	symtab_scope_begin(file->symtab);
 
 	if (macro->type == MACRO_TYPE_FUNCLIKE)
-		macro_parse_args(file, macro, invocation);
+		end = macro_parse_args(file, macro, in);
+	else
+		end = token;
 
-	copy_token_list(file, &macro->expansion, expansion);
-
-	struct list out;
-	list_init(&out);
-	macro_expand_list(file, expansion, &out);
-	cpp_dump_toklist(&out);
+	list_init(&expansion);
+	copy_token_list(file, &macro->expansion, &expansion);
+	macro_expand_recursive(file, &expansion, out);
 
 	symtab_scope_end(file->symtab);
+
+	return end;
 }
 
 

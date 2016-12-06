@@ -29,12 +29,14 @@ void list_init(struct list *lst);
 void list_free(struct list *lst);
 
 void list_prepend(struct list *lst, struct list *lst_to_prepend);
+void list_append(struct list *lst, struct list *lst_to_append);
 
 struct list_node *list_insert_first(struct list *lst, struct list_node *node);
 struct list_node *list_insert_last(struct list *lst, struct list_node *node);
 
 void *list_remove_first(struct list *lst);
 void *list_remove(struct list *lst, struct list_node *node);
+struct list list_remove_range(struct list *lst, struct list_node *start, struct list_node *end);
 
 void *list_find_predecessor(struct list *lst, struct list_node *node);
 

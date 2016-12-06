@@ -1,6 +1,14 @@
 #define MAGIC_NUMBER (-42)
 #define SWAP_SIGN(expr)	(-(expr))
-#define F1(x, y) x ## y
-#define F2()
+#define ADD(x, y) ((x) + (y))
 
-SWAP_SIGN(1)
+ahoj
+
+#define SOME_MACRO
+
+MAGIC_NUMBER + MAGIC_NUMBER
+//SWAP_SIGN(MAGIC_NUMBER);
+//SWAP_SIGN(SWAP_SIGN(MAGIC_NUMBER))
+//ADD(1, 2);
+//ADD(SWAP_SIGN(1), 2)
+ADD(ADD(1, 2), ADD(3, 4))
