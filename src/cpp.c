@@ -8,7 +8,7 @@
 #include "debug.h"
 #include "macro.h"
 #include "lexer.h"
-#include "symtab.h"
+#include "symbol.h"
 #include <assert.h>
 #include <stdarg.h>
 
@@ -52,11 +52,10 @@ static void cpp_setup_symtab_directives(struct cppfile *file)
 	for (i = 0; i < ARRAY_SIZE(directives); i++) {
 		symbol = symtab_insert(file->symtab, directives[i].name);
 
-		symdef = objpool_alloc(&file->symdef_pool);
+		symdef = symbol_define(file->symtab, symbol);
 		symdef->type = SYMBOL_TYPE_CPP_DIRECTIVE;
 		symdef->directive = directives[i].directive;
-
-		symbol_push_definition(file->symtab, symbol, symdef);
+		symdef->symbol = symbol;
 	}
 }
 
@@ -76,10 +75,8 @@ static void cpp_setup_symtab_builtins(struct cppfile *file)
 	for (i = 0; i < ARRAY_SIZE(builtins); i++) {
 		symbol = symtab_insert(file->symtab, builtins[i]);
 
-		symdef = objpool_alloc(&file->symdef_pool);
+		symdef = symbol_define(file->symtab, symbol);
 		symdef->type = SYMBOL_TYPE_CPP_BUILTIN;
-
-		symbol_push_definition(file->symtab, symbol, symdef);
 	}
 }
 
@@ -293,10 +290,9 @@ static void cpp_parse_define(struct cppfile *file)
 		macro_init(macro);
 		macro->name = symbol_get_name(file->token->symbol);
 
-		symdef = objpool_alloc(&file->symdef_pool);
+		symdef = symbol_define(file->symtab, file->token->symbol);
 		symdef->type = SYMBOL_TYPE_CPP_MACRO;
 		symdef->macro = macro;
-		symbol_push_definition(file->symtab, file->token->symbol, symdef);
 
 		cpp_pop(file);
 

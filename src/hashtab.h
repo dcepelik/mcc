@@ -15,7 +15,6 @@
 struct hashtab
 {
 	struct hashnode *table;
-	struct objpool *pool;
 	struct mempool keys;
 	size_t count;
 	size_t size;
@@ -32,7 +31,7 @@ size_t hashtab_count(struct hashtab *table);
 bool hashtab_contains(struct hashtab *table, char *key);
 void *hashtab_search(struct hashtab *table, char *key);
 void *hashtab_next(struct hashtab *table, struct hashnode *node);
-void *hashtab_insert(struct hashtab *table, char *key);
+void *hashtab_insert(struct hashtab *table, char *key, struct hashnode *node);
 bool hashtab_remove(struct hashtab *table, struct hashnode *node);
 void hashtab_free(struct hashtab *table);
 

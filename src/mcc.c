@@ -1,6 +1,6 @@
 #include "error.h"
 #include "cpp.h"
-#include "symtab.h"
+#include "symbol.h"
 #include <stdio.h>
 #include <stdlib.h>
 

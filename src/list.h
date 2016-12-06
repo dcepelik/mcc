@@ -9,7 +9,7 @@
 
 #define list_foreach(type, item, lst, member) \
 	for (type *item = container_of(list_first(lst), type, member); \
-		item != NULL; \
+		item + offsetof(type, member) != NULL; \
 		item = container_of(item->member.next, type, member))
 		
 
@@ -22,7 +22,6 @@ struct list
 {
 	struct list_node head;
 	struct list_node *last;
-	size_t len;
 };
 
 void list_init(struct list *lst);

@@ -7,7 +7,7 @@
 #include "mempool.h"
 #include "objpool.h"
 #include "strbuf.h"
-#include "symtab.h"
+#include "symbol.h"
 #include "token.h"
 #include <stdlib.h>
 

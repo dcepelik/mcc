@@ -1,4 +1,4 @@
-#include "symtab.h"
+#include "symbol.h"
 #include "token.h"
 #include <ctype.h>
 

@@ -106,12 +106,10 @@ static struct token *macro_parse_args(struct cppfile *file,
 	token = list_next(&token->list_node); /* ( */
 
 	list_foreach(struct token, arg, &macro->args, list_node) {
-		argdef = objpool_alloc(&file->symdef_pool);
+		argdef = symbol_define(file->symtab, arg->symbol);
 		argdef->type = SYMBOL_TYPE_CPP_MACRO;
 		argdef->macro = objpool_alloc(&file->macro_pool);
 		macro_init(argdef->macro);
-
-		symbol_push_definition(file->symtab, arg->symbol, argdef);
 
 		while (token->type != TOKEN_EOF) {
 			if (token->type == TOKEN_LPAREN) {
@@ -322,6 +320,7 @@ struct token *macro_expand_internal(struct cppfile *file, struct list *in, struc
 	copy_token_list(file, &macro->expansion, &expansion);
 	macro_expand_recursive(file, &expansion, out);
 
+	symtab_dump(file->symtab);
 	symtab_scope_end(file->symtab);
 
 	return end;

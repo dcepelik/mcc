@@ -19,7 +19,7 @@ bool shall_debug_file(const char *filename)
 	if (strcmp(filename, "list.c") == 0)
 		return true;
 
-	if (strcmp(filename, "symtab.c") == 0)
+	if (strcmp(filename, "symbol.c") == 0)
 		return true;
 
 	if (strcmp(filename, "macro.c") == 0)

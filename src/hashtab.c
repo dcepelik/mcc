@@ -22,7 +22,7 @@ static inline uint64_t hashtab_hash(char *key)
 }
 
 
-static void hashtab_insert_node(struct hashtab *hashtab, struct hashnode *new_node)
+static void hashtab_insert_internal(struct hashtab *hashtab, struct hashnode *new_node)
 {
 	uint64_t hash = hashtab_hash(new_node->key) % hashtab->size;
 	struct hashnode *node;
@@ -55,7 +55,7 @@ static bool hashtab_resize(struct hashtab *hashtab, size_t new_size)
 
 		while (node) {
 			tmp_node = node->next;
-			hashtab_insert_node(hashtab, node);
+			hashtab_insert_internal(hashtab, node);
 			node = tmp_node;
 		}
 	}
@@ -68,7 +68,6 @@ static bool hashtab_resize(struct hashtab *hashtab, size_t new_size)
 bool hashtab_init(struct hashtab *hashtab, struct objpool *pool, size_t init_size)
 {
 	hashtab->table = NULL;
-	hashtab->pool = pool;
 	hashtab->size = 0;
 	hashtab->count = 0;
 
@@ -118,9 +117,8 @@ void *hashtab_next(struct hashtab *hashtab, struct hashnode *node)
 }
 
 
-void *hashtab_insert(struct hashtab *hashtab, char *key)
+void *hashtab_insert(struct hashtab *hashtab, char *key, struct hashnode *node)
 {
-	struct hashnode *new_node;
 	float load;
 	char *key_copy;
 	size_t key_len;
@@ -135,16 +133,12 @@ void *hashtab_insert(struct hashtab *hashtab, char *key)
 	key_copy = mempool_alloc(&hashtab->keys, key_len + 1);
 	strncpy(key_copy, key, key_len + 1);
 
-	new_node = objpool_alloc(hashtab->pool);
-	if (!new_node)
-		return NULL;
+	node->key = key_copy;
 
-	new_node->key = key_copy;
-
-	hashtab_insert_node(hashtab, new_node);
+	hashtab_insert_internal(hashtab, node);
 	hashtab->count++;
 
-	return new_node;
+	return node;
 }
 
 
@@ -163,7 +157,6 @@ bool hashtab_remove(struct hashtab *hashtab, struct hashnode *node)
 		return false;
 
 	cur->next = node->next;
-	objpool_dealloc(hashtab->pool, node);
 
 	hashtab->count--;
 	assert(hashtab->count >= 0);
