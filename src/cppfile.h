@@ -12,32 +12,37 @@
 #include <stdlib.h>
 
 
+struct lexer_state {
+
+};
+
+
 /* TODO Make this internal and hidden from the backend and the parser. */
 /* TODO Inits for lexer and cpp may be better off separated. */
 struct cppfile
 {
-	/* former struct lexer members (extended) */
+	struct symtab *symtab;		/* symbol table */
 	struct objpool token_pool;	/* objpool for struct token */
 	struct mempool token_data;	/* mempool for token data (strings mostly) */
+	struct objpool macro_pool;	/* objpool for struct macro */
 
-	struct strbuf linebuf;		/* buffer for current logical line */
-	struct strbuf strbuf;		/* buffer for string accumulation */
+	/* lexer state */
 	struct inbuf inbuf;		/* input buffer */
-	char *c;			/* current character pointer (within line) */
-	struct symtab *symtab;		/* symbol table */
+	struct strbuf linebuf;		/* buffer for current logical line */
+	char *c;			/* current character within linebuf */
+	struct strbuf strbuf;		/* buffer for string accumulation */
+	struct location location;	/* location of c within inbuf */
+
+	/* additional lexer flags */
 	bool inside_include;		/* are we lexing in an #include? */
 	bool next_at_bol;		/* is next token at BOL? */
 	bool first_token;		/* have we produced the first token already? */
 	bool had_whitespace;		/* have we read any whitespace just before lexing current token? */
-	struct location location;	/* current location */
 
-	/* former struct cpp members (extended) */
-	struct objpool macro_pool;	/* objpool for struct macro */
-	struct objpool symdef_pool;	/* mempool for symbol definitions */
-
-	struct list tokens;		/* token list */
+	/* preprocessor state */
+	struct list tokens;		/* token queue */
 	struct token *token;		/* last popped token */
-	struct list ifs;		/* if directive stack */
+	struct list ifs;		/* if directive control stack */
 	struct cppfile *included_file;	/* currently included file */
 };
 

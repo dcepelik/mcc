@@ -210,18 +210,18 @@ void symtab_scope_end(struct symtab *table)
 }
 
 
-void symtab_dump(struct symtab *table)
+void symtab_dump(struct symtab *table, FILE *fout)
 {
 	size_t i;
 	
 	i = list_length(&table->scope_stack) - 1;
 
-	printf("Symbol table:\n");
+	fprintf(fout, "Symbol table:\n");
 	list_foreach(struct scope, scope, &table->scope_stack, scope_stack_node) {
-		printf("\tScope %lu:\n", i);
+		fprintf(fout, "\tScope %lu:\n", i);
 
 		list_foreach(struct symdef, def, &scope->defs, scope_list_node) {
-			printf("\t\t%-16s\t%-16s",
+			fprintf(fout, "\t\t%-16s\t%-16s",
 				symbol_get_name(def->symbol),
 				symbol_type_to_string(def->type));
 
@@ -229,7 +229,7 @@ void symtab_dump(struct symtab *table)
 				cpp_dump_toklist(&def->macro->expansion);
 			}
 			else {
-				putchar('\n');
+				fputc('\n', fout);
 			}
 		}
 

@@ -580,8 +580,8 @@ included:
 		next = cpp_next(file->included_file);
 
 		if (next->type == TOKEN_EOF) {
-			cppfile_close(file->included_file);
-			cppfile_delete(file->included_file);
+			//cppfile_close(file->included_file);
+			//cppfile_delete(file->included_file);
 			file->included_file = NULL;
 		}
 		else {

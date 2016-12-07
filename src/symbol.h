@@ -10,6 +10,7 @@
 #include "hashtab.h"
 #include "objpool.h"
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 
@@ -38,6 +39,8 @@ struct symbol *symtab_insert(struct symtab *table, char *name);
 
 bool symtab_scope_begin(struct symtab *table);
 void symtab_scope_end(struct symtab *table);
+
+void symtab_dump(struct symtab *table, FILE *fout);
 
 enum symbol_type
 {

@@ -1,6 +1,7 @@
 #include "debug.h"
 #include "hashtab.h"
 #include <assert.h>
+#include <inttypes.h>
 #include <string.h>
 
 
@@ -77,43 +78,10 @@ bool hashtab_init(struct hashtab *hashtab, struct objpool *pool, size_t init_siz
 }
 
 
-size_t hashtab_count(struct hashtab *hashtab)
+void hashtab_free(struct hashtab *hashtab)
 {
-	return hashtab->count;
-}
-
-
-bool hashtab_contains(struct hashtab *hashtab, char *key)
-{
-	return hashtab_search(hashtab, key) != NULL;
-}
-
-
-void *hashtab_search(struct hashtab *hashtab, char *key)
-{
-	uint64_t hash;
-	struct hashnode *node;
-
-	hash = hashtab_hash(key) % hashtab->size;
-	node = &hashtab->table[hash];
-	node->key = key; /* used by hashtab_next */
-
-	return hashtab_next(hashtab, node);
-}
-
-
-void *hashtab_next(struct hashtab *hashtab, struct hashnode *node)
-{
-	struct hashnode *cur = node->next;
-
-	while (cur != NULL) {
-		if (strcmp(cur->key, node->key) == 0)
-			return cur;
-
-		cur = cur->next;
-	}
-
-	return NULL;
+	mempool_free(&hashtab->keys);
+	free(hashtab->table);
 }
 
 
@@ -165,8 +133,41 @@ bool hashtab_remove(struct hashtab *hashtab, struct hashnode *node)
 }
 
 
-void hashtab_free(struct hashtab *hashtab)
+size_t hashtab_count(struct hashtab *hashtab)
 {
-	mempool_free(&hashtab->keys);
-	free(hashtab->table);
+	return hashtab->count;
+}
+
+
+bool hashtab_contains(struct hashtab *hashtab, char *key)
+{
+	return hashtab_search(hashtab, key) != NULL;
+}
+
+
+void *hashtab_search(struct hashtab *hashtab, char *key)
+{
+	uint64_t hash;
+	struct hashnode *node;
+
+	hash = hashtab_hash(key) % hashtab->size;
+	node = &hashtab->table[hash];
+	node->key = key; /* used by hashtab_next */
+
+	return hashtab_next(hashtab, node);
+}
+
+
+void *hashtab_next(struct hashtab *hashtab, struct hashnode *node)
+{
+	struct hashnode *cur = node->next;
+
+	while (cur != NULL) {
+		if (strcmp(cur->key, node->key) == 0)
+			return cur;
+
+		cur = cur->next;
+	}
+
+	return NULL;
 }

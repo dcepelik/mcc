@@ -57,7 +57,12 @@ int main(int argc, char *argv[])
 
 		if (i > 1)
 			strbuf_putc(&buf, ' ');
+
+		//symtab_dump(&symtab, stderr);
+
+		strbuf_reset(&buf);
 		token_print(token, &buf);
+		printf("%s\n", strbuf_get_string(&buf));
 
 		if (token->type == TOKEN_EOF)
 			break;

@@ -6,14 +6,16 @@
 #include <stdarg.h>
 #include <stdlib.h>
 
+#define STRBUF_INIT_SIZE	128
+#define INBUF_BLOCK_SIZE	2048
+#define TOKEN_POOL_BLOCK_SIZE	256
+#define MACRO_POOL_BLOCK_SIZE	32
+#define TOKEN_DATA_BLOCK_SIZE	1024
+
 
 struct cppfile *cppfile_new()
 {
-	struct cppfile *file = malloc(sizeof(*file));
-	if (!file)
-		return NULL;
-
-	return file;
+	return malloc(sizeof(struct cppfile));
 }	
 
 
@@ -23,34 +25,34 @@ mcc_error_t cppfile_open(struct cppfile *file, char *filename)
 
 	/* TODO Get rid of random init constants. */
 
-	if (!strbuf_init(&file->linebuf, 1024))
+	if (!strbuf_init(&file->linebuf, STRBUF_INIT_SIZE))
 		return MCC_ERROR_NOMEM;
 
-	if (!strbuf_init(&file->strbuf, 1024)) {
+	if (!strbuf_init(&file->strbuf, STRBUF_INIT_SIZE)) {
 		strbuf_free(&file->linebuf);
 		return MCC_ERROR_NOMEM;
 	}
 
-	if ((err = inbuf_open(&file->inbuf, 1024, filename)) != MCC_ERROR_OK)
+	if ((err = inbuf_open(&file->inbuf, INBUF_BLOCK_SIZE, filename)) != MCC_ERROR_OK)
 		goto out_err;
 
 	file->c = strbuf_get_string(&file->linebuf);
+
+	mempool_init(&file->token_data, TOKEN_DATA_BLOCK_SIZE);
+	objpool_init(&file->token_pool, sizeof(struct token), TOKEN_POOL_BLOCK_SIZE);
+	objpool_init(&file->macro_pool, sizeof(struct macro), MACRO_POOL_BLOCK_SIZE);
+
 	file->inside_include = false;
 	file->next_at_bol = true;
 	file->first_token = true;
 	file->had_whitespace = false;
 
-	file->token = NULL;
-
 	file->location.line_no = 0;
-	file->included_file = NULL;
 	
-	mempool_init(&file->token_data, 2048);
-	objpool_init(&file->token_pool, sizeof(struct token), 256);
-	objpool_init(&file->macro_pool, sizeof(struct macro), 256);
-	objpool_init(&file->symdef_pool, sizeof(struct symdef), 256);
 	list_init(&file->tokens);
+	file->token = NULL;
 	list_init(&file->ifs);
+	file->included_file = NULL;
 
 	return MCC_ERROR_OK;
 
@@ -70,7 +72,6 @@ void cppfile_close(struct cppfile *file)
 	mempool_free(&file->token_data);
 	objpool_free(&file->token_pool);
 	objpool_free(&file->macro_pool);
-	objpool_free(&file->symdef_pool);
 	list_free(&file->tokens);
 }
 

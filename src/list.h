@@ -9,7 +9,7 @@
 
 #define list_foreach(type, item, lst, member) \
 	for (type *item = container_of(list_first(lst), type, member); \
-		item + offsetof(type, member) != NULL; \
+		item != offsetof(type, member); \
 		item = container_of(item->member.next, type, member))
 		
 
