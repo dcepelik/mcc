@@ -1,6 +1,8 @@
+#include "cpp.h"
 #include "debug.h"
 #include "macro.h"
 #include "strbuf.h"
+#include "symbol.h"
 #include <assert.h>
 #include <stdio.h>
 
@@ -75,12 +77,12 @@ static inline bool token_is_expandable(struct token *token)
 }
 
 
-static void copy_token_list(struct cppfile *file, struct list *src, struct list *dst)
+static void copy_token_list(struct cpp *cpp, struct list *src, struct list *dst)
 {
 	struct token *dst_token;
 
 	list_foreach(struct token, src_token, src, list_node) {
-		dst_token = objpool_alloc(&file->token_pool);
+		dst_token = objpool_alloc(&cpp->token_pool);
 		*dst_token = *src_token;
 		list_insert_last(dst, &dst_token->list_node);
 	}
@@ -91,7 +93,7 @@ static void copy_token_list(struct cppfile *file, struct list *src, struct list 
 }
 
 
-static struct token *macro_parse_args(struct cppfile *file,
+static struct token *macro_parse_args(struct cpp *cpp,
 	struct macro *macro, struct list *invocation)
 {
 	struct token *token = list_first(invocation);
@@ -106,9 +108,9 @@ static struct token *macro_parse_args(struct cppfile *file,
 	token = list_next(&token->list_node); /* ( */
 
 	list_foreach(struct token, arg, &macro->args, list_node) {
-		argdef = symbol_define(file->symtab, arg->symbol);
+		argdef = symbol_define(cpp->symtab, arg->symbol);
 		argdef->type = SYMBOL_TYPE_CPP_MACRO;
-		argdef->macro = objpool_alloc(&file->macro_pool);
+		argdef->macro = objpool_alloc(&cpp->macro_pool);
 		macro_init(argdef->macro);
 
 		while (token->type != TOKEN_EOF) {
@@ -147,10 +149,10 @@ static struct token *macro_parse_args(struct cppfile *file,
 }
 
 
-struct token *macro_expand_internal(struct cppfile *file, struct list *in, struct list *out);
+struct token *macro_expand_internal(struct cpp *cpp, struct list *in, struct list *out);
 
 
-void macro_expand_recursive(struct cppfile *file, struct list *in, struct list *out)
+void macro_expand_recursive(struct cpp *cpp, struct list *in, struct list *out)
 {
 	struct token *token;
 	struct token *end;
@@ -163,14 +165,14 @@ void macro_expand_recursive(struct cppfile *file, struct list *in, struct list *
 		}
 
 		list_init(&expansion);
-		end = macro_expand_internal(file, in, &expansion);
+		end = macro_expand_internal(cpp, in, &expansion);
 		list_remove_range(in, &token->list_node, &end->list_node);
 		list_append(out, &expansion);
 	}
 }
 
 
-struct token *macro_expand_internal(struct cppfile *file, struct list *in, struct list *out)
+struct token *macro_expand_internal(struct cpp *cpp, struct list *in, struct list *out)
 {
 	struct macro *macro;
 	struct token *token;
@@ -180,26 +182,25 @@ struct token *macro_expand_internal(struct cppfile *file, struct list *in, struc
 	token = list_first(in);
 	macro = token->symbol->def->macro;
 
-	symtab_scope_begin(file->symtab);
+	symtab_scope_begin(cpp->symtab);
 
 	if (macro->type == MACRO_TYPE_FUNCLIKE)
-		end = macro_parse_args(file, macro, in);
+		end = macro_parse_args(cpp, macro, in);
 	else
 		end = token;
 
 	list_init(&expansion);
-	copy_token_list(file, &macro->expansion, &expansion);
-	macro_expand_recursive(file, &expansion, out);
+	copy_token_list(cpp, &macro->expansion, &expansion);
+	macro_expand_recursive(cpp, &expansion, out);
 
-	symtab_dump(file->symtab, stderr);
-	symtab_scope_end(file->symtab);
+	symtab_scope_end(cpp->symtab);
 
 	return end;
 }
 
 
-void macro_expand(struct cppfile *file, struct list *invocation,
+void macro_expand(struct cpp *cpp, struct list *invocation,
 	struct list *expansion)
 {
-	macro_expand_internal(file, invocation, expansion);
+	macro_expand_internal(cpp, invocation, expansion);
 }

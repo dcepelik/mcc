@@ -4,8 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define BUFFER_SIZE	4096
-
 /*
  * TODO Global task: make interfaces between components separate, (mainly) hide
  *      implementation of internal structures.
@@ -14,7 +12,7 @@
 int main(int argc, char *argv[])
 {
 	char *filename;
-	struct cppfile *cppfile;
+	struct cpp *cpp;
 	struct token *token;
 	struct symtab symtab;
 	mcc_error_t err;
@@ -30,25 +28,23 @@ int main(int argc, char *argv[])
 
 	symtab_init(&symtab);
 
-	cppfile = cppfile_new();
-	if (!cppfile)
+	cpp = cpp_new();
+	if (!cpp)
 		return EXIT_FAILURE;
 
-	err = cppfile_open(cppfile, filename);
+	err = cpp_open_file(cpp, filename);
 	if (err != MCC_ERROR_OK) {
 		fprintf(stderr, "Cannot open input file '%s': %s\n",
 			filename,
 			error_str(err)
 		);
 
-		cppfile_delete(cppfile);
+		cpp_delete(cpp);
 		return EXIT_FAILURE;
 	}
 
-	cppfile_set_symtab(cppfile, &symtab);
-
 	strbuf_init(&buf, 256);
-	for (i = 1; (token = cpp_next(cppfile)); i++) {	
+	for (i = 1; (token = cpp_next(cpp)); i++) {	
 		if (token->type  == TOKEN_EOL) {
 			strbuf_putc(&buf, '\n');
 			i = 0;
@@ -60,9 +56,7 @@ int main(int argc, char *argv[])
 
 		//symtab_dump(&symtab, stderr);
 
-		strbuf_reset(&buf);
 		token_print(token, &buf);
-		printf("%s\n", strbuf_get_string(&buf));
 
 		if (token->type == TOKEN_EOF)
 			break;
@@ -76,8 +70,7 @@ int main(int argc, char *argv[])
 	printf("%s\n", strbuf_get_string(&buf));
 	strbuf_free(&buf);
 
-	cppfile_close(cppfile);
-	cppfile_delete(cppfile);
+	cpp_delete(cpp);
 	symtab_free(&symtab);
 
 	return EXIT_SUCCESS;

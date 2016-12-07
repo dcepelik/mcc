@@ -1,7 +1,32 @@
 #ifndef CPP_H
 #define CPP_H
 
+#include "error.h"
+#include "lexer.h"
 #include "list.h"
+#include "mempool.h"
+#include "objpool.h"
+#include "token.h"
+#include <stdarg.h>
+#include <stdlib.h>
+
+/*
+ * C preprocessor state. This structure owns all token-related memory
+ * and maintains the stack of all open input files.
+ */
+struct cpp
+{
+	struct symtab *symtab;		/* symbol table */
+	struct objpool token_pool;	/* objpool for struct token */
+	struct mempool token_data;	/* mempool for misc token data */
+	struct objpool macro_pool;	/* objpool for macros */
+	struct objpool file_pool;	/* objpool for open files */
+
+	struct list file_stack;		/* stack of open files */
+	struct list tokens;		/* token queue */
+	struct token *token;		/* last popped token */
+	struct list ifs;		/* if directive control stack */
+};
 
 enum cpp_directive
 {
@@ -19,19 +44,15 @@ enum cpp_directive
 	CPP_DIRECTIVE_UNDEF,
 };
 
-struct cpp_if
-{
-	struct list_node list_node;
-	struct token *token;
-	bool skip_this_branch;
-	bool skip_next_branch;
-};
+struct cpp *cpp_new();
+void cpp_delete(struct cpp *cpp);
 
-#include "cppfile.h"
+mcc_error_t cpp_open_file(struct cpp *cpp, char *filename);
+void cpp_close_file(struct cpp *file);
 
-struct cppfile;
+struct token *cpp_next(struct cpp *cpp);
 
-struct token *cpp_next(struct cppfile *file);
-void cpp_setup_symtab(struct cppfile *file);
+void cpp_error(struct cpp *cpp, char *fmt, ...);
+void cpp_warning(struct cpp *cpp, char *fmt, ...);
 
 #endif

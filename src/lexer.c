@@ -1,11 +1,14 @@
 #include "debug.h"
 #include "lexer.h"
+#include "symbol.h"
 #include <assert.h>
 #include <ctype.h>
 #include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
 
+#define INBUF_BLOCK_SIZE	2048
+#define STRBUF_INIT_SIZE	128
 
 static struct token eol = { .type = TOKEN_EOL };
 static struct token eof = { .type = TOKEN_EOF };
@@ -23,6 +26,48 @@ static const char simple_escape_seq[256] = {
 	['\''] = '\'',
 	['\?'] = '\?',
 };
+
+
+mcc_error_t lexer_init(struct lexer *lexer, char *filename)
+{
+	mcc_error_t err;
+
+	if (!strbuf_init(&lexer->linebuf, STRBUF_INIT_SIZE))
+		return MCC_ERROR_NOMEM;
+
+	if (!strbuf_init(&lexer->strbuf, STRBUF_INIT_SIZE)) {
+		strbuf_free(&lexer->linebuf);
+		return MCC_ERROR_NOMEM;
+	}
+
+	err = inbuf_open(&lexer->inbuf, INBUF_BLOCK_SIZE, filename);
+	if (err != MCC_ERROR_OK)
+		goto out_err;
+
+	lexer->c = strbuf_get_string(&lexer->linebuf);
+
+	lexer->location.line_no = 0;
+	lexer->inside_include = false;
+	lexer->next_at_bol = true;
+	lexer->first_token = true;
+	lexer->had_whitespace = false;
+
+	return MCC_ERROR_OK;
+
+out_err:
+	strbuf_free(&lexer->linebuf);
+	strbuf_free(&lexer->strbuf);
+
+	return err;
+}
+
+
+void lexer_free(struct lexer *lexer)
+{
+	strbuf_free(&lexer->linebuf);
+	strbuf_free(&lexer->strbuf);
+	inbuf_close(&lexer->inbuf);
+}
 
 
 inline static bool is_letter(int c)
@@ -55,19 +100,19 @@ inline static bool is_octal_digit(int c)
 }
 
 
-static int32_t read_octal_number(struct cppfile *file)
+static int32_t read_octal_number(struct lexer *lexer)
 {
 	uint32_t val = 0;
 	int i;
 
 	for (i = 0; i < 3; i++) {
-		if (!is_octal_digit(*file->c))
+		if (!is_octal_digit(*lexer->c))
 			break;
 
 		val *= 8;
-		val += *file->c - '0';
+		val += *lexer->c - '0';
 
-		file->c++;
+		lexer->c++;
 	}
 
 	if (i == 0) {
@@ -93,19 +138,19 @@ static inline int hex_val(int c)
 }
 
 
-static uint32_t read_hex_number(struct cppfile *file, size_t min_len, size_t max_len)
+static uint32_t read_hex_number(struct lexer *lexer, size_t min_len, size_t max_len)
 {	
 	uint32_t val = 0;
 	int i;
 
 	for (i = 0; i < max_len; i++) {
-		if (!is_hex_digit(*file->c))
+		if (!is_hex_digit(*lexer->c))
 			break;
 
 		val *= 16;
-		val += hex_val(*file->c);
+		val += hex_val(*lexer->c);
 
-		file->c++;
+		lexer->c++;
 	}
 
 	if (i < min_len)
@@ -116,12 +161,12 @@ static uint32_t read_hex_number(struct cppfile *file, size_t min_len, size_t max
 }
 
 
-static uint32_t read_escape_sequence(struct cppfile *file)
+static uint32_t read_escape_sequence(struct lexer *lexer)
 {
-	assert(file->c[-1] == '\\');
+	assert(lexer->c[-1] == '\\');
 
-	int c = *file->c;
-	file->c++;
+	int c = *lexer->c;
+	lexer->c++;
 
 	if (simple_escape_seq[c])
 		return simple_escape_seq[c];
@@ -129,27 +174,27 @@ static uint32_t read_escape_sequence(struct cppfile *file)
 	switch (c) {
 	case '0': case '1': case '2': case '3':
 	case '4': case '5': case '6': case '7':
-		file->c--;
-		return read_octal_number(file);
+		lexer->c--;
+		return read_octal_number(lexer);
 
 	case 'x':	
-		return read_hex_number(file, 1, 8);
+		return read_hex_number(lexer, 1, 8);
 
 	case 'u':
-		return read_hex_number(file, 4, 4);
+		return read_hex_number(lexer, 4, 4);
 
 	case 'U':
-		return read_hex_number(file, 8, 8);
+		return read_hex_number(lexer, 8, 8);
 
 	default:
-		DEBUG_PRINTF("error: unknown escape sequence: \\%c", *file->c);
-		file->c++;
+		DEBUG_PRINTF("error: unknown escape sequence: \\%c", *lexer->c);
+		lexer->c++;
 		return -1;
 	}
 }
 
 
-struct symbol *lexer_search_or_insert_symbol(struct cppfile *file, char *name)
+struct symbol *lexer_search_or_insert_symbol(struct cpp *file, char *name)
 {
 	struct symbol *symbol;
 	
@@ -161,21 +206,20 @@ struct symbol *lexer_search_or_insert_symbol(struct cppfile *file, char *name)
 }
 
 
-struct token *lex_name(struct cppfile *file, struct token *token)
+struct token *lexer_lex_name(struct cpp *file, struct lexer *lexer, struct token *token)
 {
-	strbuf_reset(&file->strbuf);
+	strbuf_reset(&lexer->strbuf);
 
-	while (is_letter(*file->c)
-		|| is_digit(*file->c)
-		|| *file->c == '_'
-		|| *file->c == '\\') {
-		strbuf_putc(&file->strbuf, *file->c); // TODO UCN support affects this
-		file->c++;
+	while (is_letter(*lexer->c)
+		|| is_digit(*lexer->c)
+		|| *lexer->c == '_'
+		|| *lexer->c == '\\') {
+		strbuf_putc(&lexer->strbuf, *lexer->c); // TODO UCN support affects this
+		lexer->c++;
 	}
 
-
 	token->type = TOKEN_NAME;
-	token->symbol = lexer_search_or_insert_symbol(file, strbuf_get_string(&file->strbuf));
+	token->symbol = lexer_search_or_insert_symbol(file, strbuf_get_string(&lexer->strbuf));
 
 	if (!token->symbol)
 		return NULL;
@@ -184,28 +228,28 @@ struct token *lex_name(struct cppfile *file, struct token *token)
 }
 
 
-static struct token *lex_char(struct cppfile *file, struct token *token)
+static struct token *lexer_lex_char(struct cpp *file, struct lexer *lexer, struct token *token)
 {
 	uint32_t val;
 	bool seen_delimiter = false;
 	size_t i;
 
-	assert(file->c[-1] == '\'');
+	assert(lexer->c[-1] == '\'');
 
-	for (i = 0; *file->c != '\0'; i++) {
-		if (*file->c == '\'') {
+	for (i = 0; *lexer->c != '\0'; i++) {
+		if (*lexer->c == '\'') {
 			seen_delimiter = true;
-			file->c++;
+			lexer->c++;
 			break;
 		}
 
-		if (*file->c == '\\') {
-			file->c++;
-			val = read_escape_sequence(file);
+		if (*lexer->c == '\\') {
+			lexer->c++;
+			val = read_escape_sequence(lexer);
 		}
 		else {
-			val = (int)(*file->c);
-			file->c++;
+			val = (int)(*lexer->c);
+			lexer->c++;
 		}
 	}
 
@@ -225,44 +269,44 @@ static struct token *lex_char(struct cppfile *file, struct token *token)
 }
 
 
-static inline bool lexer_is_eol(struct cppfile *file)
+static inline bool lexer_is_eol(struct lexer *lexer)
 {
-	return (file->c - strbuf_get_string(&file->linebuf))
-		>= strbuf_strlen(&file->linebuf);
+	return (lexer->c - strbuf_get_string(&lexer->linebuf))
+		>= strbuf_strlen(&lexer->linebuf);
 }
 
 
-struct token *lex_pp_number(struct cppfile *file, struct token *token)
+struct token *lexer_lex_pp_number(struct cpp *file, struct lexer *lexer, struct token *token)
 {
 	char c;
 
-	strbuf_reset(&file->strbuf);
+	strbuf_reset(&lexer->strbuf);
 
-	while (!lexer_is_eol(file)) {
-		if (*file->c == '+' || *file->c == '-') {
+	while (!lexer_is_eol(lexer)) {
+		if (*lexer->c == '+' || *lexer->c == '-') {
 			/* assert(not at the BOL) */
-			assert(file->c != strbuf_get_string(&file->linebuf));
+			assert(lexer->c != strbuf_get_string(&lexer->linebuf));
 
-			c = file->c[-1];
+			c = lexer->c[-1];
 			if (c != 'e' && c != 'E' && c != 'p' && c != 'P') {
 				break;
 			}
 		}
-		else if (*file->c == '\\') {
+		else if (*lexer->c == '\\') {
 			// process UCN
-			file->c++;
+			lexer->c++;
 			continue;
 		}
-		else if (!is_digit(*file->c) && !is_letter(*file->c) && *file->c != '.' && *file->c != '_') {
+		else if (!is_digit(*lexer->c) && !is_letter(*lexer->c) && *lexer->c != '.' && *lexer->c != '_') {
 			break;
 		}
 
-		strbuf_putc(&file->strbuf, *file->c);
-		file->c++;
+		strbuf_putc(&lexer->strbuf, *lexer->c);
+		lexer->c++;
 	}
 
 	token->type = TOKEN_NUMBER;
-	token->str = strbuf_copy_to_mempool(&file->strbuf, &file->token_data);
+	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &file->token_data);
 
 	if (!token->str)
 		return NULL;
@@ -271,29 +315,29 @@ struct token *lex_pp_number(struct cppfile *file, struct token *token)
 }
 
 
-struct token *lex_string(struct cppfile *file, struct token *token)
+struct token *lexer_lex_string(struct cpp *file, struct lexer *lexer, struct token *token)
 {
-	strbuf_reset(&file->strbuf);
+	strbuf_reset(&lexer->strbuf);
 
 	bool seen_delimiter = false;
 	size_t i;
 
-	assert(file->c[-1] == '\"');
+	assert(lexer->c[-1] == '\"');
 
-	for (i = 0; *file->c != '\0'; i++) {
-		if (*file->c == '\"') {
+	for (i = 0; *lexer->c != '\0'; i++) {
+		if (*lexer->c == '\"') {
 			seen_delimiter = true;
-			file->c++;
+			lexer->c++;
 			break;
 		}
 
-		if (*file->c == '\\') {
-			file->c++;
-			strbuf_putc(&file->strbuf, read_escape_sequence(file));
+		if (*lexer->c == '\\') {
+			lexer->c++;
+			strbuf_putc(&lexer->strbuf, read_escape_sequence(lexer));
 		}
 		else {
-			strbuf_putc(&file->strbuf, *file->c);
-			file->c++;
+			strbuf_putc(&lexer->strbuf, *lexer->c);
+			lexer->c++;
 		}
 	}
 
@@ -302,7 +346,7 @@ struct token *lex_string(struct cppfile *file, struct token *token)
 	}
 
 	token->type = TOKEN_STRING;
-	token->str = strbuf_copy_to_mempool(&file->strbuf, &file->token_data);
+	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &file->token_data);
 
 	if (!token->str)
 		return NULL;
@@ -333,15 +377,15 @@ static bool is_valid_hchar(char c)
 }
 
 
-struct token *lex_header_name(struct cppfile *file, struct token *token,
+struct token *lexer_lex_header_name(struct cpp *file, struct lexer *lexer, struct token *token,
 	bool (*is_valid_char)(char c), char delim)
 {
 	char c;
 	bool seen_delim = false;
 
-	strbuf_reset(&file->strbuf);
+	strbuf_reset(&lexer->strbuf);
 
-	while ((c = *file->c++) != '\0') {
+	while ((c = *lexer->c++) != '\0') {
 		if (c == delim) {
 			seen_delim = true;
 			break;
@@ -351,7 +395,7 @@ struct token *lex_header_name(struct cppfile *file, struct token *token,
 			DEBUG_PRINTF("error: unexpected char: %c", c);
 		}
 		else {
-			strbuf_putc(&file->strbuf, c);
+			strbuf_putc(&lexer->strbuf, c);
 		}
 	}
 
@@ -361,7 +405,7 @@ struct token *lex_header_name(struct cppfile *file, struct token *token,
 	// TODO Check (and warn about) presence of // and /* comments within header name
 
 	token->type = TOKEN_HEADER_NAME;
-	token->str = strbuf_copy_to_mempool(&file->strbuf, &file->token_data);
+	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &file->token_data);
 
 	if (!token->str)
 		return NULL;
@@ -370,36 +414,36 @@ struct token *lex_header_name(struct cppfile *file, struct token *token,
 }
 
 
-struct token *lex_header_hname(struct cppfile *file, struct token *token)
+struct token *lexer_lex_header_hname(struct cpp *file, struct lexer *lexer, struct token *token)
 {
-	return lex_header_name(file, token, is_valid_hchar, '>');
+	return lexer_lex_header_name(file, lexer, token, is_valid_hchar, '>');
 }
 
 
-struct token *lex_header_qname(struct cppfile *file, struct token *token)
+struct token *lexer_lex_header_qname(struct cpp *file, struct lexer *lexer, struct token *token)
 {
-	return lex_header_name(file, token, is_valid_qchar, '\"');
+	return lexer_lex_header_name(file, lexer, token, is_valid_qchar, '\"');
 }
 
 
 /*
  * TODO Add trigraph support.
  */
-static mcc_error_t lexer_read_line(struct cppfile *file)
+static mcc_error_t lexer_read_line(struct lexer *lexer)
 {
 	int c;
 	bool escape = false;
 
-	strbuf_reset(&file->linebuf);
+	strbuf_reset(&lexer->linebuf);
 
-	for (file->location.column_no = 0; (c = inbuf_get_char(&file->inbuf)) != INBUF_EOF; file->location.column_no++) {
+	for (lexer->location.column_no = 0; (c = inbuf_get_char(&lexer->inbuf)) != INBUF_EOF; lexer->location.column_no++) {
 		switch (c) {
 		case ' ':
 		case '\t':
 		case '\v':
 		case '\f':
 		// TODO more cases
-			strbuf_putc(&file->linebuf, c);
+			strbuf_putc(&lexer->linebuf, c);
 			continue;
 
 		case '\n':
@@ -418,71 +462,71 @@ static mcc_error_t lexer_read_line(struct cppfile *file)
 
 		default:
 			if (escape) {
-				strbuf_putc(&file->linebuf, '\\');
+				strbuf_putc(&lexer->linebuf, '\\');
 			}
 
-			strbuf_putc(&file->linebuf, c);
+			strbuf_putc(&lexer->linebuf, c);
 			escape = false;
 		}
 	}
 
-	file->location.line_no++;
+	lexer->location.line_no++;
 
 	if (c == INBUF_EOF)
 		return MCC_ERROR_EOF;
 
 eol_or_eof:
-	file->c = strbuf_get_string(&file->linebuf);
+	lexer->c = strbuf_get_string(&lexer->linebuf);
 
 	return MCC_ERROR_OK;
 }
 
 
-static inline void eat_whitespace(struct cppfile *file)
+static inline void eat_whitespace(struct lexer *lexer)
 {
-	while (is_whitespace(*file->c)) {
-		file->had_whitespace = true;
-		file->c++;
+	while (is_whitespace(*lexer->c)) {
+		lexer->had_whitespace = true;
+		lexer->c++;
 	}
 }
 
 
-void eat_cpp_comment(struct cppfile *file)
+void eat_cpp_comment(struct lexer *lexer)
 {
-	lexer_read_line(file);
+	lexer_read_line(lexer);
 }
 
 
-void eat_c_comment(struct cppfile *file)
+void eat_c_comment(struct lexer *lexer)
 {
-	assert(file->c[-2] == '/' && file->c[-1] == '*');
+	assert(lexer->c[-2] == '/' && lexer->c[-1] == '*');
 
 search_comment_terminator:
-	while (!lexer_is_eol(file)) {
-		if (*file->c == '/' && file->c[-1] == '*') {
-			file->c += 2;
+	while (!lexer_is_eol(lexer)) {
+		if (*lexer->c == '/' && lexer->c[-1] == '*') {
+			lexer->c += 2;
 			return;
 		}
 
-		file->c++;
+		lexer->c++;
 	}
 
-	if (lexer_read_line(file))
+	if (lexer_read_line(lexer))
 		goto search_comment_terminator;
 
 	DEBUG_MSG("error: missing */");
 }
 
 
-struct token *lexer_next(struct cppfile *file)
+struct token *lexer_next(struct cpp *file, struct lexer *lexer)
 {
 	struct token *token;
 	mcc_error_t err;
 
 next_nonwhite_char:
-	if (lexer_is_eol(file)) {
-		err = lexer_read_line(file);
-		file->next_at_bol = true;
+	if (lexer_is_eol(lexer)) {
+		err = lexer_read_line(lexer);
+		lexer->next_at_bol = true;
 
 		if (err == MCC_ERROR_EOF)
 			return &eof;
@@ -490,49 +534,49 @@ next_nonwhite_char:
 		if (err != MCC_ERROR_OK)
 			return NULL;
 
-		if (!file->first_token)
+		if (!lexer->first_token)
 			return &eol;
 	}
 
-	file->first_token = false;
+	lexer->first_token = false;
 
-	eat_whitespace(file);
+	eat_whitespace(lexer);
 
 	token = objpool_alloc(&file->token_pool);
 	if (!token)
 		return NULL;
 
-	token->is_at_bol = file->next_at_bol;
-	token->preceded_by_whitespace = file->had_whitespace;
+	token->is_at_bol = lexer->next_at_bol;
+	token->preceded_by_whitespace = lexer->had_whitespace;
 
-	file->next_at_bol = false;
-	file->had_whitespace = false;
+	lexer->next_at_bol = false;
+	lexer->had_whitespace = false;
 
 	/* TODO unhack this */
-	file->location.column_no = file->c - strbuf_get_string(&file->linebuf);
-	token->startloc = file->location;
+	lexer->location.column_no = lexer->c - strbuf_get_string(&lexer->linebuf);
+	token->startloc = lexer->location;
 
-	file->c++;
-	switch (file->c[-1]) {
+	lexer->c++;
+	switch (lexer->c[-1]) {
 	case 'u':
 		/* u8"string" */
-		if (*file->c == '8' && file->c[1] == '\"') {
-			file->c += 2;
-			return lex_string(file, token);
+		if (*lexer->c == '8' && lexer->c[1] == '\"') {
+			lexer->c += 2;
+			return lexer_lex_string(file, lexer, token);
 		}
 
 	case 'U':
 	case 'L':
 		/* L'char' or U'char' or u'char' */
-		if (*file->c == '\'') {
-			file->c++;
-			return lex_char(file, token);
+		if (*lexer->c == '\'') {
+			lexer->c++;
+			return lexer_lex_char(file, lexer, token);
 		}
 		
 		/* L"string" or U"string" or u"string" */
-		if (*file->c == '\"') {
-			file->c++;
-			return lex_string(file, token);
+		if (*lexer->c == '\"') {
+			lexer->c++;
+			return lexer_lex_string(file, lexer, token);
 		}
 
 	case '_': case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
@@ -543,23 +587,23 @@ next_nonwhite_char:
 	case 'J': case 'K': case 'M': case 'N': case 'O': case 'P': case 'Q':
 	case 'R': case 'S': case 'T': case 'V': case 'W': case 'X': case 'Y':
 	case 'Z': case '\\':
-		file->c--;
-		return lex_name(file, token);
+		lexer->c--;
+		return lexer_lex_name(file, lexer, token);
 
 	case '\"':
-		if (file->inside_include)
-			return lex_header_qname(file, token);
+		if (lexer->inside_include)
+			return lexer_lex_header_qname(file, lexer, token);
 		else
-			return lex_string(file, token);
+			return lexer_lex_string(file, lexer, token);
 
 	case '\'':
-		return lex_char(file, token);
+		return lexer_lex_char(file, lexer, token);
 
 	case '.':
-		if (!is_digit(*file->c)) {
-			if (*file->c == '.' && file->c[1] == '.') {
+		if (!is_digit(*lexer->c)) {
+			if (*lexer->c == '.' && lexer->c[1] == '.') {
 				token->type = TOKEN_ELLIPSIS;
-				file->c += 2;
+				lexer->c += 2;
 			}
 			else {
 				token->type = TOKEN_DOT;
@@ -572,8 +616,8 @@ next_nonwhite_char:
 
 	case '0': case '1': case '2': case '3': case '4': case '5':
 	case '6': case '7': case '8': case '9':
-		file->c--;
-		return lex_pp_number(file, token);
+		lexer->c--;
+		return lexer_lex_pp_number(file, lexer, token);
 
 	case '[':
 		token->type = TOKEN_LBRACKET;
@@ -600,17 +644,17 @@ next_nonwhite_char:
 		break;
 
 	case '-':
-		if (*file->c == '>') {
+		if (*lexer->c == '>') {
 			token->type = TOKEN_ARROW;
-			file->c++;
+			lexer->c++;
 		}
-		else if (*file->c == '-') {
+		else if (*lexer->c == '-') {
 			token->type = TOKEN_DEC;
-			file->c++;
+			lexer->c++;
 		}
-		else if (*file->c == '=') {
+		else if (*lexer->c == '=') {
 			token->type = TOKEN_MINUS_EQ;
-			file->c++;
+			lexer->c++;
 		}
 		else {
 			token->type = TOKEN_MINUS;
@@ -619,13 +663,13 @@ next_nonwhite_char:
 		break;
 
 	case '+':
-		if (*file->c == '+') {
+		if (*lexer->c == '+') {
 			token->type = TOKEN_INC;
-			file->c++;
+			lexer->c++;
 		}
-		else if (*file->c == '=') {
+		else if (*lexer->c == '=') {
 			token->type = TOKEN_PLUS_EQ;
-			file->c++;
+			lexer->c++;
 		}
 		else {
 			token->type = TOKEN_PLUS;
@@ -634,13 +678,13 @@ next_nonwhite_char:
 		break;
 
 	case '&':
-		if (*file->c == '=') {
+		if (*lexer->c == '=') {
 			token->type = TOKEN_AND_EQ;
-			file->c++;
+			lexer->c++;
 		}
-		else if (*file->c == '&') {
+		else if (*lexer->c == '&') {
 			token->type = TOKEN_LOGICAL_AND;
-			file->c++;
+			lexer->c++;
 		}
 		else {
 			token->type = TOKEN_AMPERSAND;
@@ -649,9 +693,9 @@ next_nonwhite_char:
 		break;
 
 	case '*':
-		if (*file->c == '=') {
+		if (*lexer->c == '=') {
 			token->type = TOKEN_MUL_EQ;
-			file->c++;
+			lexer->c++;
 		}
 		else {
 			token->type = TOKEN_ASTERISK;
@@ -664,9 +708,9 @@ next_nonwhite_char:
 		break;
 
 	case '!':
-		if (*file->c == '=') {
+		if (*lexer->c == '=') {
 			token->type = TOKEN_NEQ;
-			file->c++;
+			lexer->c++;
 		}
 		else {
 			token->type = TOKEN_NOT;
@@ -675,21 +719,21 @@ next_nonwhite_char:
 		break;
 
 	case '/':
-		if (*file->c == '*') {
-			file->c++;
-			eat_c_comment(file);
+		if (*lexer->c == '*') {
+			lexer->c++;
+			eat_c_comment(lexer);
 			goto next_nonwhite_char;
 		}
 
-		if (*file->c == '/') {
-			file->c++;
-			eat_cpp_comment(file);
+		if (*lexer->c == '/') {
+			lexer->c++;
+			eat_cpp_comment(lexer);
 			goto next_nonwhite_char;
 		}
 
-		if (*file->c == '=') {
+		if (*lexer->c == '=') {
 			token->type = TOKEN_DIV_EQ;
-			file->c++;
+			lexer->c++;
 		}
 		else {
 			token->type = TOKEN_DIV;
@@ -698,23 +742,23 @@ next_nonwhite_char:
 		break;
 
 	case '%':
-		if (*file->c == '=') {
+		if (*lexer->c == '=') {
 			token->type = TOKEN_MOD_EQ;
-			file->c++;
+			lexer->c++;
 		}
-		else if (*file->c == ':') {
-			if (file->c[1] == '%' && file->c[2] == ':') {
+		else if (*lexer->c == ':') {
+			if (lexer->c[1] == '%' && lexer->c[2] == ':') {
 				token->type = TOKEN_HASH_HASH;
-				file->c += 3;
+				lexer->c += 3;
 			}
 			else {
 				token->type = TOKEN_HASH;
-				file->c++;
+				lexer->c++;
 			}
 		}
-		else if (*file->c == '>') {
+		else if (*lexer->c == '>') {
 			token->type = TOKEN_RBRACE;
-			file->c++;
+			lexer->c++;
 		}
 		else {
 			token->type = TOKEN_MOD;
@@ -722,50 +766,50 @@ next_nonwhite_char:
 		break;
 
 	case '<':
-		if (!file->inside_include) {
-			if (*file->c == '=') {
+		if (!lexer->inside_include) {
+			if (*lexer->c == '=') {
 				token->type = TOKEN_LE;
 			}
-			else if (*file->c == '<') {
-				if (file->c[1] == '=') {
+			else if (*lexer->c == '<') {
+				if (lexer->c[1] == '=') {
 					token->type = TOKEN_SHL_EQ;
-					file->c += 2;
+					lexer->c += 2;
 				}
 				else {
 					token->type = TOKEN_SHL;
-					file->c++;
+					lexer->c++;
 				}
 			}
-			else if (*file->c == '%') {
+			else if (*lexer->c == '%') {
 				token->type = TOKEN_LBRACE;
-				file->c++;
+				lexer->c++;
 			}
-			else if (*file->c == ':') {
+			else if (*lexer->c == ':') {
 				token->type = TOKEN_LBRACKET;
-				file->c++;
+				lexer->c++;
 			}
 			else {
 				token->type = TOKEN_LT;
 			}
 		}
 		else {
-			return lex_header_hname(file, token);
+			return lexer_lex_header_hname(file, lexer, token);
 		}
 		break;
 
 	case '>':
-		if (*file->c == '=') {
+		if (*lexer->c == '=') {
 			token->type = TOKEN_GE;
-			file->c++;
+			lexer->c++;
 		}
-		else if (*file->c == '>') {
-			if (file->c[1] == '=') {
+		else if (*lexer->c == '>') {
+			if (lexer->c[1] == '=') {
 				token->type = TOKEN_SHR_EQ;
-				file->c += 2;
+				lexer->c += 2;
 			}
 			else {
 				token->type = TOKEN_SHR;
-				file->c++;
+				lexer->c++;
 			}
 		}
 		else {
@@ -775,9 +819,9 @@ next_nonwhite_char:
 		break;
 
 	case '^':
-		if (*file->c == '=') {
+		if (*lexer->c == '=') {
 			token->type = TOKEN_XOR_EQ;
-			file->c++;
+			lexer->c++;
 		}
 		else {
 			token->type = TOKEN_XOR;
@@ -786,13 +830,13 @@ next_nonwhite_char:
 		break;
 
 	case '|':
-		if (*file->c == '|') {
+		if (*lexer->c == '|') {
 			token->type = TOKEN_LOGICAL_OR;
-			file->c++;
+			lexer->c++;
 		}
-		else if (*file->c == '=') {
+		else if (*lexer->c == '=') {
 			token->type = TOKEN_OR_EQ;
-			file->c++;
+			lexer->c++;
 		}
 		else {
 			token->type = TOKEN_OR;
@@ -805,9 +849,9 @@ next_nonwhite_char:
 		break;
 
 	case ':':
-		if (*file->c == '>') {
+		if (*lexer->c == '>') {
 			token->type = TOKEN_RBRACKET;
-			file->c++;
+			lexer->c++;
 		}
 		else {
 			token->type = TOKEN_COLON;
@@ -820,9 +864,9 @@ next_nonwhite_char:
 		break;
 
 	case '=':
-		if (*file->c == '=') {
+		if (*lexer->c == '=') {
 			token->type = TOKEN_EQ_EQ;
-			file->c++;
+			lexer->c++;
 		}
 		else {
 			token->type = TOKEN_EQ;
@@ -835,9 +879,9 @@ next_nonwhite_char:
 		break;
 
 	case '#':
-		if (*file->c == '#') {
+		if (*lexer->c == '#') {
 			token->type = TOKEN_HASH_HASH;
-			file->c++;
+			lexer->c++;
 		}
 		else {
 			token->type = TOKEN_HASH;
@@ -846,8 +890,8 @@ next_nonwhite_char:
 		break;
 
 	default:
-		DEBUG_PRINTF("error: character %c was unexpected", *file->c);
-		file->c++;
+		DEBUG_PRINTF("error: character %c was unexpected", *lexer->c);
+		lexer->c++;
 		goto next_nonwhite_char;
 	}
 

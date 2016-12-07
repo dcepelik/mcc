@@ -1,7 +1,6 @@
 #ifndef MACRO_H
 #define MACRO_H
 
-#include "cppfile.h"
 #include "list.h"
 
 enum macro_type
@@ -19,10 +18,12 @@ struct macro
 	bool is_macro_arg;	/* is this macro is another macro's argument? */
 };
 
+struct cpp;
+
 void macro_init(struct macro *macro);
 void macro_free(struct macro *macro);
 
-void macro_expand(struct cppfile *file, struct list *invocation,
+void macro_expand(struct cpp *file, struct list *invocation,
 	struct list *expansion);
 
 void macro_dump(struct macro *macro);

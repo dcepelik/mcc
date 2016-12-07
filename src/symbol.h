@@ -13,7 +13,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
 struct scope
 {
 	struct list_node scope_stack_node;
