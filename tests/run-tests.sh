@@ -21,7 +21,7 @@ for test in *; do
 	if [ $? != 0 ]; then
 		echo "Errors during compilation"
 	else
-		diff out $out_test
+		diff out $out_test >/dev/null
 
 		if [ $? != 0 ]; then
 			echo "Output differs"
@@ -30,6 +30,6 @@ for test in *; do
 		fi
 	fi
 
-	#rm -f $out_test
+	rm -f $out_test
 	cd ..
 done
