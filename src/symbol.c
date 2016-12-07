@@ -197,9 +197,10 @@ void symtab_scope_end(struct symtab *table)
 		assert(list_first(&symbol->def_stack) == &def->def_stack_node);
 		list_remove_first(&symbol->def_stack);
 
-		symbol->def = container_of(list_first(&symbol->def_stack), struct symdef, def_stack_node);
-		if (!symbol->def)
+		if (list_is_empty(&symbol->def_stack))
 			symbol->def = &symbol_undef;
+		else
+			symbol->def = container_of(list_first(&symbol->def_stack), struct symdef, def_stack_node);
 
 		//objpool_dealloc(&table->symdef_pool, def); TODO How?
 	}
@@ -226,7 +227,7 @@ void symtab_dump(struct symtab *table, FILE *fout)
 				symbol_type_to_string(def->type));
 
 			if (def->type == SYMBOL_TYPE_CPP_MACRO) {
-				cpp_dump_toklist(&def->macro->expansion);
+				cpp_dump_toklist(&def->macro->expansion, fout);
 			}
 			else {
 				fputc('\n', fout);

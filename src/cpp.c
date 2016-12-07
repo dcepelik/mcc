@@ -9,6 +9,7 @@
 #include "symbol.h"
 #include <assert.h>
 #include <stdarg.h>
+#include <stdio.h>
 
 #define TOKEN_POOL_BLOCK_SIZE	256
 #define MACRO_POOL_BLOCK_SIZE	32
@@ -591,10 +592,11 @@ conclude:
 	}
 
 	cpp_match_eol_eof(cpp);
+	//cpp_cur_file(cpp)->lexer.emit_eols = false;
 }
 
 
-void cpp_dump_toklist(struct list *lst)
+void cpp_dump_toklist(struct list *lst, FILE *fout)
 {
 	struct strbuf buf;
 
@@ -615,7 +617,7 @@ void cpp_dump_toklist(struct list *lst)
 		}
 	}
 
-	printf("%s\n", strbuf_get_string(&buf));
+	fprintf(fout, "%s\n", strbuf_get_string(&buf));
 
 	strbuf_free(&buf);
 }
@@ -662,6 +664,7 @@ static void cpp_expand_macro(struct cpp *cpp)
 		}
 	}
 
+	//cpp_dump_toklist(&invocation);
 	macro_expand(cpp, &invocation, &expansion);
 
 	list_insert_first(&cpp->tokens, &cpp->token->list_node);
@@ -679,6 +682,7 @@ static void cpp_parse(struct cpp *cpp)
 
 	while (!cpp_got_eof(cpp)) {
 		if (cpp_got_hash(cpp)) {
+			cpp_cur_file(cpp)->lexer.emit_eols = true;
 			cpp_pop(cpp);
 			cpp_parse_directive(cpp);
 

@@ -14,7 +14,6 @@ int main(int argc, char *argv[])
 	char *filename;
 	struct cpp *cpp;
 	struct token *token;
-	struct symtab symtab;
 	mcc_error_t err;
 	struct strbuf buf;
 	size_t i;
@@ -26,7 +25,6 @@ int main(int argc, char *argv[])
 
 	filename = argv[1];
 
-	symtab_init(&symtab);
 
 	cpp = cpp_new();
 	if (!cpp)
@@ -54,8 +52,6 @@ int main(int argc, char *argv[])
 		if (i > 1)
 			strbuf_putc(&buf, ' ');
 
-		//symtab_dump(&symtab, stderr);
-
 		token_print(token, &buf);
 
 		if (token->type == TOKEN_EOF)
@@ -71,7 +67,6 @@ int main(int argc, char *argv[])
 	strbuf_free(&buf);
 
 	cpp_delete(cpp);
-	symtab_free(&symtab);
 
 	return EXIT_SUCCESS;
 }

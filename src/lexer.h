@@ -26,8 +26,9 @@ struct lexer
 
 	/* flags */
 	bool inside_include;		/* are we lexing in an #include? */
+	bool emit_eols;
 	bool next_at_bol;		/* is next token at BOL? */
-	bool first_token;		/* first token already produced? */
+	bool first_token;		/* first token of the line produced? */
 	bool had_whitespace;		/* whitespace before current token? */
 };
 

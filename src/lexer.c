@@ -10,7 +10,6 @@
 #define INBUF_BLOCK_SIZE	2048
 #define STRBUF_INIT_SIZE	128
 
-static struct token eol = { .type = TOKEN_EOL };
 static struct token eof = { .type = TOKEN_EOF };
 
 static const char simple_escape_seq[256] = {
@@ -48,6 +47,7 @@ mcc_error_t lexer_init(struct lexer *lexer, char *filename)
 
 	lexer->location.line_no = 0;
 	lexer->inside_include = false;
+	lexer->emit_eols = false;
 	lexer->next_at_bol = true;
 	lexer->first_token = true;
 	lexer->had_whitespace = false;
@@ -493,7 +493,9 @@ static inline void eat_whitespace(struct lexer *lexer)
 
 void eat_cpp_comment(struct lexer *lexer)
 {
-	lexer_read_line(lexer);
+	while (!lexer_is_eol(lexer)) {
+		lexer->c++;
+	}
 }
 
 
@@ -518,6 +520,17 @@ search_comment_terminator:
 }
 
 
+static struct token *new_eol(struct cpp *file)
+{
+	struct token *token;
+
+	token = objpool_alloc(&file->token_pool);
+	token->type = TOKEN_EOL;
+
+	return token;
+}
+
+
 struct token *lexer_next(struct cpp *file, struct lexer *lexer)
 {
 	struct token *token;
@@ -534,8 +547,8 @@ next_nonwhite_char:
 		if (err != MCC_ERROR_OK)
 			return NULL;
 
-		if (!lexer->first_token)
-			return &eol;
+		if (!lexer->first_token && lexer->emit_eols)
+			return new_eol(file);
 	}
 
 	lexer->first_token = false;
