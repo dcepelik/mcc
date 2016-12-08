@@ -13,6 +13,7 @@ void macro_init(struct macro *macro)
 	list_init(&macro->expansion);
 	macro->type = MACRO_TYPE_OBJLIKE;
 	macro->is_macro_arg = false;
+	macro->is_expanding = false;
 }
 
 
@@ -160,32 +161,25 @@ void macro_expand_recursive(struct cpp *cpp, struct list *in, struct list *out)
 	struct token *token;
 	struct token *end;
 	struct list expansion;
-	struct list intermediate;
 
-	list_init(&intermediate);
+	DEBUG_TRACE;
 	cpp_dump_toklist(in, stderr);
 
 	while ((token = list_first(in)) != NULL) {
-		if (token_is_expandable(token) && token->symbol->def->macro->is_macro_arg) {
-			list_init(&expansion);
-			end = macro_expand_internal(cpp, in, &expansion);
-			list_remove_range(in, &token->list_node, &end->list_node);
-			list_append(&intermediate, &expansion);
-		}
-		else {
-			list_insert_last(&intermediate, list_remove_first(in));
-		}
-	}
-
-	while ((token = list_first(&intermediate)) != NULL) {
 		if (!token_is_expandable(token)) {
-			list_insert_last(out, list_remove_first(&intermediate));
+			list_insert_last(out, list_remove_first(in));
+			continue;
+		}
+
+		if (token->symbol->def->macro->is_expanding) {
+			token->noexpand = true;
+			list_insert_last(out, list_remove_first(in));
 			continue;
 		}
 
 		list_init(&expansion);
-		end = macro_expand_internal(cpp, &intermediate, &expansion);
-		list_remove_range(&intermediate, &token->list_node, &end->list_node);
+		end = macro_expand_internal(cpp, in, &expansion);
+		list_remove_range(in, &token->list_node, &end->list_node);
 		list_append(out, &expansion);
 	}
 }
@@ -195,26 +189,46 @@ struct token *macro_expand_internal(struct cpp *cpp, struct list *in, struct lis
 {
 	struct macro *macro;
 	struct token *token;
-	struct token *end;	/* end of macro invocation */
-	struct list expansion;
+	struct token *end;		/* end of macro invocation */
+	struct token *end2;		/* end of macro invocation */
+	struct list expansion;		/* copy of macro expansion list */
+	struct list arg_expansion;	/* copy of macro expansion list */
+	struct list replaced_args;	/* expansion with args fully expanded */
+
+	DEBUG_TRACE;
+	cpp_dump_toklist(in, stderr);
 
 	token = list_first(in);
 	macro = token->symbol->def->macro;
 
-	symtab_scope_begin(cpp->symtab);
+	assert(!macro->is_expanding);
 
-	cpp_dump_toklist(in, stderr);
+	symtab_scope_begin(cpp->symtab);
 
 	if (macro->type == MACRO_TYPE_FUNCLIKE)
 		end = macro_parse_args(cpp, macro, in);
 	else
 		end = token;
 
-	symtab_dump(cpp->symtab, stderr);
-
 	list_init(&expansion);
 	copy_token_list(cpp, &macro->expansion, &expansion);
-	macro_expand_recursive(cpp, &expansion, out);
+
+	list_init(&replaced_args);
+	while ((token = list_first(&expansion)) != NULL) {
+		if (token_is_expandable(token) && token->symbol->def->macro->is_macro_arg) {
+			list_init(&arg_expansion);
+			end2 = macro_expand_internal(cpp, &expansion, &arg_expansion);
+			list_remove_range(&expansion, &token->list_node, &end2->list_node);
+			list_append(&replaced_args, &arg_expansion);
+		}
+		else {
+			list_insert_last(&replaced_args, list_remove_first(&expansion));
+		}
+	}
+
+	macro->is_expanding = true;
+	macro_expand_recursive(cpp, &replaced_args, out);
+	macro->is_expanding = false;
 
 	symtab_scope_end(cpp->symtab);
 

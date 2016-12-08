@@ -53,6 +53,7 @@ struct token
 	/* flags */
 	bool preceded_by_whitespace;
 	bool is_at_bol;
+	bool noexpand;		/* don't expand this token even if it's macro */
 };
 
 const char *token_get_name(enum token_type token);

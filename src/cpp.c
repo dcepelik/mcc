@@ -688,7 +688,8 @@ static void cpp_parse(struct cpp *cpp)
 
 		}
 		else if (cpp->token->type == TOKEN_NAME
-			&& cpp->token->symbol->def->type == SYMBOL_TYPE_CPP_MACRO) {
+			&& cpp->token->symbol->def->type == SYMBOL_TYPE_CPP_MACRO
+			&& !cpp->token->noexpand) {
 			/* exception: no cpp_pop(cpp) here */
 			cpp_expand_macro(cpp);
 		}

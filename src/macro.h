@@ -16,6 +16,7 @@ struct macro
 	struct list expansion;	/* expansion list */
 	enum macro_type type;	/* type of the macro */
 	bool is_macro_arg;	/* is this macro is another macro's argument? */
+	bool is_expanding;	/* is this macro just expanding? */
 };
 
 struct cpp;

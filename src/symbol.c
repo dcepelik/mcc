@@ -227,7 +227,12 @@ void symtab_dump(struct symtab *table, FILE *fout)
 				symbol_type_to_string(def->type));
 
 			if (def->type == SYMBOL_TYPE_CPP_MACRO) {
+				if (def->macro->is_expanding) {
+					fprintf(fout, "(expanding)");
+					fputc('\t', fout);
+				}
 				cpp_dump_toklist(&def->macro->expansion, fout);
+
 			}
 			else {
 				fputc('\n', fout);

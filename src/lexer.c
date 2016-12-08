@@ -561,6 +561,7 @@ next_nonwhite_char:
 
 	token->is_at_bol = lexer->next_at_bol;
 	token->preceded_by_whitespace = lexer->had_whitespace;
+	token->noexpand = false;
 
 	lexer->next_at_bol = false;
 	lexer->had_whitespace = false;

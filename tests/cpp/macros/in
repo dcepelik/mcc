@@ -35,3 +35,9 @@ LEP2(A,1)
 #define WALK0(dx, dy) x += dx, y += dy
 #define WALK(a) WALK0(a)
 WALK(LEFT)
+
+#define FOO(x) FOO(x)
+FOO(1)
+
+#define ECHO2(x) x ECHO2(x)
+ECHO2(ECHO2(1))
