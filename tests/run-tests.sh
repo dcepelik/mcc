@@ -21,7 +21,7 @@ for test in *; do
 	if [ $? != 0 ]; then
 		echo "Errors during compilation"
 	else
-		diff out $out_test >/dev/null
+		diff out $out_test #>/dev/null
 
 		if [ $? != 0 ]; then
 			echo "Output differs"

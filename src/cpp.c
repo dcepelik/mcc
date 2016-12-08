@@ -15,6 +15,7 @@
 #define MACRO_POOL_BLOCK_SIZE	32
 #define TOKEN_DATA_BLOCK_SIZE	1024
 #define FILE_POOL_BLOCK_SIZE	16
+#define VA_ARGS_NAME		"__VA_ARGS__"
 
 
 struct cpp_file
@@ -397,6 +398,9 @@ static void cpp_parse_macro_arglist(struct cpp *cpp, struct macro *macro)
 		if (expect_comma)
 			cpp_error(cpp, "comma was expected here");
 
+		if (cpp->token->type == TOKEN_ELLIPSIS)
+			cpp->token->symbol = symtab_search_or_insert(cpp->symtab, VA_ARGS_NAME);
+
 		list_insert_last(&macro->args, &cpp->token->list_node);
 		expect_comma = true;
 		cpp_pop(cpp);
@@ -448,6 +452,7 @@ static void cpp_parse_define(struct cpp *cpp)
 	}
 
 	//macro_dump(macro);
+	symtab_dump(cpp->symtab, stderr);
 }
 
 

@@ -1,14 +1,19 @@
 #define MAGIC_NUMBER (-42)
-#define SWAP_SIGN(expr)	(-(expr))
-#define ADD(x, y) ((x) + (y))
-#define ECHO(x) x
 
 MAGIC_NUMBER + MAGIC_NUMBER
+
+#define SWAP_SIGN(expr)	(-(expr))
+
 SWAP_SIGN(MAGIC_NUMBER)
 SWAP_SIGN(SWAP_SIGN(MAGIC_NUMBER))
+
+#define ADD(x, y) ((x) + (y))
+
 ADD(1, 2)
 ADD(SWAP_SIGN(1), 2)
 ADD(ADD(1, 2), ADD(3, 4))
+
+#define ECHO(x) x
 
 ECHO(1)
 ECHO(
@@ -18,26 +23,12 @@ ECHO (1)
 ECHO(1)
 ECHO(ECHO(ECHO(ECHO(ECHO(ECHO(ECHO(ECHO(ECHO(ECHO(1))))))))))
 
+#define ECHO2(x) x ECHO2(x)
+
+ECHO2(ECHO2(1))
+
 #define ARGS 1
 #define ONEARG(x) x
 #define EXPAND(x) ONEARG(x)
+
 EXPAND(ARGS)
-
-#define LEP(x, y) x y
-#define LEP2(x, y) LEP(x, y)
-#define A aa
-
-LEP(a,1)
-LEP(A,1)
-LEP2(A,1)
-
-#define LEFT -1, 0
-#define WALK0(dx, dy) x += dx, y += dy
-#define WALK(a) WALK0(a)
-WALK(LEFT)
-
-#define FOO(x) FOO(x)
-FOO(1)
-
-#define ECHO2(x) x ECHO2(x)
-ECHO2(ECHO2(1))

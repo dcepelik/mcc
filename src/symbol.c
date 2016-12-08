@@ -169,6 +169,18 @@ struct symbol *symtab_insert(struct symtab *table, char *name)
 }
 
 
+struct symbol *symtab_search_or_insert(struct symtab *table, char *name)
+{
+	struct symbol *symbol;
+
+	symbol = symtab_search(table, name);
+	if (!symbol)
+		symbol = symtab_insert(table, name);
+
+	return symbol;
+}
+
+
 bool symtab_scope_begin(struct symtab *table)
 {
 	struct scope *scope;

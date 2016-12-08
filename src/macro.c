@@ -131,8 +131,10 @@ static struct token *macro_parse_args(struct cpp *cpp,
 				}
 			}
 			else if (token->type == TOKEN_COMMA && parens_balance == 0) {
-				token = list_next(&token->list_node);
-				break;
+				if (arg->type != TOKEN_ELLIPSIS) {
+					token = list_next(&token->list_node);
+					break;
+				}
 			}
 
 			assert(parens_balance >= 0);

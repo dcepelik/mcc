@@ -194,18 +194,6 @@ static uint32_t read_escape_sequence(struct lexer *lexer)
 }
 
 
-struct symbol *lexer_search_or_insert_symbol(struct cpp *file, char *name)
-{
-	struct symbol *symbol;
-	
-	symbol = symtab_search(file->symtab, name);
-	if (!symbol)
-		symbol = symtab_insert(file->symtab, name);
-
-	return symbol;
-}
-
-
 struct token *lexer_lex_name(struct cpp *file, struct lexer *lexer, struct token *token)
 {
 	strbuf_reset(&lexer->strbuf);
@@ -219,7 +207,7 @@ struct token *lexer_lex_name(struct cpp *file, struct lexer *lexer, struct token
 	}
 
 	token->type = TOKEN_NAME;
-	token->symbol = lexer_search_or_insert_symbol(file, strbuf_get_string(&lexer->strbuf));
+	token->symbol = symtab_search_or_insert(file->symtab, strbuf_get_string(&lexer->strbuf));
 
 	if (!token->symbol)
 		return NULL;

@@ -1,3 +1,10 @@
+/*
+ * Macro expansion routines.
+ *
+ * TODO Refactor the code.
+ * TODO Remove the recursion from the expansion if possible.
+ */
+
 #ifndef MACRO_H
 #define MACRO_H
 

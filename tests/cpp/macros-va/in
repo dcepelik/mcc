@@ -1,0 +1,2 @@
+#define MSG(fmt, ...) printf(fmt, __VA_ARGS__)
+MSG("Hello, World, this is %s\n", "mcc");

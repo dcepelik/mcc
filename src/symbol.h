@@ -35,6 +35,7 @@ void symtab_free(struct symtab *table);
 struct symbol *symtab_search(struct symtab *symtab, char *name);
 bool symtab_contains(struct symtab *symtab, char *name);
 struct symbol *symtab_insert(struct symtab *table, char *name);
+struct symbol *symtab_search_or_insert(struct symtab *table, char *name);
 
 bool symtab_scope_begin(struct symtab *table);
 void symtab_scope_end(struct symtab *table);
