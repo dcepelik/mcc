@@ -129,6 +129,8 @@ struct cpp *cpp_new()
 	symtab_init(cpp->symtab);
 	cpp_setup_symtab(cpp->symtab);
 
+	errlist_init(&cpp->errlist);
+
 	return cpp;
 }
 
@@ -140,6 +142,7 @@ void cpp_delete(struct cpp *cpp)
 	objpool_free(&cpp->macro_pool);
 	objpool_free(&cpp->file_pool);
 	list_free(&cpp->tokens);
+	errlist_free(&cpp->errlist);
 
 	free(cpp);
 }
@@ -152,7 +155,7 @@ mcc_error_t cpp_open_file(struct cpp *cpp, char *filename)
 
 	file = objpool_alloc(&cpp->file_pool);
 
-	err = lexer_init(&file->lexer, filename);
+	err = lexer_init(&file->lexer, cpp, filename);
 	if (err != MCC_ERROR_OK)
 		return err;
 
@@ -182,39 +185,46 @@ struct cpp_file *cpp_cur_file(struct cpp *cpp)
 }
 
 
-void cpp_error(struct cpp *cpp, char *fmt, ...)
+static void cpp_error_internal(struct cpp *cpp, enum error_level level,
+	char *fmt, va_list args)
 {
-	struct strbuf buf;
-	char *line;
-	size_t i;
-	struct location loc;
+	struct strbuf msg;
+	strbuf_init(&msg, 64);
 
-	(void) cpp;
+	strbuf_vprintf_at(&msg, 0, fmt, args);
+	errlist_insert(&cpp->errlist, level, "some-file.c",
+		strbuf_get_string(&msg),
+		strbuf_get_string(&cpp_cur_file(cpp)->lexer.linebuf),
+		cpp->token->startloc);
 
-	line = strbuf_get_string(&cpp_cur_file(cpp)->lexer.linebuf);
-	loc = cpp->token->startloc;
+	strbuf_free(&msg);
+}
 
+
+static void cpp_notice(struct cpp *cpp, char *fmt, ...)
+{
 	va_list args;
 	va_start(args, fmt);
-	strbuf_init(&buf, 1024);
-
-	strbuf_printf(&buf, "error: ");
-	strbuf_vprintf_at(&buf, strbuf_strlen(&buf), fmt, args);
-	strbuf_printf(&buf, "\n%s\n", line);
-
-	for (i = 0; i < loc.column_no; i++) {
-		if (line[i] == '\t')
-			strbuf_putc(&buf, '\t');
-		else
-			strbuf_putc(&buf, ' ');
-	}
-
-	strbuf_printf(&buf, "^^^");
-
-	fprintf(stderr, "%s\n", strbuf_get_string(&buf));
-
+	cpp_error_internal(cpp, ERROR_LEVEL_NOTICE, fmt, args);
 	va_end(args);
-	strbuf_free(&buf);
+}
+
+
+static void cpp_warning(struct cpp *cpp, char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	cpp_error_internal(cpp, ERROR_LEVEL_WARNING, fmt, args);
+	va_end(args);
+}
+
+
+static void cpp_error(struct cpp *cpp, char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	cpp_error_internal(cpp, ERROR_LEVEL_ERROR, fmt, args);
+	va_end(args);
 }
 
 
@@ -227,7 +237,7 @@ static struct token *cpp_pop(struct cpp *cpp)
 	if (list_is_empty(&cpp->tokens)) {
 		file = cpp_cur_file(cpp);
 
-		token = lexer_next(cpp, &file->lexer);
+		token = lexer_next(&file->lexer);
 		assert(token != NULL);
 
 		list_insert_last(&cpp->tokens, &token->list_node);

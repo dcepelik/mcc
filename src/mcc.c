@@ -66,6 +66,8 @@ int main(int argc, char *argv[])
 	printf("%s\n", strbuf_get_string(&buf));
 	strbuf_free(&buf);
 
+	errlist_dump(&cpp->errlist, stderr);
+
 	cpp_delete(cpp);
 
 	return EXIT_SUCCESS;

@@ -18,6 +18,8 @@
  */
 struct lexer
 {
+	struct cpp *cpp;		/* CPP object owning this lexer */
+
 	struct inbuf inbuf;		/* input buffer */
 	struct strbuf linebuf;		/* buffer for current logical line */
 	char *c;			/* current character within linebuf */
@@ -34,8 +36,8 @@ struct lexer
 
 struct cpp *cpp;
 
-mcc_error_t lexer_init(struct lexer *lexer, char *filename);
+mcc_error_t lexer_init(struct lexer *lexer, struct cpp *cpp, char *filename);
 void lexer_free(struct lexer *lexer);
-struct token *lexer_next(struct cpp *cpp, struct lexer *lexer);
+struct token *lexer_next(struct lexer *lexer);
 
 #endif

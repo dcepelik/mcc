@@ -27,7 +27,7 @@ static const char simple_escape_seq[256] = {
 };
 
 
-mcc_error_t lexer_init(struct lexer *lexer, char *filename)
+mcc_error_t lexer_init(struct lexer *lexer, struct cpp *cpp, char *filename)
 {
 	mcc_error_t err;
 
@@ -45,6 +45,7 @@ mcc_error_t lexer_init(struct lexer *lexer, char *filename)
 
 	lexer->c = strbuf_get_string(&lexer->linebuf);
 
+	lexer->cpp = cpp;
 	lexer->location.line_no = 0;
 	lexer->inside_include = false;
 	lexer->emit_eols = false;
@@ -67,6 +68,41 @@ void lexer_free(struct lexer *lexer)
 	strbuf_free(&lexer->linebuf);
 	strbuf_free(&lexer->strbuf);
 	inbuf_close(&lexer->inbuf);
+}
+
+
+static void lexer_error_internal(struct lexer *lexer, enum error_level level,
+	char *fmt, va_list args, char *context, struct location location)
+{
+	struct strbuf msg;
+
+	strbuf_init(&msg, 128);
+	strbuf_vprintf_at(&msg, 0, fmt, args);
+
+	errlist_insert(&lexer->cpp->errlist, level, "some-file.c",
+		strbuf_get_string(&msg), context, lexer->location);
+
+	strbuf_free(&msg);
+}
+
+
+static void lexer_error(struct lexer *lexer, char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	lexer_error_internal(lexer, ERROR_LEVEL_ERROR, fmt, args,
+		strbuf_get_string(&lexer->linebuf), lexer->location);
+	va_end(args);
+}
+
+
+static void lexer_error_noctx(struct lexer *lexer, char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	lexer_error_internal(lexer, ERROR_LEVEL_ERROR, fmt, args, NULL,
+		lexer->location);
+	va_end(args);
 }
 
 
@@ -116,7 +152,7 @@ static int32_t read_octal_number(struct lexer *lexer)
 	}
 
 	if (i == 0) {
-		DEBUG_MSG("error: octal digit expected");
+		lexer_error(lexer, "octal digit expected");
 	}
 
 	return val;
@@ -154,7 +190,7 @@ static uint32_t read_hex_number(struct lexer *lexer, size_t min_len, size_t max_
 	}
 
 	if (i < min_len)
-		DEBUG_MSG("error: hex digit expected");
+		lexer_error(lexer, "hex digit expected");
 
 
 	return val;
@@ -187,14 +223,14 @@ static uint32_t read_escape_sequence(struct lexer *lexer)
 		return read_hex_number(lexer, 8, 8);
 
 	default:
-		DEBUG_PRINTF("error: unknown escape sequence: \\%c", *lexer->c);
+		lexer_error(lexer, "unknown escape sequence: \\%c", *lexer->c);
 		lexer->c++;
 		return -1;
 	}
 }
 
 
-struct token *lexer_lex_name(struct cpp *file, struct lexer *lexer, struct token *token)
+struct token *lexer_lex_name(struct lexer *lexer, struct token *token)
 {
 	strbuf_reset(&lexer->strbuf);
 
@@ -207,7 +243,7 @@ struct token *lexer_lex_name(struct cpp *file, struct lexer *lexer, struct token
 	}
 
 	token->type = TOKEN_NAME;
-	token->symbol = symtab_search_or_insert(file->symtab, strbuf_get_string(&lexer->strbuf));
+	token->symbol = symtab_search_or_insert(lexer->cpp->symtab, strbuf_get_string(&lexer->strbuf));
 
 	if (!token->symbol)
 		return NULL;
@@ -216,7 +252,7 @@ struct token *lexer_lex_name(struct cpp *file, struct lexer *lexer, struct token
 }
 
 
-static struct token *lexer_lex_char(struct cpp *file, struct lexer *lexer, struct token *token)
+static struct token *lexer_lex_char(struct lexer *lexer, struct token *token)
 {
 	uint32_t val;
 	bool seen_delimiter = false;
@@ -242,13 +278,13 @@ static struct token *lexer_lex_char(struct cpp *file, struct lexer *lexer, struc
 	}
 
 	if (i == 0)
-		DEBUG_MSG("error: empty character constant");
+		lexer_error(lexer, "empty character constant");
 
 	if (i > 1)
-		DEBUG_MSG("error: multichar character constants are not supported")
+		lexer_error(lexer, "multichar character constants are not supported");
 
 	if (!seen_delimiter)
-		DEBUG_MSG("error: missing the final \'");
+		lexer_error(lexer, "missing the final \'");
 
 	token->type = TOKEN_CHAR_CONST;
 	token->value = val;
@@ -264,7 +300,7 @@ static inline bool lexer_is_eol(struct lexer *lexer)
 }
 
 
-struct token *lexer_lex_pp_number(struct cpp *file, struct lexer *lexer, struct token *token)
+struct token *lexer_lex_pp_number(struct lexer *lexer, struct token *token)
 {
 	char c;
 
@@ -294,7 +330,7 @@ struct token *lexer_lex_pp_number(struct cpp *file, struct lexer *lexer, struct 
 	}
 
 	token->type = TOKEN_NUMBER;
-	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &file->token_data);
+	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->cpp->token_data);
 
 	if (!token->str)
 		return NULL;
@@ -303,7 +339,7 @@ struct token *lexer_lex_pp_number(struct cpp *file, struct lexer *lexer, struct 
 }
 
 
-struct token *lexer_lex_string(struct cpp *file, struct lexer *lexer, struct token *token)
+struct token *lexer_lex_string(struct lexer *lexer, struct token *token)
 {
 	strbuf_reset(&lexer->strbuf);
 
@@ -330,11 +366,11 @@ struct token *lexer_lex_string(struct cpp *file, struct lexer *lexer, struct tok
 	}
 
 	if (!seen_delimiter) {
-		DEBUG_MSG("error: missing the final \"");
+		lexer_error(lexer, "missing the final \"");
 	}
 
 	token->type = TOKEN_STRING;
-	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &file->token_data);
+	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->cpp->token_data);
 
 	if (!token->str)
 		return NULL;
@@ -365,7 +401,7 @@ static bool is_valid_hchar(char c)
 }
 
 
-struct token *lexer_lex_header_name(struct cpp *file, struct lexer *lexer, struct token *token,
+struct token *lexer_lex_header_name(struct lexer *lexer, struct token *token,
 	bool (*is_valid_char)(char c), char delim)
 {
 	char c;
@@ -380,7 +416,7 @@ struct token *lexer_lex_header_name(struct cpp *file, struct lexer *lexer, struc
 		}
 
 		if (!is_valid_char(c)) {
-			DEBUG_PRINTF("error: unexpected char: %c", c);
+			lexer_error(lexer, "unexpected char: %c", c);
 		}
 		else {
 			strbuf_putc(&lexer->strbuf, c);
@@ -388,12 +424,12 @@ struct token *lexer_lex_header_name(struct cpp *file, struct lexer *lexer, struc
 	}
 
 	if (!seen_delim)
-		DEBUG_PRINTF("error: %c was expected here", delim);
+		lexer_error(lexer, "%c was expected here", delim);
 
 	// TODO Check (and warn about) presence of // and /* comments within header name
 
 	token->type = TOKEN_HEADER_NAME;
-	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &file->token_data);
+	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->cpp->token_data);
 
 	if (!token->str)
 		return NULL;
@@ -402,15 +438,15 @@ struct token *lexer_lex_header_name(struct cpp *file, struct lexer *lexer, struc
 }
 
 
-struct token *lexer_lex_header_hname(struct cpp *file, struct lexer *lexer, struct token *token)
+struct token *lexer_lex_header_hname(struct lexer *lexer, struct token *token)
 {
-	return lexer_lex_header_name(file, lexer, token, is_valid_hchar, '>');
+	return lexer_lex_header_name(lexer, token, is_valid_hchar, '>');
 }
 
 
-struct token *lexer_lex_header_qname(struct cpp *file, struct lexer *lexer, struct token *token)
+struct token *lexer_lex_header_qname(struct lexer *lexer, struct token *token)
 {
-	return lexer_lex_header_name(file, lexer, token, is_valid_qchar, '\"');
+	return lexer_lex_header_name(lexer, token, is_valid_qchar, '\"');
 }
 
 
@@ -458,13 +494,12 @@ static mcc_error_t lexer_read_line(struct lexer *lexer)
 		}
 	}
 
-	lexer->location.line_no++;
-
 	if (c == INBUF_EOF)
 		return MCC_ERROR_EOF;
 
 eol_or_eof:
 	lexer->c = strbuf_get_string(&lexer->linebuf);
+	lexer->location.line_no++;
 
 	return MCC_ERROR_OK;
 }
@@ -493,6 +528,7 @@ void eat_c_comment(struct lexer *lexer)
 
 search_comment_terminator:
 	while (!lexer_is_eol(lexer)) {
+		/* TODO Wrong, reading invalid memory in some cases */
 		if (*lexer->c == '/' && lexer->c[-1] == '*') {
 			lexer->c += 2;
 			return;
@@ -501,25 +537,25 @@ search_comment_terminator:
 		lexer->c++;
 	}
 
-	if (lexer_read_line(lexer))
+	if (lexer_read_line(lexer) != MCC_ERROR_EOF)
 		goto search_comment_terminator;
 
-	DEBUG_MSG("error: missing */");
+	lexer_error_noctx(lexer, "missing */");
 }
 
 
-static struct token *new_eol(struct cpp *file)
+static struct token *new_eol(struct lexer *lexer)
 {
 	struct token *token;
 
-	token = objpool_alloc(&file->token_pool);
+	token = objpool_alloc(&lexer->cpp->token_pool);
 	token->type = TOKEN_EOL;
 
 	return token;
 }
 
 
-struct token *lexer_next(struct cpp *file, struct lexer *lexer)
+struct token *lexer_next(struct lexer *lexer)
 {
 	struct token *token;
 	mcc_error_t err;
@@ -536,14 +572,14 @@ next_nonwhite_char:
 			return NULL;
 
 		if (!lexer->first_token && lexer->emit_eols)
-			return new_eol(file);
+			return new_eol(lexer);
 	}
 
 	lexer->first_token = false;
 
 	eat_whitespace(lexer);
 
-	token = objpool_alloc(&file->token_pool);
+	token = objpool_alloc(&lexer->cpp->token_pool);
 	if (!token)
 		return NULL;
 
@@ -564,7 +600,7 @@ next_nonwhite_char:
 		/* u8"string" */
 		if (*lexer->c == '8' && lexer->c[1] == '\"') {
 			lexer->c += 2;
-			return lexer_lex_string(file, lexer, token);
+			return lexer_lex_string(lexer, token);
 		}
 
 	case 'U':
@@ -572,13 +608,13 @@ next_nonwhite_char:
 		/* L'char' or U'char' or u'char' */
 		if (*lexer->c == '\'') {
 			lexer->c++;
-			return lexer_lex_char(file, lexer, token);
+			return lexer_lex_char(lexer, token);
 		}
 		
 		/* L"string" or U"string" or u"string" */
 		if (*lexer->c == '\"') {
 			lexer->c++;
-			return lexer_lex_string(file, lexer, token);
+			return lexer_lex_string(lexer, token);
 		}
 
 	case '_': case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
@@ -590,16 +626,16 @@ next_nonwhite_char:
 	case 'R': case 'S': case 'T': case 'V': case 'W': case 'X': case 'Y':
 	case 'Z': case '\\':
 		lexer->c--;
-		return lexer_lex_name(file, lexer, token);
+		return lexer_lex_name(lexer, token);
 
 	case '\"':
 		if (lexer->inside_include)
-			return lexer_lex_header_qname(file, lexer, token);
+			return lexer_lex_header_qname(lexer, token);
 		else
-			return lexer_lex_string(file, lexer, token);
+			return lexer_lex_string(lexer, token);
 
 	case '\'':
-		return lexer_lex_char(file, lexer, token);
+		return lexer_lex_char(lexer, token);
 
 	case '.':
 		if (!is_digit(*lexer->c)) {
@@ -619,7 +655,7 @@ next_nonwhite_char:
 	case '0': case '1': case '2': case '3': case '4': case '5':
 	case '6': case '7': case '8': case '9':
 		lexer->c--;
-		return lexer_lex_pp_number(file, lexer, token);
+		return lexer_lex_pp_number(lexer, token);
 
 	case '[':
 		token->type = TOKEN_LBRACKET;
@@ -795,7 +831,7 @@ next_nonwhite_char:
 			}
 		}
 		else {
-			return lexer_lex_header_hname(file, lexer, token);
+			return lexer_lex_header_hname(lexer, token);
 		}
 		break;
 
@@ -892,7 +928,7 @@ next_nonwhite_char:
 		break;
 
 	default:
-		DEBUG_PRINTF("error: character %c was unexpected", *lexer->c);
+		lexer_error(lexer, "character %c was unexpected", *--lexer->c);
 		lexer->c++;
 		goto next_nonwhite_char;
 	}

@@ -1,7 +1,7 @@
 .PHONY: clean gdb tests all
 
 OBJS=mcc.o lexer.o inbuf.o symbol.o objpool.o cpp.o error.o token.o strbuf.o \
-	hashtab.o mempool.o array.o debug.o list.o macro.o
+	hashtab.o mempool.o array.o debug.o list.o macro.o errlist.o
 PROG=mcc
 CFLAGS+=-c -std=gnu11 -Wall --pedantic -ggdb3 -DDEBUG
 LDFLAGS=-Wall

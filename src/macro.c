@@ -165,7 +165,7 @@ void macro_expand_recursive(struct cpp *cpp, struct list *in, struct list *out)
 	struct list expansion;
 
 	DEBUG_TRACE;
-	cpp_dump_toklist(in, stderr);
+	//cpp_dump_toklist(in, stderr);
 
 	while ((token = list_first(in)) != NULL) {
 		if (!token_is_expandable(token)) {
@@ -198,7 +198,7 @@ struct token *macro_expand_internal(struct cpp *cpp, struct list *in, struct lis
 	struct list replaced_args;	/* expansion with args fully expanded */
 
 	DEBUG_TRACE;
-	cpp_dump_toklist(in, stderr);
+	//cpp_dump_toklist(in, stderr);
 
 	token = list_first(in);
 	macro = token->symbol->def->macro;

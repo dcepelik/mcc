@@ -2,6 +2,7 @@
 #define CPP_H
 
 #include "error.h"
+#include "errlist.h"
 #include "lexer.h"
 #include "list.h"
 #include "mempool.h"
@@ -26,7 +27,17 @@ struct cpp
 	struct list tokens;		/* token queue */
 	struct token *token;		/* last popped token */
 	struct list ifs;		/* if directive control stack */
+
+	struct errlist errlist;		/* error list */
 };
+
+struct cpp *cpp_new();
+void cpp_delete(struct cpp *cpp);
+
+mcc_error_t cpp_open_file(struct cpp *cpp, char *filename);
+void cpp_close_file(struct cpp *file);
+
+struct token *cpp_next(struct cpp *cpp);
 
 enum cpp_directive
 {
@@ -43,16 +54,5 @@ enum cpp_directive
 	CPP_DIRECTIVE_PRAGMA,
 	CPP_DIRECTIVE_UNDEF,
 };
-
-struct cpp *cpp_new();
-void cpp_delete(struct cpp *cpp);
-
-mcc_error_t cpp_open_file(struct cpp *cpp, char *filename);
-void cpp_close_file(struct cpp *file);
-
-struct token *cpp_next(struct cpp *cpp);
-
-void cpp_error(struct cpp *cpp, char *fmt, ...);
-void cpp_warning(struct cpp *cpp, char *fmt, ...);
 
 #endif

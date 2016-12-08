@@ -1,6 +1,7 @@
+#include "debug.h"
 #include "mempool.h"
 #include <assert.h>
-#include "debug.h"
+#include <string.h>
 
 
 static void mempool_init_chain(struct mempool_chain *chain)
@@ -131,4 +132,24 @@ void mempool_print_stats(struct mempool *pool)
 	mempool_print_chain_stats(&pool->big);
 	printf("\tSmall objects chain: ");
 	mempool_print_chain_stats(&pool->small);
+}
+
+
+char *mempool_strdup(struct mempool *pool, char *orig)
+{
+	char *dup;
+	size_t len;
+
+	if (!orig)
+		return NULL;
+
+	len = strlen(orig);
+	dup = mempool_alloc(pool, len + 1);
+	if (!dup)
+		return NULL;
+
+	memcpy(dup, orig, len + 1);
+	dup[len] = '\0';
+
+	return dup;
 }

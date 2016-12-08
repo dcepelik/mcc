@@ -33,8 +33,11 @@ struct mempool
 };
 
 void mempool_init(struct mempool *pool, size_t block_size);
-void *mempool_alloc(struct mempool *pool, size_t size);
 void mempool_free(struct mempool *pool);
+
+void *mempool_alloc(struct mempool *pool, size_t size);
+char *mempool_strdup(struct mempool *pool, char *str);
+
 void mempool_print_stats(struct mempool *pool);
 
 #endif
