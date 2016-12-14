@@ -19,12 +19,14 @@
 struct lexer
 {
 	struct cpp *cpp;		/* CPP object owning this lexer */
+	char *filename;			/* TODO */
 
 	struct inbuf inbuf;		/* input buffer */
 	struct strbuf linebuf;		/* buffer for current logical line */
 	char *c;			/* current character within linebuf */
 	struct location location;	/* location of c within inbuf */
 	struct strbuf strbuf;		/* buffer for string accumulation */
+	struct strbuf spelling;		/* buffer for token spelling */
 
 	/* flags */
 	bool inside_include;		/* are we lexing in an #include? */

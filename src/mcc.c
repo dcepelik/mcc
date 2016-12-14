@@ -49,9 +49,8 @@ int main(int argc, char *argv[])
 			continue;
 		}
 
-		if (i > 1)
+		if (i != 1)
 			strbuf_putc(&buf, ' ');
-
 		token_print(token, &buf);
 
 		if (token->type == TOKEN_EOF)
@@ -68,6 +67,7 @@ int main(int argc, char *argv[])
 
 	errlist_dump(&cpp->errlist, stderr);
 
+	cpp_close_file(cpp);
 	cpp_delete(cpp);
 
 	return EXIT_SUCCESS;

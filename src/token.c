@@ -1,6 +1,6 @@
 #include "symbol.h"
 #include "token.h"
-#include <ctype.h>
+#include "print.h"
 
 
 const char *token_names[] = {
@@ -24,7 +24,8 @@ const char *token_names[] = {
 	[TOKEN_GT] = ">",
 	[TOKEN_HASH] = "#",
 	[TOKEN_HASH_HASH] = "##",
-	[TOKEN_HEADER_NAME] = "header-name",
+	[TOKEN_HEADER_HNAME] = "header-hname",
+	[TOKEN_HEADER_QNAME] = "header-qname",
 	[TOKEN_INC] = "++",
 	[TOKEN_LBRACE] = "{",
 	[TOKEN_LBRACKET] = "[",
@@ -68,61 +69,6 @@ const char *token_get_name(enum token_type token)
 }
 
 
-static inline size_t print_char(char c, struct strbuf *buf)
-{
-	switch (c)
-	{
-	case '\a':
-		return strbuf_printf(buf, "\\a");
-
-	case '\b':
-		return strbuf_printf(buf, "\\b");
-
-	case '\f':
-		return strbuf_printf(buf, "\\f");
-
-	case '\r':
-		return strbuf_printf(buf, "\\r");
-
-	case '\n':
-		return strbuf_printf(buf, "\\n");
-
-	case '\v':
-		return strbuf_printf(buf, "\\v");
-
-	case '\t':
-		return strbuf_printf(buf, "\\t");
-
-	case '\\':
-		return strbuf_printf(buf, "\\");
-
-	case '\"':
-		return strbuf_printf(buf, "\\\"");
-
-	case '\'':
-		return strbuf_printf(buf, "\\\'");
-
-	case '\?':
-		return strbuf_printf(buf, "\\\?");
-	}
-
-	if (isprint(c))
-		return strbuf_printf(buf, "%c", c);
-	else
-		return strbuf_printf(buf, "\'0x%x\'", c);
-}
-
-
-static inline void print_string(char *str, struct strbuf *buf)
-{
-	char c;
-	size_t i = 0;
-
-	while ((c = str[i++]))
-		print_char(c, buf);
-}
-
-
 void token_print(struct token *token, struct strbuf *buf)
 {
 	const char *name;
@@ -136,8 +82,12 @@ void token_print(struct token *token, struct strbuf *buf)
 		strbuf_putc(buf, '\'');
 		break;
 
-	case TOKEN_HEADER_NAME:
-		strbuf_printf(buf, "<<%s:%s>>", name, token->str);
+	case TOKEN_HEADER_HNAME:
+		strbuf_printf(buf, "<%s>", token->str);
+		break;
+
+	case TOKEN_HEADER_QNAME:
+		strbuf_printf(buf, "\"%s\"", token->str);
 		break;
 
 	case TOKEN_NAME:
@@ -150,7 +100,8 @@ void token_print(struct token *token, struct strbuf *buf)
 
 	case TOKEN_STRING:
 		strbuf_putc(buf, '\"');
-		print_string(token->str, buf);
+		//print_string(token->str, buf);
+		strbuf_printf(buf, token->str);
 		strbuf_putc(buf, '\"');
 		break;
 
@@ -167,4 +118,10 @@ void token_dump(struct token *token)
 	token_print(token, &buf);
 	printf("%s\n", strbuf_get_string(&buf));
 	strbuf_free(&buf);
+}
+
+
+void location_dump(struct location *loc)
+{
+	fprintf(stderr, "%lu:%lu\n", loc->line_no, loc->column_no);
 }

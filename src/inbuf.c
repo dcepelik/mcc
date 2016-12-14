@@ -13,6 +13,8 @@ static void inbuf_fill(struct inbuf *buf)
 
 mcc_error_t inbuf_open(struct inbuf *buf, size_t size, const char *filename)
 {
+	assert(size > 0);
+
 	buf->file = fopen(filename, "r");
 	if (!buf->file)
 		return MCC_ERROR_ACCESS;

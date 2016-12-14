@@ -1,9 +1,9 @@
 .PHONY: clean gdb tests all
 
 OBJS=mcc.o lexer.o inbuf.o symbol.o objpool.o cpp.o error.o token.o strbuf.o \
-	hashtab.o mempool.o array.o debug.o list.o macro.o errlist.o
+	hashtab.o mempool.o array.o debug.o list.o macro.o errlist.o print.o
 PROG=mcc
-CFLAGS+=-c -std=gnu11 -Wall --pedantic -ggdb3 -DDEBUG
+CFLAGS+=-c -std=gnu11 -Wall -Werror -Wno-unused-function --pedantic -ggdb3 -DDEBUG
 LDFLAGS=-Wall
 
 $(PROG): $(OBJS)

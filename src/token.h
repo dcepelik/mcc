@@ -9,8 +9,8 @@
 enum token_type
 {
 	/* pp-token categories (except punctuators) */
-	TOKEN_CHAR_CONST, TOKEN_HEADER_NAME, TOKEN_NAME, TOKEN_NUMBER,
-	TOKEN_STRING,
+	TOKEN_CHAR_CONST, TOKEN_HEADER_HNAME, TOKEN_HEADER_QNAME, TOKEN_NAME,
+	TOKEN_NUMBER, TOKEN_STRING,
 
 	/* punctuators */
 	TOKEN_AMPERSAND, TOKEN_AND_EQ, TOKEN_ARROW, TOKEN_ASTERISK, TOKEN_COLON,
@@ -24,36 +24,41 @@ enum token_type
 	TOKEN_RPAREN, TOKEN_SEMICOLON, TOKEN_SHL, TOKEN_SHL_EQ, TOKEN_SHR,
 	TOKEN_SHR_EQ, TOKEN_XOR, TOKEN_XOR_EQ,
 
+	/* internal markers */
 	TOKEN_EOF, TOKEN_EOL
 };
 
 struct location
 {
+	char *filename;
 	size_t line_no;
 	size_t column_no;
 };
 
+void location_dump(struct location *loc);
+
 struct token
 {
 	struct list_node list_node;
+	char *spelling;			/* token as given */
 
 	union
 	{
-		struct symbol *symbol;
-		char *str;
-		int value;
-		int c;
+		struct symbol *symbol;	/* for name tokens */
+		char *str;		/* for string tokens */
+		int value;		/* for number tokens */
+		int c;			/* for char const tokens */
 	};
 
-	struct location startloc;
-	struct location endloc;
+	struct location startloc;	/* beginning of the token */
+	struct location endloc;		/* end of the token */
 
-	enum token_type type;
+	enum token_type type;		/* token type */
 
 	/* flags */
 	bool preceded_by_whitespace;
 	bool is_at_bol;
-	bool noexpand;		/* don't expand this token even if it's macro */
+	bool noexpand;			/* don't expand this token */
 };
 
 const char *token_get_name(enum token_type token);

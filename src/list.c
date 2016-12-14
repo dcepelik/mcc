@@ -141,25 +141,27 @@ void list_prepend(struct list *lst, struct list *lst_to_prepend)
 	struct list_node *first_prepend;
 	struct list_node *last_prepend;
 
-	first_prepend = list_first(lst_to_prepend);
-	last_prepend = list_last(lst_to_prepend);
+	if (!list_is_empty(lst_to_prepend)) {
+		first_prepend = list_first(lst_to_prepend);
+		last_prepend = list_last(lst_to_prepend);
 
-	assert(first_prepend != list_first(lst)); /* avoid obvious cycle */
+		assert(first_prepend != list_first(lst)); /* avoid obvious cycle */
 
-	last_prepend->next = list_first(lst);
-	lst->head.next = first_prepend;
+		last_prepend->next = list_first(lst);
+		lst->head.next = first_prepend;
 
-	if (lst->last == &lst->head)
-		lst->last = last_prepend;
+		if (lst->last == &lst->head)
+			lst->last = last_prepend;
 
-	assert(list_is_empty(lst_to_prepend) || !list_is_empty(lst));
+		assert(list_is_empty(lst_to_prepend) || !list_is_empty(lst));
+	}
 }
 
 
 void list_append(struct list *lst, struct list *lst_to_append)
 {
-	assert(!list_is_empty(lst_to_append));
-
-	lst->last->next = list_first(lst_to_append);
-	lst->last = list_last(lst_to_append);
+	if (!list_is_empty(lst_to_append)) {
+		lst->last->next = list_first(lst_to_append);
+		lst->last = list_last(lst_to_append);
+	}
 }

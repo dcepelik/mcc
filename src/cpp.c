@@ -1,5 +1,7 @@
 /*
- * TODO Add #pragma and #line support.
+ * TODO add #pragma and #line support
+ * TODO cexpr support in if conditionals
+ * TODO stringify and glue support
  */
 
 #include "common.h"
@@ -7,9 +9,10 @@
 #include "macro.h"
 #include "lexer.h"
 #include "symbol.h"
+#include <unistd.h>
 #include <assert.h>
 #include <stdarg.h>
-#include <stdio.h>
+#include <string.h>
 
 #define TOKEN_POOL_BLOCK_SIZE	256
 #define MACRO_POOL_BLOCK_SIZE	32
@@ -17,10 +20,10 @@
 #define FILE_POOL_BLOCK_SIZE	16
 #define VA_ARGS_NAME		"__VA_ARGS__"
 
-
 struct cpp_file
 {
 	struct list_node list_node;
+	char *filename;
 	struct lexer lexer;
 };
 
@@ -40,9 +43,31 @@ struct cpp_if
  * wrapped in a big #if 1...#endif block.
  */
 static struct cpp_if ifstack_bottom = {
+	.token = NULL,
 	.skip_this_branch = false,
 	.skip_next_branch = true /* no other branches */
 };
+
+
+/*
+ * <include> search paths.
+ */
+static const char *include_dirs[] = {
+	".",
+	"",
+	"/usr/include",
+	"../include"
+};
+
+
+void cpp_dump_file_stack(struct cpp *cpp)
+{
+	fprintf(stderr, "File stack:\n");
+	list_foreach(struct cpp_file, file, &cpp->file_stack, list_node) {
+		fprintf(stderr, "\t%s\n", file->filename);
+	}
+	fprintf(stderr, "\n");
+}
 
 
 static const struct {
@@ -144,6 +169,9 @@ void cpp_delete(struct cpp *cpp)
 	list_free(&cpp->tokens);
 	errlist_free(&cpp->errlist);
 
+	symtab_free(cpp->symtab);
+	free(cpp->symtab);
+
 	free(cpp);
 }
 
@@ -156,8 +184,10 @@ mcc_error_t cpp_open_file(struct cpp *cpp, char *filename)
 	file = objpool_alloc(&cpp->file_pool);
 
 	err = lexer_init(&file->lexer, cpp, filename);
-	if (err != MCC_ERROR_OK)
+	if (err != MCC_ERROR_OK) {
+		objpool_dealloc(&cpp->file_pool, file);
 		return err;
+	}
 
 	list_insert_first(&cpp->file_stack, &file->list_node);
 
@@ -192,7 +222,9 @@ static void cpp_error_internal(struct cpp *cpp, enum error_level level,
 	strbuf_init(&msg, 64);
 
 	strbuf_vprintf_at(&msg, 0, fmt, args);
-	errlist_insert(&cpp->errlist, level, "some-file.c",
+	errlist_insert(&cpp->errlist,
+		level,
+		cpp_cur_file(cpp)->filename,
 		strbuf_get_string(&msg),
 		strbuf_get_string(&cpp_cur_file(cpp)->lexer.linebuf),
 		cpp->token->startloc);
@@ -201,22 +233,22 @@ static void cpp_error_internal(struct cpp *cpp, enum error_level level,
 }
 
 
-static void cpp_notice(struct cpp *cpp, char *fmt, ...)
-{
-	va_list args;
-	va_start(args, fmt);
-	cpp_error_internal(cpp, ERROR_LEVEL_NOTICE, fmt, args);
-	va_end(args);
-}
+//static void cpp_notice(struct cpp *cpp, char *fmt, ...)
+//{
+//	va_list args;
+//	va_start(args, fmt);
+//	cpp_error_internal(cpp, ERROR_LEVEL_NOTICE, fmt, args);
+//	va_end(args);
+//}
 
 
-static void cpp_warning(struct cpp *cpp, char *fmt, ...)
-{
-	va_list args;
-	va_start(args, fmt);
-	cpp_error_internal(cpp, ERROR_LEVEL_WARNING, fmt, args);
-	va_end(args);
-}
+//static void cpp_warning(struct cpp *cpp, char *fmt, ...)
+//{
+//	va_list args;
+//	va_start(args, fmt);
+//	cpp_error_internal(cpp, ERROR_LEVEL_WARNING, fmt, args);
+//	va_end(args);
+//}
 
 
 static void cpp_error(struct cpp *cpp, char *fmt, ...)
@@ -249,6 +281,14 @@ static struct token *cpp_pop(struct cpp *cpp)
 	cpp->token = list_remove_first(&cpp->tokens);
 	return tmp;
 }
+
+//static struct token *cpp_pop_wrap(struct cpp *cpp, int line)
+//{
+//	fprintf(stderr, "Popping from %i\n", line);
+//	return cpp_pop(cpp);
+//}
+
+//#define cpp_pop(cpp) cpp_pop_wrap(cpp, __LINE__)
 
 
 static inline bool cpp_got(struct cpp *cpp, enum token_type token)
@@ -303,7 +343,8 @@ static inline void cpp_skip_line(struct cpp *cpp)
 
 static inline void cpp_skip_rest_of_directive(struct cpp *cpp)
 {
-	while (!cpp_got_eof(cpp) && !cpp_got_eol(cpp))
+	cpp_cur_file(cpp)->lexer.emit_eols = true;
+	while (!cpp_got_eol_eof(cpp))
 		cpp_pop(cpp);
 }
 
@@ -447,9 +488,11 @@ static void cpp_parse_define(struct cpp *cpp)
 			cpp_pop(cpp);
 			cpp_parse_macro_arglist(cpp, macro);
 			macro->type = MACRO_TYPE_FUNCLIKE;
+			//macro_dump(macro);
 		}
 		else {
 			macro->type = MACRO_TYPE_OBJLIKE;
+			//macro_dump(macro);
 		}
 
 		while (!cpp_got_eol_eof(cpp)) {
@@ -461,8 +504,7 @@ static void cpp_parse_define(struct cpp *cpp)
 		cpp_pop(cpp);
 	}
 
-	//macro_dump(macro);
-	symtab_dump(cpp->symtab, stderr);
+	//symtab_dump(cpp->symtab, stderr);
 }
 
 
@@ -484,9 +526,10 @@ static void cpp_parse_undef(struct cpp *cpp)
 
 static void cpp_parse_error(struct cpp *cpp)
 {
-	cpp_error(cpp, "%s", cpp->token->str);
-	cpp_pop(cpp);
-	cpp_match_eol_eof(cpp);
+	/* TODO cat tokens to get error message */
+	cpp_error(cpp, "%s", "#error");
+	cpp_skip_rest_of_directive(cpp);
+	//cpp_match_eol_eof(cpp);
 }
 
 
@@ -496,28 +539,80 @@ static void cpp_parse_error(struct cpp *cpp)
 static void cpp_parse_include(struct cpp *cpp)
 {
 	char *filename;
+	struct strbuf path_buf;
+	char *path;
+	bool file_included = false;
+	size_t i;
 
-	if (cpp_expect(cpp, TOKEN_HEADER_NAME) && !cpp_skipping(cpp)) {
-		filename = cpp->token->str;
+	strbuf_init(&path_buf, 128);
 
-		/* TODO warning if tokens thrown away */
+	if (cpp->token->type != TOKEN_HEADER_HNAME
+		&& cpp->token->type != TOKEN_HEADER_QNAME) {
+		cpp_error(cpp, "header name was expected, got %s",
+			token_get_name(cpp->token->type));
+
+		cpp_pop(cpp);
+		cpp_skip_rest_of_directive(cpp);
+	}
+
+	if (cpp_skipping(cpp)) {
+		cpp_pop(cpp);
 		cpp_skip_rest_of_directive(cpp);
 
-		cpp_cur_file(cpp)->lexer.inside_include = false;
+		goto out;
+	}
 
-		if (cpp_open_file(cpp, filename) != MCC_ERROR_OK) {
-			cpp_error(cpp, "cannot include file %s: access denied",
-				filename);
+	filename = cpp->token->str;
+	cpp_pop(cpp);
+	cpp_skip_rest_of_directive(cpp);
+
+	for (i = 0; i < ARRAY_SIZE(include_dirs); i++) {
+		strbuf_reset(&path_buf);
+		strbuf_printf(&path_buf, "%s/%s", include_dirs[i], filename);
+
+		path = strbuf_get_string(&path_buf);
+
+		if (cpp_open_file(cpp, path) == MCC_ERROR_OK) {
+			file_included = true;
+			cpp_cur_file(cpp)->filename = filename; // TODO this is hacky
+			cpp_cur_file(cpp)->lexer.filename = filename; // TODO this is hacky, too
+			break;
 		}
 	}
 
-	cpp_pop(cpp);
+	if (!file_included) {
+		cpp_error(cpp, "cannot include file %s", filename);
+	}
+
+	assert(cpp->token != NULL);
+
+	cpp_dump_file_stack(cpp);
+
+out:
+	strbuf_free(&path_buf);
+	cpp_cur_file(cpp)->lexer.inside_include = false;
+}
+
+void cpp_dump_ifstack(struct cpp *cpp)
+{
+	list_foreach(struct cpp_if, cpp_if, &cpp->ifs, list_node) {
+		if (!cpp_if->token)
+			continue;
+
+		fprintf(stderr, "%s at %s:%lu:%lu\n", symbol_get_name(cpp_if->token->symbol),
+			cpp_if->token->startloc.filename,
+			cpp_if->token->startloc.line_no,
+			cpp_if->token->startloc.column_no
+		);
+	}
+	putc('\n', stderr);
 }
 
 
 static void cpp_parse_directive(struct cpp *cpp)
 {
 	struct cpp_if *cpp_if;
+	struct token *prev;
 	enum cpp_directive dir;
 	bool skipping;
 	bool test_cond;
@@ -527,6 +622,7 @@ static void cpp_parse_directive(struct cpp *cpp)
 		return;
 	}
 
+	prev = cpp->token;
 	dir = cpp->token->symbol->def->directive;
 
 	cpp_cur_file(cpp)->lexer.inside_include
@@ -550,7 +646,7 @@ static void cpp_parse_directive(struct cpp *cpp)
 
 push_if:
 		skipping = cpp_skipping(cpp);
-		cpp_if = cpp_ifstack_push(cpp, cpp->token);
+		cpp_if = cpp_ifstack_push(cpp, prev);
 		cpp_if->skip_next_branch = skipping;
 
 		goto conclude;
@@ -562,6 +658,8 @@ push_if:
 conclude:
 		cpp_if->skip_this_branch = !test_cond || cpp_if->skip_next_branch;
 		cpp_if->skip_next_branch |= !cpp_if->skip_this_branch;
+
+		cpp_dump_ifstack(cpp);
 
 		break;
 	
@@ -579,10 +677,17 @@ conclude:
 		else
 			cpp_ifstack_pop(cpp);
 
+		DEBUG_PRINTF("#endif at %s:%lu:%lu",
+			cpp_cur_file(cpp)->filename,
+			prev->startloc.line_no,
+			prev->startloc.column_no);
+		cpp_dump_ifstack(cpp);
+
 		break;
 
 	case CPP_DIRECTIVE_DEFINE:
 		cpp_parse_define(cpp);
+		//symtab_dump(cpp->symtab, stderr);
 		break;
 
 	case CPP_DIRECTIVE_INCLUDE:
@@ -662,6 +767,7 @@ static void cpp_expand_macro(struct cpp *cpp)
 	 * in the macro module.
 	 */
 	if (macro->type == MACRO_TYPE_FUNCLIKE) {
+		DEBUG_TRACE;
 		while (!cpp_got_eof(cpp)) {
 			if (cpp_got(cpp, TOKEN_LPAREN)) {
 				parens_balance++;
@@ -679,12 +785,17 @@ static void cpp_expand_macro(struct cpp *cpp)
 		}
 	}
 
-	//cpp_dump_toklist(&invocation);
+	DEBUG_MSG("Invocation in the CPP:");
+	cpp_dump_toklist(&invocation, stderr);
 	macro_expand(cpp, &invocation, &expansion);
+
+	assert(cpp->token != NULL);
 
 	list_insert_first(&cpp->tokens, &cpp->token->list_node);
 	list_prepend(&cpp->tokens, &expansion);
 	cpp_pop(cpp);
+
+	assert(cpp->token != NULL);
 }
 
 
@@ -705,8 +816,27 @@ static void cpp_parse(struct cpp *cpp)
 		else if (cpp->token->type == TOKEN_NAME
 			&& cpp->token->symbol->def->type == SYMBOL_TYPE_CPP_MACRO
 			&& !cpp->token->noexpand) {
-			/* exception: no cpp_pop(cpp) here */
-			cpp_expand_macro(cpp);
+
+			/* TODO no cpp_pop(cpp) here */
+			if (cpp->token->symbol->def->macro->type == MACRO_TYPE_FUNCLIKE) {
+				struct token *macro_name = cpp->token;
+				cpp_pop(cpp);
+
+				if (cpp->token->type == TOKEN_LPAREN) {
+					list_insert_first(&cpp->tokens, &cpp->token->list_node);
+					cpp->token = macro_name;
+					cpp_expand_macro(cpp);
+				}
+				else {
+					macro_name->noexpand = true;
+					cpp->token = macro_name;
+					list_insert_first(&cpp->tokens, &cpp->token->list_node);
+				}
+
+			}
+			else {
+				cpp_expand_macro(cpp);
+			}
 		}
 		else {
 			if (!cpp_skipping(cpp))

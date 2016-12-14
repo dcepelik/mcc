@@ -1,5 +1,6 @@
 #include "debug.h"
 #include "lexer.h"
+#include "print.h"
 #include "symbol.h"
 #include <assert.h>
 #include <ctype.h>
@@ -39,6 +40,12 @@ mcc_error_t lexer_init(struct lexer *lexer, struct cpp *cpp, char *filename)
 		return MCC_ERROR_NOMEM;
 	}
 
+	if (!strbuf_init(&lexer->spelling, STRBUF_INIT_SIZE)) {
+		strbuf_free(&lexer->linebuf);
+		strbuf_free(&lexer->strbuf);
+		return MCC_ERROR_NOMEM;
+	}
+
 	err = inbuf_open(&lexer->inbuf, INBUF_BLOCK_SIZE, filename);
 	if (err != MCC_ERROR_OK)
 		goto out_err;
@@ -46,6 +53,7 @@ mcc_error_t lexer_init(struct lexer *lexer, struct cpp *cpp, char *filename)
 	lexer->c = strbuf_get_string(&lexer->linebuf);
 
 	lexer->cpp = cpp;
+	lexer->filename = filename;
 	lexer->location.line_no = 0;
 	lexer->inside_include = false;
 	lexer->emit_eols = false;
@@ -58,6 +66,7 @@ mcc_error_t lexer_init(struct lexer *lexer, struct cpp *cpp, char *filename)
 out_err:
 	strbuf_free(&lexer->linebuf);
 	strbuf_free(&lexer->strbuf);
+	strbuf_free(&lexer->spelling);
 
 	return err;
 }
@@ -67,6 +76,7 @@ void lexer_free(struct lexer *lexer)
 {
 	strbuf_free(&lexer->linebuf);
 	strbuf_free(&lexer->strbuf);
+	strbuf_free(&lexer->spelling);
 	inbuf_close(&lexer->inbuf);
 }
 
@@ -79,8 +89,12 @@ static void lexer_error_internal(struct lexer *lexer, enum error_level level,
 	strbuf_init(&msg, 128);
 	strbuf_vprintf_at(&msg, 0, fmt, args);
 
-	errlist_insert(&lexer->cpp->errlist, level, "some-file.c",
-		strbuf_get_string(&msg), context, lexer->location);
+	errlist_insert(&lexer->cpp->errlist,
+		level,
+		lexer->filename,
+		strbuf_get_string(&msg),
+		context,
+		lexer->location);
 
 	strbuf_free(&msg);
 }
@@ -339,14 +353,28 @@ struct token *lexer_lex_pp_number(struct lexer *lexer, struct token *token)
 }
 
 
+char *lexer_spell(struct lexer *lexer, char *start, char *end)
+{
+	char *c;
+
+	strbuf_reset(&lexer->spelling);
+	for (c = start; c != end; c++)
+		strbuf_putc(&lexer->spelling, *c);
+
+	return strbuf_copy_to_mempool(&lexer->spelling, &lexer->cpp->token_data);
+}
+
+
 struct token *lexer_lex_string(struct lexer *lexer, struct token *token)
 {
-	strbuf_reset(&lexer->strbuf);
-
 	bool seen_delimiter = false;
 	size_t i;
+	char *start;
 
+	strbuf_reset(&lexer->strbuf);
 	assert(lexer->c[-1] == '\"');
+
+	start = lexer->c - 1;
 
 	for (i = 0; *lexer->c != '\0'; i++) {
 		if (*lexer->c == '\"') {
@@ -371,6 +399,7 @@ struct token *lexer_lex_string(struct lexer *lexer, struct token *token)
 
 	token->type = TOKEN_STRING;
 	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->cpp->token_data);
+	token->spelling = lexer_spell(lexer, start, lexer->c);
 
 	if (!token->str)
 		return NULL;
@@ -428,7 +457,6 @@ struct token *lexer_lex_header_name(struct lexer *lexer, struct token *token,
 
 	// TODO Check (and warn about) presence of // and /* comments within header name
 
-	token->type = TOKEN_HEADER_NAME;
 	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->cpp->token_data);
 
 	if (!token->str)
@@ -440,13 +468,17 @@ struct token *lexer_lex_header_name(struct lexer *lexer, struct token *token,
 
 struct token *lexer_lex_header_hname(struct lexer *lexer, struct token *token)
 {
-	return lexer_lex_header_name(lexer, token, is_valid_hchar, '>');
+	token->type = TOKEN_HEADER_HNAME;
+	lexer_lex_header_name(lexer, token, is_valid_hchar, '>');
+	return token;
 }
 
 
 struct token *lexer_lex_header_qname(struct lexer *lexer, struct token *token)
 {
-	return lexer_lex_header_name(lexer, token, is_valid_qchar, '\"');
+	token->type = TOKEN_HEADER_QNAME;
+	lexer_lex_header_name(lexer, token, is_valid_qchar, '\"');
+	return token;
 }
 
 
@@ -559,6 +591,7 @@ struct token *lexer_next(struct lexer *lexer)
 {
 	struct token *token;
 	mcc_error_t err;
+	struct strbuf errbuf;
 
 next_nonwhite_char:
 	if (lexer_is_eol(lexer)) {
@@ -578,6 +611,8 @@ next_nonwhite_char:
 	lexer->first_token = false;
 
 	eat_whitespace(lexer);
+	if (lexer_is_eol(lexer))
+		goto next_nonwhite_char;
 
 	token = objpool_alloc(&lexer->cpp->token_pool);
 	if (!token)
@@ -593,6 +628,8 @@ next_nonwhite_char:
 	/* TODO unhack this */
 	lexer->location.column_no = lexer->c - strbuf_get_string(&lexer->linebuf);
 	token->startloc = lexer->location;
+	/* TODO unhack this */
+	token->startloc.filename = lexer->filename;
 
 	lexer->c++;
 	switch (lexer->c[-1]) {
@@ -806,6 +843,7 @@ next_nonwhite_char:
 	case '<':
 		if (!lexer->inside_include) {
 			if (*lexer->c == '=') {
+				lexer->c++;
 				token->type = TOKEN_LE;
 			}
 			else if (*lexer->c == '<') {
@@ -928,7 +966,13 @@ next_nonwhite_char:
 		break;
 
 	default:
-		lexer_error(lexer, "character %c was unexpected", *--lexer->c);
+		strbuf_init(&errbuf, 4); // TODO get rid of the strbuf
+		print_char(*(lexer->c - 1), &errbuf);
+		lexer_error(lexer, "character %s was unexpected",
+			strbuf_get_string(&errbuf));
+		lexer_error(lexer, "line len was %lu", strbuf_strlen(&lexer->linebuf));
+		strbuf_free(&errbuf);
+
 		lexer->c++;
 		goto next_nonwhite_char;
 	}

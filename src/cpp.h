@@ -10,6 +10,7 @@
 #include "token.h"
 #include <stdarg.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 /*
  * C preprocessor state. This structure owns all token-related memory
@@ -54,5 +55,8 @@ enum cpp_directive
 	CPP_DIRECTIVE_PRAGMA,
 	CPP_DIRECTIVE_UNDEF,
 };
+
+void cpp_dump_toklist(struct list *lst, FILE *fout);
+void cpp_dump_file_stack(struct cpp *cpp);
 
 #endif
