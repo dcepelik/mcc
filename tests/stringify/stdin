@@ -1,0 +1,10 @@
+#define M1	this is a series of preprocessing tokens
+#define M2	same,  but	with/* a lot of */whitespace
+#define M3	this "macro" contains a "string"
+#define M4	beware, "strings\tshould\nbe   \"escaped\"" specially
+#define GCC_EXAMPLE p = "foo\n";
+
+#define E1	# M4
+#define E5	# GCC_EXAMPLE
+
+E5

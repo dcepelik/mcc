@@ -1,0 +1,11 @@
+ifdef at stdin:2:1
+
+*** DEBUG ***	     cpp.c  681    #endif at (null):5:1
+
+ifdef at stdin:6:1
+
+*** DEBUG ***	     cpp.c  681    #endif at (null):8:1
+
+(null): 7: error: #error
+#error "A should be undefined."
+       ^

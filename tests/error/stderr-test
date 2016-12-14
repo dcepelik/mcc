@@ -1,0 +1,3 @@
+(null): 1: error: #error
+#error "Message"
+       ^

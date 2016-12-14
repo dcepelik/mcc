@@ -1,0 +1,23 @@
+File stack:
+	(null)
+
+ifdef at stdin:2:1
+
+ifdef at stdin:3:1
+ifdef at stdin:2:1
+
+*** DEBUG ***	     cpp.c  681    #endif at (null):5:1
+ifdef at stdin:2:1
+
+*** DEBUG ***	     cpp.c  681    #endif at (null):6:1
+
+File stack:
+	(null)
+
+(null): 0: error: cannot include file /home/david/ideas/mcc/tests/cpp/include/inc.c
+#ifdef INC_INCLUDED_OK
+^
+
+(null): 0: error: cannot include file /home/david/ideas/mcc/tests/cpp/include/inc.c
+
+^

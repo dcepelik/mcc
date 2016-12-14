@@ -1,0 +1,8 @@
+*** DEBUG ***	   macro.c  290    Control reached macro_expand_internal
+*** DEBUG ***	   macro.c  291    in toklist:
+TL: [E1]
+*** DEBUG ***	   macro.c  169    Control reached macro_expand_recursive
+*** DEBUG ***	   macro.c  170    in toklist:
+TL: "'0xffffffc8'|p , strings\tshould\nbe   \"escaped\" '0xffffffcf'|p"
+*** DEBUG ***	   macro.c  326    resulting toklist:
+TL: "'0xffffffc8'|p , strings\tshould\nbe   \"escaped\" '0xffffffcf'|p"

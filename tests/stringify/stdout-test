@@ -1,0 +1,1 @@
+"'0xffffffc8'|p , strings\tshould\nbe   \"escaped\" '0xffffffcf'|p" <<EOF>>

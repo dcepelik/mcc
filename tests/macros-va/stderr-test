@@ -1,0 +1,21 @@
+*** DEBUG ***	     cpp.c  768    Control reached cpp_expand_macro
+*** DEBUG ***	   macro.c  290    Control reached macro_expand_internal
+*** DEBUG ***	   macro.c  291    in toklist:
+TL: [MSG] ( "Hello, World, this is %s\n" , "mcc" )
+*** DEBUG ***	   macro.c  290    Control reached macro_expand_internal
+*** DEBUG ***	   macro.c  291    in toklist:
+TL: [fmt] , [__VA_ARGS__] )
+*** DEBUG ***	   macro.c  169    Control reached macro_expand_recursive
+*** DEBUG ***	   macro.c  170    in toklist:
+TL: "Hello, World, this is %s\n"
+*** DEBUG ***	   macro.c  290    Control reached macro_expand_internal
+*** DEBUG ***	   macro.c  291    in toklist:
+TL: [__VA_ARGS__] )
+*** DEBUG ***	   macro.c  169    Control reached macro_expand_recursive
+*** DEBUG ***	   macro.c  170    in toklist:
+TL: "mcc"
+*** DEBUG ***	   macro.c  169    Control reached macro_expand_recursive
+*** DEBUG ***	   macro.c  170    in toklist:
+TL: [printf] ( "Hello, World, this is %s\n" , "mcc" )
+*** DEBUG ***	   macro.c  326    resulting toklist:
+TL: [printf] ( "Hello, World, this is %s\n" , "mcc" )
