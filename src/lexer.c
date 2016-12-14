@@ -1,3 +1,4 @@
+#include "context.h"
 #include "debug.h"
 #include "lexer.h"
 #include "print.h"
@@ -28,7 +29,7 @@ static const char simple_escape_seq[256] = {
 };
 
 
-mcc_error_t lexer_init(struct lexer *lexer, struct cpp *cpp, char *filename)
+mcc_error_t lexer_init(struct lexer *lexer, struct context *ctx, char *filename)
 {
 	mcc_error_t err;
 
@@ -52,7 +53,7 @@ mcc_error_t lexer_init(struct lexer *lexer, struct cpp *cpp, char *filename)
 
 	lexer->c = strbuf_get_string(&lexer->linebuf);
 
-	lexer->cpp = cpp;
+	lexer->ctx = ctx;
 	lexer->filename = filename;
 	lexer->location.line_no = 0;
 	lexer->inside_include = false;
@@ -89,7 +90,7 @@ static void lexer_error_internal(struct lexer *lexer, enum error_level level,
 	strbuf_init(&msg, 128);
 	strbuf_vprintf_at(&msg, 0, fmt, args);
 
-	errlist_insert(&lexer->cpp->errlist,
+	errlist_insert(&lexer->ctx->errlist,
 		level,
 		lexer->filename,
 		strbuf_get_string(&msg),
@@ -257,7 +258,7 @@ struct token *lexer_lex_name(struct lexer *lexer, struct token *token)
 	}
 
 	token->type = TOKEN_NAME;
-	token->symbol = symtab_search_or_insert(lexer->cpp->symtab, strbuf_get_string(&lexer->strbuf));
+	token->symbol = symtab_search_or_insert(&lexer->ctx->symtab, strbuf_get_string(&lexer->strbuf));
 
 	if (!token->symbol)
 		return NULL;
@@ -344,7 +345,7 @@ struct token *lexer_lex_pp_number(struct lexer *lexer, struct token *token)
 	}
 
 	token->type = TOKEN_NUMBER;
-	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->cpp->token_data);
+	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->ctx->token_data);
 
 	if (!token->str)
 		return NULL;
@@ -361,7 +362,7 @@ char *lexer_spell(struct lexer *lexer, char *start, char *end)
 	for (c = start; c != end; c++)
 		strbuf_putc(&lexer->spelling, *c);
 
-	return strbuf_copy_to_mempool(&lexer->spelling, &lexer->cpp->token_data);
+	return strbuf_copy_to_mempool(&lexer->spelling, &lexer->ctx->token_data);
 }
 
 
@@ -398,7 +399,7 @@ struct token *lexer_lex_string(struct lexer *lexer, struct token *token)
 	}
 
 	token->type = TOKEN_STRING;
-	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->cpp->token_data);
+	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->ctx->token_data);
 	token->spelling = lexer_spell(lexer, start, lexer->c);
 
 	if (!token->str)
@@ -457,7 +458,7 @@ struct token *lexer_lex_header_name(struct lexer *lexer, struct token *token,
 
 	// TODO Check (and warn about) presence of // and /* comments within header name
 
-	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->cpp->token_data);
+	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->ctx->token_data);
 
 	if (!token->str)
 		return NULL;
@@ -580,7 +581,7 @@ static struct token *new_eol(struct lexer *lexer)
 {
 	struct token *token;
 
-	token = objpool_alloc(&lexer->cpp->token_pool);
+	token = objpool_alloc(&lexer->ctx->token_pool);
 	token->type = TOKEN_EOL;
 
 	return token;
@@ -614,7 +615,7 @@ next_nonwhite_char:
 	if (lexer_is_eol(lexer))
 		goto next_nonwhite_char;
 
-	token = objpool_alloc(&lexer->cpp->token_pool);
+	token = objpool_alloc(&lexer->ctx->token_pool);
 	if (!token)
 		return NULL;
 

@@ -13,13 +13,13 @@
 #include <stdio.h>
 
 /*
- * C preprocessor state. This structure owns all token-related memory
- * and maintains the stack of all open input files.
+ * C preprocessor state.
  */
 struct cpp
 {
+	struct context *ctx;
+
 	struct symtab *symtab;		/* symbol table */
-	struct objpool token_pool;	/* objpool for struct token */
 	struct mempool token_data;	/* mempool for misc token data */
 	struct objpool macro_pool;	/* objpool for macros */
 	struct objpool file_pool;	/* objpool for open files */
@@ -32,7 +32,7 @@ struct cpp
 	struct errlist errlist;		/* error list */
 };
 
-struct cpp *cpp_new();
+struct cpp *cpp_new(struct context *ctx);
 void cpp_delete(struct cpp *cpp);
 
 mcc_error_t cpp_open_file(struct cpp *cpp, char *filename);

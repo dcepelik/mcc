@@ -4,6 +4,7 @@
  * TODO stringify and glue support
  */
 
+#include "context.h"
 #include "common.h"
 #include "debug.h"
 #include "macro.h"
@@ -14,7 +15,6 @@
 #include <stdarg.h>
 #include <string.h>
 
-#define TOKEN_POOL_BLOCK_SIZE	256
 #define MACRO_POOL_BLOCK_SIZE	32
 #define TOKEN_DATA_BLOCK_SIZE	1024
 #define FILE_POOL_BLOCK_SIZE	16
@@ -134,14 +134,14 @@ static void cpp_setup_symtab(struct symtab *table)
 }
 
 
-struct cpp *cpp_new()
+struct cpp *cpp_new(struct context *ctx)
 {
 	struct cpp *cpp;
 
 	cpp = malloc(sizeof(*cpp));
+	cpp->ctx = ctx;
 
 	mempool_init(&cpp->token_data, TOKEN_DATA_BLOCK_SIZE);
-	objpool_init(&cpp->token_pool, sizeof(struct token), TOKEN_POOL_BLOCK_SIZE);
 	objpool_init(&cpp->macro_pool, sizeof(struct macro), MACRO_POOL_BLOCK_SIZE);
 	objpool_init(&cpp->file_pool, sizeof(struct cpp_file), FILE_POOL_BLOCK_SIZE);
 
@@ -150,9 +150,8 @@ struct cpp *cpp_new()
 	cpp->token = NULL;
 	list_init(&cpp->ifs);
 
-	cpp->symtab = malloc(sizeof(*cpp->symtab));
-	symtab_init(cpp->symtab);
-	cpp_setup_symtab(cpp->symtab);
+	cpp_setup_symtab(&cpp->ctx->symtab);
+	cpp->symtab = &cpp->ctx->symtab;
 
 	errlist_init(&cpp->errlist);
 
@@ -163,14 +162,10 @@ struct cpp *cpp_new()
 void cpp_delete(struct cpp *cpp)
 {
 	mempool_free(&cpp->token_data);
-	objpool_free(&cpp->token_pool);
 	objpool_free(&cpp->macro_pool);
 	objpool_free(&cpp->file_pool);
 	list_free(&cpp->tokens);
 	errlist_free(&cpp->errlist);
-
-	symtab_free(cpp->symtab);
-	free(cpp->symtab);
 
 	free(cpp);
 }
@@ -183,7 +178,7 @@ mcc_error_t cpp_open_file(struct cpp *cpp, char *filename)
 
 	file = objpool_alloc(&cpp->file_pool);
 
-	err = lexer_init(&file->lexer, cpp, filename);
+	err = lexer_init(&file->lexer, cpp->ctx, filename);
 	if (err != MCC_ERROR_OK) {
 		objpool_dealloc(&cpp->file_pool, file);
 		return err;
@@ -450,7 +445,7 @@ static void cpp_parse_macro_arglist(struct cpp *cpp, struct macro *macro)
 			cpp_error(cpp, "comma was expected here");
 
 		if (cpp->token->type == TOKEN_ELLIPSIS)
-			cpp->token->symbol = symtab_search_or_insert(cpp->symtab, VA_ARGS_NAME);
+			cpp->token->symbol = symtab_search_or_insert(&cpp->ctx->symtab, VA_ARGS_NAME);
 
 		list_insert_last(&macro->args, &cpp->token->list_node);
 		expect_comma = true;
@@ -478,7 +473,7 @@ static void cpp_parse_define(struct cpp *cpp)
 		macro_init(macro);
 		macro->name = symbol_get_name(cpp->token->symbol);
 
-		symdef = symbol_define(cpp->symtab, cpp->token->symbol);
+		symdef = symbol_define(&cpp->ctx->symtab, cpp->token->symbol);
 		symdef->type = SYMBOL_TYPE_CPP_MACRO;
 		symdef->macro = macro;
 
@@ -504,7 +499,7 @@ static void cpp_parse_define(struct cpp *cpp)
 		cpp_pop(cpp);
 	}
 
-	//symtab_dump(cpp->symtab, stderr);
+	//symtab_dump(&cpp->ctx->symtab, stderr);
 }
 
 
@@ -517,7 +512,7 @@ static void cpp_parse_undef(struct cpp *cpp)
 
 	if (!cpp_skipping(cpp)) {
 		/* TODO check it's defined */
-		//TODO symbol_pop_definition(cpp->symtab, cpp->token->symbol); 
+		//TODO symbol_pop_definition(&cpp->ctx->symtab, cpp->token->symbol); 
 	}
 
 	cpp_pop(cpp);
@@ -687,7 +682,7 @@ conclude:
 
 	case CPP_DIRECTIVE_DEFINE:
 		cpp_parse_define(cpp);
-		//symtab_dump(cpp->symtab, stderr);
+		//symtab_dump(&cpp->ctx->symtab, stderr);
 		break;
 
 	case CPP_DIRECTIVE_INCLUDE:

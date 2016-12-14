@@ -9,8 +9,9 @@
 #ifndef LEXER_H
 #define LEXER_H
 
-#include "strbuf.h"
+#include "error.h"
 #include "inbuf.h"
+#include "strbuf.h"
 #include "token.h"
 
 /*
@@ -18,7 +19,7 @@
  */
 struct lexer
 {
-	struct cpp *cpp;		/* CPP object owning this lexer */
+	struct context *ctx;
 	char *filename;			/* TODO */
 
 	struct inbuf inbuf;		/* input buffer */
@@ -36,9 +37,7 @@ struct lexer
 	bool had_whitespace;		/* whitespace before current token? */
 };
 
-struct cpp *cpp;
-
-mcc_error_t lexer_init(struct lexer *lexer, struct cpp *cpp, char *filename);
+mcc_error_t lexer_init(struct lexer *lexer, struct context *ctx, char *filename);
 void lexer_free(struct lexer *lexer);
 struct token *lexer_next(struct lexer *lexer);
 

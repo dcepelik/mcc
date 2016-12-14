@@ -1,5 +1,6 @@
-#include "error.h"
+#include "context.h"
 #include "cpp.h"
+#include "error.h"
 #include "symbol.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,12 +12,15 @@
 
 int main(int argc, char *argv[])
 {
+	struct context ctx;
 	char *filename;
 	struct cpp *cpp;
 	struct token *token;
 	mcc_error_t err;
 	struct strbuf buf;
 	size_t i;
+
+	context_init(&ctx);
 
 	if (argc != 2) {
 		fprintf(stderr, "Usage: %s FILE\n", argv[0]);
@@ -26,7 +30,7 @@ int main(int argc, char *argv[])
 	filename = argv[1];
 
 
-	cpp = cpp_new();
+	cpp = cpp_new(&ctx);
 	if (!cpp)
 		return EXIT_FAILURE;
 
@@ -69,6 +73,7 @@ int main(int argc, char *argv[])
 
 	cpp_close_file(cpp);
 	cpp_delete(cpp);
+	context_free(&ctx);
 
 	return EXIT_SUCCESS;
 }

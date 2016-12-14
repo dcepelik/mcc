@@ -1,3 +1,4 @@
+#include "context.h"
 #include "cpp.h"
 #include "debug.h"
 #include "macro.h"
@@ -94,7 +95,7 @@ static void copy_token_list(struct cpp *cpp, struct list *src, struct list *dst)
 	struct token *dst_token;
 
 	list_foreach(struct token, src_token, src, list_node) {
-		dst_token = objpool_alloc(&cpp->token_pool);
+		dst_token = objpool_alloc(&cpp->ctx->token_pool);
 		*dst_token = *src_token;
 		list_insert_last(dst, &dst_token->list_node);
 	}
@@ -120,7 +121,7 @@ static struct token *macro_parse_args(struct cpp *cpp,
 	token = list_next(&token->list_node); /* skip ( */
 
 	list_foreach(struct token, arg, &macro->args, list_node) {
-		argdef = symbol_define(cpp->symtab, arg->symbol);
+		argdef = symbol_define(&cpp->ctx->symtab, arg->symbol);
 		argdef->type = SYMBOL_TYPE_CPP_MACRO;
 		argdef->macro = objpool_alloc(&cpp->macro_pool);
 
@@ -239,9 +240,9 @@ static struct token *macro_stringify(struct cpp *cpp, struct list *tokens)
 	first = list_first(tokens);
 	last = list_last(tokens);
 
-	strtoken = objpool_alloc(&cpp->token_pool);
+	strtoken = objpool_alloc(&cpp->ctx->token_pool);
 	strtoken->type = TOKEN_STRING;
-	strtoken->str = strbuf_copy_to_mempool(&str, &cpp->token_data);
+	strtoken->str = strbuf_copy_to_mempool(&str, &cpp->ctx->token_data);
 	strtoken->startloc = first->startloc;
 	strtoken->endloc = last->endloc;
 	strtoken->preceded_by_whitespace = first->preceded_by_whitespace;
@@ -315,7 +316,7 @@ struct token *macro_expand_internal(struct cpp *cpp, struct list *in, struct lis
 
 	assert(!macro->is_expanding);
 
-	symtab_scope_begin(cpp->symtab);
+	symtab_scope_begin(&cpp->ctx->symtab);
 
 	if (macro->type == MACRO_TYPE_FUNCLIKE)
 		end = macro_parse_args(cpp, macro, in);
@@ -332,7 +333,7 @@ struct token *macro_expand_internal(struct cpp *cpp, struct list *in, struct lis
 	macro_expand_recursive(cpp, &replaced_args, out);
 	macro->is_expanding = false;
 
-	symtab_scope_end(cpp->symtab);
+	symtab_scope_end(&cpp->ctx->symtab);
 
 	return end;
 }
