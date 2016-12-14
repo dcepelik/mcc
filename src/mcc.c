@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
 	printf("%s\n", strbuf_get_string(&buf));
 	strbuf_free(&buf);
 
-	errlist_dump(&cpp->errlist, stderr);
+	errlist_dump(&ctx.errlist, stderr);
 
 	cpp_close_file(cpp);
 	cpp_delete(cpp);

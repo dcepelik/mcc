@@ -1,10 +1,10 @@
 #ifndef CONTEXT_H
 #define CONTEXT_H
 
+#include "symbol.h"
 #include "errlist.h"
 #include "mempool.h"
 #include "objpool.h"
-#include "symbol.h"
 
 /*
  * Translation unit context. Owns objects and memory needed by multiple

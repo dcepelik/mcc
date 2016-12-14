@@ -2,15 +2,13 @@
 #define CPP_H
 
 #include "error.h"
-#include "errlist.h"
-#include "lexer.h"
 #include "list.h"
 #include "mempool.h"
 #include "objpool.h"
-#include "token.h"
+#include "toklist.h"
 #include <stdarg.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 /*
  * C preprocessor state.
@@ -27,9 +25,8 @@ struct cpp
 	struct list file_stack;		/* stack of open files */
 	struct list tokens;		/* token queue */
 	struct token *token;		/* last popped token */
+	struct toklist tokens2;		/* token list (used as a buffer) */
 	struct list ifs;		/* if directive control stack */
-
-	struct errlist errlist;		/* error list */
 };
 
 struct cpp *cpp_new(struct context *ctx);

@@ -9,7 +9,6 @@
 #include "debug.h"
 #include "macro.h"
 #include "lexer.h"
-#include "symbol.h"
 #include <unistd.h>
 #include <assert.h>
 #include <stdarg.h>
@@ -141,7 +140,6 @@ struct cpp *cpp_new(struct context *ctx)
 	cpp = malloc(sizeof(*cpp));
 	cpp->ctx = ctx;
 
-	mempool_init(&cpp->token_data, TOKEN_DATA_BLOCK_SIZE);
 	objpool_init(&cpp->macro_pool, sizeof(struct macro), MACRO_POOL_BLOCK_SIZE);
 	objpool_init(&cpp->file_pool, sizeof(struct cpp_file), FILE_POOL_BLOCK_SIZE);
 
@@ -153,19 +151,15 @@ struct cpp *cpp_new(struct context *ctx)
 	cpp_setup_symtab(&cpp->ctx->symtab);
 	cpp->symtab = &cpp->ctx->symtab;
 
-	errlist_init(&cpp->errlist);
-
 	return cpp;
 }
 
 
 void cpp_delete(struct cpp *cpp)
 {
-	mempool_free(&cpp->token_data);
 	objpool_free(&cpp->macro_pool);
 	objpool_free(&cpp->file_pool);
 	list_free(&cpp->tokens);
-	errlist_free(&cpp->errlist);
 
 	free(cpp);
 }
@@ -217,7 +211,7 @@ static void cpp_error_internal(struct cpp *cpp, enum error_level level,
 	strbuf_init(&msg, 64);
 
 	strbuf_vprintf_at(&msg, 0, fmt, args);
-	errlist_insert(&cpp->errlist,
+	errlist_insert(&cpp->ctx->errlist,
 		level,
 		cpp_cur_file(cpp)->filename,
 		strbuf_get_string(&msg),
@@ -385,7 +379,8 @@ static inline void cpp_match_eol_eof(struct cpp *cpp)
 
 static struct cpp_if *cpp_ifstack_push(struct cpp *cpp, struct token *token)
 {
-	struct cpp_if *cpp_if = mempool_alloc(&cpp->token_data, sizeof(*cpp_if));
+	/* TODO Use a different pool for struct cpp_if? */
+	struct cpp_if *cpp_if = mempool_alloc(&cpp->ctx->token_data, sizeof(*cpp_if));
 	cpp_if->token = token;
 	cpp_if->skip_this_branch = false;
 	cpp_if->skip_next_branch = false;
