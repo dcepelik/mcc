@@ -69,6 +69,43 @@ const char *token_get_name(enum token_type token)
 }
 
 
+bool token_is(struct token *token, enum token_type token_type)
+{
+	return token && token->type == token_type;
+}
+
+
+bool token_is_name(struct token *token)
+{
+	return token_is(token, TOKEN_NAME);
+}
+
+
+bool token_is_macro(struct token *token)
+{
+	return token_is_name(token)
+		&& token->symbol->def->type == SYMBOL_TYPE_CPP_MACRO;
+}
+
+
+bool token_is_eof(struct token *token)
+{
+	return token_is(token, TOKEN_EOF);
+}
+
+
+bool token_is_eol(struct token *token)
+{
+	return token_is(token, TOKEN_EOL);
+}
+
+
+bool token_is_eol_or_eof(struct token *token)
+{
+	return token_is_eol(token) || token_is_eof(token);
+}
+
+
 void token_print(struct token *token, struct strbuf *buf)
 {
 	const char *name;
@@ -111,12 +148,12 @@ void token_print(struct token *token, struct strbuf *buf)
 }
 
 
-void token_dump(struct token *token)
+void token_dump(struct token *token, FILE *fout)
 {
 	struct strbuf buf;
 	strbuf_init(&buf, 1024);
 	token_print(token, &buf);
-	printf("%s\n", strbuf_get_string(&buf));
+	fprintf(fout, "%s\n", strbuf_get_string(&buf));
 	strbuf_free(&buf);
 }
 
@@ -124,4 +161,32 @@ void token_dump(struct token *token)
 void location_dump(struct location *loc)
 {
 	fprintf(stderr, "%lu:%lu\n", loc->line_no, loc->column_no);
+}
+
+
+void token_list_print(struct list *tokens, struct strbuf *buf)
+{
+	int level = 0;
+
+	list_foreach(struct token, token, tokens, list_node) {
+		level++;
+		token_print(token, buf);
+		if (token != list_last(tokens))
+			strbuf_putc(buf, ' ');
+
+		if (level > 100) {
+			fprintf(stderr, "*** MAYBE RECURSION ***\n");
+			break;
+		}
+	}
+}
+
+
+void token_list_dump(struct list *tokens, FILE *fout)
+{
+	struct strbuf buf;
+	strbuf_init(&buf, 1024);
+	token_list_print(tokens, &buf);
+	fprintf(fout, "%s\n", strbuf_get_string(&buf));
+	strbuf_free(&buf);
 }

@@ -19,6 +19,7 @@
 #define FILE_POOL_BLOCK_SIZE	16
 #define VA_ARGS_NAME		"__VA_ARGS__"
 
+
 struct cpp_file
 {
 	struct list_node list_node;
@@ -146,7 +147,9 @@ struct cpp *cpp_new(struct context *ctx)
 	list_init(&cpp->file_stack);
 	list_init(&cpp->tokens);
 	cpp->token = NULL;
+
 	list_init(&cpp->ifs);
+	list_insert_first(&cpp->ifs, &ifstack_bottom.list_node);
 
 	cpp_setup_symtab(&cpp->ctx->symtab);
 	cpp->symtab = &cpp->ctx->symtab;
@@ -162,39 +165,6 @@ void cpp_delete(struct cpp *cpp)
 	list_free(&cpp->tokens);
 
 	free(cpp);
-}
-
-
-mcc_error_t cpp_open_file(struct cpp *cpp, char *filename)
-{
-	struct cpp_file *file;
-	mcc_error_t err;
-
-	file = objpool_alloc(&cpp->file_pool);
-
-	err = lexer_init(&file->lexer, cpp->ctx, filename);
-	if (err != MCC_ERROR_OK) {
-		objpool_dealloc(&cpp->file_pool, file);
-		return err;
-	}
-
-	list_insert_first(&cpp->file_stack, &file->list_node);
-
-	return MCC_ERROR_OK;
-}
-
-
-void cpp_close_file(struct cpp *cpp)
-{
-	assert(!list_is_empty(&cpp->file_stack));
-
-	struct cpp_file *file;
-
-	file = list_first(&cpp->file_stack);
-	lexer_free(&file->lexer);
-	list_remove_first(&cpp->file_stack);
-
-	objpool_dealloc(&cpp->file_pool, file);
 }
 
 
@@ -249,92 +219,94 @@ static void cpp_error(struct cpp *cpp, char *fmt, ...)
 }
 
 
-static struct token *cpp_pop(struct cpp *cpp)
+static void cpp_next_token(struct cpp *cpp)
+{
+	if (!list_is_empty(&cpp->tokens))
+		cpp->token = list_remove_first(&cpp->tokens);
+	else
+		cpp->token = lexer_next(&cpp_cur_file(cpp)->lexer);
+
+	assert(cpp->token != NULL); /* invariant: EOF guards the list */
+}
+
+
+static void cpp_requeue_current(struct cpp *cpp)
+{
+	list_insert_first(&cpp->tokens, &cpp->token->list_node);
+}
+
+
+mcc_error_t cpp_open_file(struct cpp *cpp, char *filename)
 {
 	struct cpp_file *file;
-	struct token *token;
-	struct token *tmp;
+	mcc_error_t err;
 
-	if (list_is_empty(&cpp->tokens)) {
-		file = cpp_cur_file(cpp);
+	file = objpool_alloc(&cpp->file_pool);
 
-		token = lexer_next(&file->lexer);
-		assert(token != NULL);
-
-		list_insert_last(&cpp->tokens, &token->list_node);
+	err = lexer_init(&file->lexer, cpp->ctx, filename);
+	if (err != MCC_ERROR_OK) {
+		objpool_dealloc(&cpp->file_pool, file);
+		return err;
 	}
 
-	assert(!list_is_empty(&cpp->tokens)); /* at least TOKEN_EOF/TOKEN_EOL */
+	list_insert_first(&cpp->file_stack, &file->list_node);
+	if (cpp->token == NULL)
+		cpp_next_token(cpp); 
 
-	tmp = cpp->token;
-	cpp->token = list_remove_first(&cpp->tokens);
-	return tmp;
-}
-
-//static struct token *cpp_pop_wrap(struct cpp *cpp, int line)
-//{
-//	fprintf(stderr, "Popping from %i\n", line);
-//	return cpp_pop(cpp);
-//}
-
-//#define cpp_pop(cpp) cpp_pop_wrap(cpp, __LINE__)
-
-
-static inline bool cpp_got(struct cpp *cpp, enum token_type token)
-{
-	return cpp->token->type == token;
+	return MCC_ERROR_OK;
 }
 
 
-static inline bool cpp_got_eol(struct cpp *cpp)
+void cpp_close_file(struct cpp *cpp)
 {
-	return cpp_got(cpp, TOKEN_EOL);
-}
+	assert(!list_is_empty(&cpp->file_stack));
 
+	struct cpp_file *file;
 
-static inline bool cpp_got_eof(struct cpp *cpp)
-{
-	return cpp_got(cpp, TOKEN_EOF);
-}
+	file = list_first(&cpp->file_stack);
+	lexer_free(&file->lexer);
+	list_remove_first(&cpp->file_stack);
 
-
-static inline bool cpp_got_eol_eof(struct cpp *cpp)
-{
-	return cpp_got_eol(cpp) || cpp_got_eof(cpp);
+	objpool_dealloc(&cpp->file_pool, file);
 }
 
 
 static inline bool cpp_got_hash(struct cpp *cpp)
 {
-	return cpp_got(cpp, TOKEN_HASH) && cpp->token->is_at_bol;
+	return token_is(cpp->token, TOKEN_HASH) && cpp->token->is_at_bol;
 }
 
 
 static inline bool cpp_directive(struct cpp *cpp, enum cpp_directive directive)
 {
-	return cpp_got(cpp, TOKEN_NAME)
+	return token_is(cpp->token, TOKEN_NAME)
 		&& cpp->token->symbol->def->type == SYMBOL_TYPE_CPP_DIRECTIVE
 		&& cpp->token->symbol->def->directive == directive;
 }
 
 
-static inline void cpp_skip_line(struct cpp *cpp)
+static inline void cpp_skip_till_eol(struct cpp *cpp)
 {
-	while (!cpp_got_eof(cpp)) {
-		if (cpp_got(cpp, TOKEN_EOL)) {
-			cpp_pop(cpp);
-			break;
-		}
-		cpp_pop(cpp);
-	}
+	/* TODO Consider freeing those tokens */
+
+	assert(cpp_cur_file(cpp)->lexer.emit_eols == true);
+
+	while (!token_is_eol_or_eof(cpp->token))
+		cpp_next_token(cpp);
+
+	if (token_is_eol(cpp->token))
+		cpp_next_token(cpp);
 }
 
 
-static inline void cpp_skip_rest_of_directive(struct cpp *cpp)
+static inline void cpp_skip_find_eol(struct cpp *cpp)
 {
-	cpp_cur_file(cpp)->lexer.emit_eols = true;
-	while (!cpp_got_eol_eof(cpp))
-		cpp_pop(cpp);
+	/* TODO Consider freeing those tokens */
+
+	assert(cpp_cur_file(cpp)->lexer.emit_eols == true);
+
+	while (!token_is_eol_or_eof(cpp->token))
+		cpp_next_token(cpp);
 }
 
 
@@ -365,14 +337,14 @@ static inline bool cpp_expect_directive(struct cpp *cpp)
 	return true;
 }
 
-static inline void cpp_match_eol_eof(struct cpp *cpp)
+static inline void cpp_match_eol_or_eof(struct cpp *cpp)
 {
-	if (!cpp_got(cpp, TOKEN_EOL) && !cpp_got_eof(cpp)) {
+	if (!token_is(cpp->token, TOKEN_EOL) && !token_is_eof(cpp->token)) {
 		cpp_error(cpp, "extra tokens will be skipped");
-		cpp_skip_line(cpp);
+		cpp_skip_till_eol(cpp);
 	}
-	else if (cpp_got(cpp, TOKEN_EOL)) {
-		cpp_pop(cpp);
+	else if (token_is(cpp->token, TOKEN_EOL)) {
+		cpp_next_token(cpp);
 	}
 }
 
@@ -414,25 +386,25 @@ static void cpp_parse_macro_arglist(struct cpp *cpp, struct macro *macro)
 	bool expect_comma = false;
 	bool arglist_ended = false;
 
-	while (!cpp_got_eol_eof(cpp)) {
-		if (cpp_got(cpp, TOKEN_LPAREN)) {
+	while (!token_is_eol_or_eof(cpp->token)) {
+		if (token_is(cpp->token, TOKEN_LPAREN)) {
 			cpp_error(cpp, "the '(' may not appear inside macro argument list");
 			break;
 		}
 
-		if (cpp_got(cpp, TOKEN_COMMA)) {
+		if (token_is(cpp->token, TOKEN_COMMA)) {
 			if (expect_comma)
 				expect_comma = false;
 			else
 				cpp_error(cpp, "comma was unexpected here");
 
-			cpp_pop(cpp);
+			cpp_next_token(cpp);
 			continue;
 		}
 
-		if (cpp_got(cpp, TOKEN_RPAREN)) {
+		if (token_is(cpp->token, TOKEN_RPAREN)) {
 			arglist_ended = true;
-			cpp_pop(cpp);
+			cpp_next_token(cpp);
 			break;
 		}
 
@@ -444,7 +416,7 @@ static void cpp_parse_macro_arglist(struct cpp *cpp, struct macro *macro)
 
 		list_insert_last(&macro->args, &cpp->token->list_node);
 		expect_comma = true;
-		cpp_pop(cpp);
+		cpp_next_token(cpp);
 	}
 
 	if (!arglist_ended)
@@ -456,10 +428,9 @@ static void cpp_parse_define(struct cpp *cpp)
 {
 	struct symdef *symdef;
 	struct macro *macro;
-	struct token *tmp;
 
 	if (!cpp_expect(cpp, TOKEN_NAME)) {
-		cpp_skip_line(cpp);
+		cpp_skip_till_eol(cpp);
 		return;
 	}
 
@@ -472,10 +443,10 @@ static void cpp_parse_define(struct cpp *cpp)
 		symdef->type = SYMBOL_TYPE_CPP_MACRO;
 		symdef->macro = macro;
 
-		cpp_pop(cpp);
+		cpp_next_token(cpp);
 
 		if (cpp->token->type == TOKEN_LPAREN && !cpp->token->preceded_by_whitespace) {
-			cpp_pop(cpp);
+			cpp_next_token(cpp);
 			cpp_parse_macro_arglist(cpp, macro);
 			macro->type = MACRO_TYPE_FUNCLIKE;
 			//macro_dump(macro);
@@ -485,13 +456,13 @@ static void cpp_parse_define(struct cpp *cpp)
 			//macro_dump(macro);
 		}
 
-		while (!cpp_got_eol_eof(cpp)) {
-			tmp = cpp_pop(cpp);
-			list_insert_last(&macro->expansion, &tmp->list_node);
+		while (!token_is_eol_or_eof(cpp->token)) {
+			list_insert_last(&macro->expansion, &cpp->token->list_node);
+			cpp_next_token(cpp);
 		}
 	}
 	else {
-		cpp_pop(cpp);
+		cpp_next_token(cpp);
 	}
 
 	//symtab_dump(&cpp->ctx->symtab, stderr);
@@ -501,7 +472,7 @@ static void cpp_parse_define(struct cpp *cpp)
 static void cpp_parse_undef(struct cpp *cpp)
 {
 	if (!cpp_expect(cpp, TOKEN_NAME)) {
-		cpp_skip_line(cpp);
+		cpp_skip_till_eol(cpp);
 		return;
 	}
 
@@ -510,7 +481,7 @@ static void cpp_parse_undef(struct cpp *cpp)
 		//TODO symbol_pop_definition(&cpp->ctx->symtab, cpp->token->symbol); 
 	}
 
-	cpp_pop(cpp);
+	cpp_next_token(cpp);
 }
 
 
@@ -518,8 +489,8 @@ static void cpp_parse_error(struct cpp *cpp)
 {
 	/* TODO cat tokens to get error message */
 	cpp_error(cpp, "%s", "#error");
-	cpp_skip_rest_of_directive(cpp);
-	//cpp_match_eol_eof(cpp);
+	cpp_skip_find_eol(cpp);
+	//cpp_match_eol_or_eof(cpp);
 }
 
 
@@ -541,20 +512,20 @@ static void cpp_parse_include(struct cpp *cpp)
 		cpp_error(cpp, "header name was expected, got %s",
 			token_get_name(cpp->token->type));
 
-		cpp_pop(cpp);
-		cpp_skip_rest_of_directive(cpp);
+		cpp_next_token(cpp);
+		cpp_skip_find_eol(cpp);
 	}
 
 	if (cpp_skipping(cpp)) {
-		cpp_pop(cpp);
-		cpp_skip_rest_of_directive(cpp);
+		cpp_next_token(cpp);
+		cpp_skip_find_eol(cpp);
 
 		goto out;
 	}
 
 	filename = cpp->token->str;
-	cpp_pop(cpp);
-	cpp_skip_rest_of_directive(cpp);
+	cpp_next_token(cpp);
+	cpp_skip_find_eol(cpp);
 
 	for (i = 0; i < ARRAY_SIZE(include_dirs); i++) {
 		strbuf_reset(&path_buf);
@@ -608,7 +579,7 @@ static void cpp_parse_directive(struct cpp *cpp)
 	bool test_cond;
 
 	if (!cpp_expect_directive(cpp)) {
-		cpp_skip_line(cpp);
+		cpp_skip_till_eol(cpp);
 		return;
 	}
 
@@ -618,17 +589,17 @@ static void cpp_parse_directive(struct cpp *cpp)
 	cpp_cur_file(cpp)->lexer.inside_include
 		= cpp_directive(cpp, CPP_DIRECTIVE_INCLUDE);
 
-	cpp_pop(cpp);
+	cpp_next_token(cpp);
 
 	switch (dir) {
 	case CPP_DIRECTIVE_IFDEF:
 		test_cond = cpp->token->symbol->def->type == SYMBOL_TYPE_CPP_MACRO;
-		cpp_pop(cpp);
+		cpp_next_token(cpp);
 		goto push_if;
 
 	case CPP_DIRECTIVE_IFNDEF:
 		test_cond = cpp->token->symbol->def->type != SYMBOL_TYPE_CPP_MACRO;
-		cpp_pop(cpp);
+		cpp_next_token(cpp);
 		goto push_if;
 
 	case CPP_DIRECTIVE_IF:
@@ -701,53 +672,27 @@ conclude:
 		return;
 	}
 
-	cpp_match_eol_eof(cpp);
-	//cpp_cur_file(cpp)->lexer.emit_eols = false;
+	cpp_match_eol_or_eof(cpp);
+	cpp_cur_file(cpp)->lexer.emit_eols = false;
 }
 
 
-void cpp_dump_toklist(struct list *lst, FILE *fout)
+static void cpp_parse_macro_invocation(struct cpp *cpp)
 {
-	struct strbuf buf;
+	assert(token_is_macro(cpp->token));
 
-	strbuf_init(&buf, 1024);
-	strbuf_printf(&buf, "TL: ");
-
-	int c = 0;
-
-	list_foreach(struct token, token, lst, list_node) {
-		c++;
-		token_print(token, &buf);
-		if (token != list_last(lst))
-			strbuf_putc(&buf, ' ');
-
-		if (c > 100) {
-			fprintf(stderr, "*** MAYBE RECURSION ***\n");
-			break;
-		}
-	}
-
-	fprintf(fout, "%s\n", strbuf_get_string(&buf));
-
-	strbuf_free(&buf);
-}
-
-
-static void cpp_expand_macro(struct cpp *cpp)
-{
 	struct macro *macro;
 	struct list invocation;
 	struct list expansion;
 	unsigned parens_balance = 0;
+	bool args_ended = false;
 
+	macro = cpp->token->symbol->def->macro;
 	list_init(&invocation);
 	list_init(&expansion);
 
-	assert(cpp_got(cpp, TOKEN_NAME));
-	assert(cpp->token->symbol->def->type == SYMBOL_TYPE_CPP_MACRO);
-
-	macro = cpp->token->symbol->def->macro;
-	list_insert_last(&invocation, &cpp_pop(cpp)->list_node); /* macro name */
+	list_insert_last(&invocation, &cpp->token->list_node); /* macro name */
+	cpp_next_token(cpp);
 
 	/*
 	 * For invocations of function-like macros, this code block will grab
@@ -756,50 +701,37 @@ static void cpp_expand_macro(struct cpp *cpp)
 	 * This is to avoid duplication of the arglist parsing logic contained
 	 * in the macro module.
 	 */
-	if (macro->type == MACRO_TYPE_FUNCLIKE) {
-		DEBUG_TRACE;
-		while (!cpp_got_eof(cpp)) {
-			if (cpp_got(cpp, TOKEN_LPAREN)) {
+	if (macro->type == MACRO_TYPE_FUNCLIKE && token_is(cpp->token, TOKEN_LPAREN)) {
+		while (!token_is_eof(cpp->token)) {
+			if (token_is(cpp->token, TOKEN_LPAREN)) {
 				parens_balance++;
 			}
-			else if (cpp_got(cpp, TOKEN_RPAREN)) {
-				parens_balance--;
-
-				if (parens_balance == 0) {
-					list_insert_last(&invocation, &cpp_pop(cpp)->list_node);
-					break;
-				}
+			else if (token_is(cpp->token, TOKEN_RPAREN)) {
+				if (--parens_balance == 0)
+					args_ended = true;
 			}
 
-			list_insert_last(&invocation, &cpp_pop(cpp)->list_node);
+			list_insert_last(&invocation, &cpp->token->list_node);
+			cpp_next_token(cpp);
+
+			if (args_ended)
+				break;
 		}
 	}
 
-	DEBUG_MSG("Invocation in the CPP:");
-	cpp_dump_toklist(&invocation, stderr);
 	macro_expand(cpp, &invocation, &expansion);
-
-	assert(cpp->token != NULL);
-
-	list_insert_first(&cpp->tokens, &cpp->token->list_node);
+	cpp_requeue_current(cpp);
 	list_prepend(&cpp->tokens, &expansion);
-	cpp_pop(cpp);
-
-	assert(cpp->token != NULL);
+	cpp_next_token(cpp);
 }
 
 
 static void cpp_parse(struct cpp *cpp)
 {
-	if (cpp->token == NULL) { /* TODO Get rid of this special case */
-		cpp_pop(cpp); 
-		list_insert_first(&cpp->ifs, &ifstack_bottom.list_node);
-	}
-
-	while (!cpp_got_eof(cpp)) {
+	while (!token_is_eof(cpp->token)) {
 		if (cpp_got_hash(cpp)) {
 			cpp_cur_file(cpp)->lexer.emit_eols = true;
-			cpp_pop(cpp);
+			cpp_next_token(cpp);
 			cpp_parse_directive(cpp);
 
 		}
@@ -807,15 +739,15 @@ static void cpp_parse(struct cpp *cpp)
 			&& cpp->token->symbol->def->type == SYMBOL_TYPE_CPP_MACRO
 			&& !cpp->token->noexpand) {
 
-			/* TODO no cpp_pop(cpp) here */
+			/* TODO no cpp_next_token(cpp) here */
 			if (cpp->token->symbol->def->macro->type == MACRO_TYPE_FUNCLIKE) {
 				struct token *macro_name = cpp->token;
-				cpp_pop(cpp);
+				cpp_next_token(cpp);
 
 				if (cpp->token->type == TOKEN_LPAREN) {
 					list_insert_first(&cpp->tokens, &cpp->token->list_node);
 					cpp->token = macro_name;
-					cpp_expand_macro(cpp);
+					cpp_parse_macro_invocation(cpp);
 				}
 				else {
 					macro_name->noexpand = true;
@@ -825,14 +757,14 @@ static void cpp_parse(struct cpp *cpp)
 
 			}
 			else {
-				cpp_expand_macro(cpp);
+				cpp_parse_macro_invocation(cpp);
 			}
 		}
 		else {
 			if (!cpp_skipping(cpp))
 				break;
 
-			cpp_pop(cpp);
+			cpp_next_token(cpp);
 		}
 	}
 }
@@ -842,17 +774,21 @@ struct token *cpp_next(struct cpp *cpp)
 {
 	assert(!list_is_empty(&cpp->file_stack));
 
+	struct token *tmp;
+
 again:
 	cpp_parse(cpp);
 
-	if (cpp_got_eof(cpp)) {
+	if (token_is_eof(cpp->token)) {
 		if (list_length(&cpp->file_stack) == 1)
 			return cpp->token;
 
 		cpp_close_file(cpp);
-		cpp_pop(cpp);
+		cpp_next_token(cpp);
 		goto again;
 	}
 
-	return cpp_pop(cpp);
+	tmp = cpp->token;
+	cpp_next_token(cpp);
+	return tmp;
 }

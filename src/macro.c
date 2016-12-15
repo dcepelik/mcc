@@ -176,7 +176,7 @@ void macro_expand_recursive(struct cpp *cpp, struct list *in, struct list *out)
 	struct list expansion;
 
 	DEBUG_MSG("in toklist:");
-	cpp_dump_toklist(in, stderr);
+	token_list_dump(in, stderr);
 
 	while ((token = list_first(in)) != NULL) {
 		if (!token_is_expandable(token)) {
@@ -303,7 +303,7 @@ struct token *macro_expand_internal(struct cpp *cpp, struct list *in, struct lis
 	struct list replaced_args;	/* expansion with args fully expanded */
 
 	DEBUG_MSG("in toklist:");
-	cpp_dump_toklist(in, stderr);
+	token_list_dump(in, stderr);
 
 	if (!list_is_empty(in)) {
 		DEBUG_MSG("First token location:");
@@ -346,5 +346,5 @@ void macro_expand(struct cpp *cpp, struct list *invocation,
 
 	macro_expand_internal(cpp, invocation, expansion);
 	DEBUG_MSG("resulting toklist:");
-	cpp_dump_toklist(expansion, stderr);
+	token_list_dump(expansion, stderr);
 }

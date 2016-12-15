@@ -5,7 +5,6 @@
 #include "list.h"
 #include "mempool.h"
 #include "objpool.h"
-#include "toklist.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,7 +24,6 @@ struct cpp
 	struct list file_stack;		/* stack of open files */
 	struct list tokens;		/* token queue */
 	struct token *token;		/* last popped token */
-	struct toklist tokens2;		/* token list (used as a buffer) */
 	struct list ifs;		/* if directive control stack */
 };
 
