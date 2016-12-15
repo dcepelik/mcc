@@ -35,7 +35,7 @@ void print_char(char c, struct strbuf *buf)
 		break;
 
 	case '\\':
-		strbuf_printf(buf, "\\");
+		strbuf_printf(buf, "\\\\");
 		break;
 
 	case '\"':
@@ -55,6 +55,23 @@ void print_char(char c, struct strbuf *buf)
 }
 
 
+void print_char_stringify(char c, struct strbuf *buf)
+{
+	switch (c) {
+	case '\\':
+		strbuf_printf(buf, "\\\\");
+		break;
+
+	case '\"':
+		strbuf_printf(buf, "\\\"");
+		break;
+
+	default:
+		strbuf_putc(buf, c);
+	}
+}
+
+
 void print_string(char *str, struct strbuf *buf)
 {
 	char c;
@@ -70,18 +87,6 @@ void print_string_stringify(char *str, struct strbuf *buf)
 	char c;
 	size_t i = 0;
 
-	while ((c = str[i++]) != '\0') {
-		switch (c) {
-		case '\\':
-			strbuf_printf(buf, "\\\\");
-			break;
-
-		case '\"':
-			strbuf_printf(buf, "\\\"");
-			break;
-
-		default:
-			strbuf_putc(buf, c);
-		}
-	}
+	while ((c = str[i++]) != '\0')
+		print_char_stringify(c, buf);
 }

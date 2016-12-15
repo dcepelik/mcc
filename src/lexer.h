@@ -28,6 +28,7 @@ struct lexer
 	struct location location;	/* location of c within inbuf */
 	struct strbuf strbuf;		/* buffer for string accumulation */
 	struct strbuf spelling;		/* buffer for token spelling */
+	char *spelling_start;		/* start of current token's spelling */
 
 	/* flags */
 	bool inside_include;		/* are we lexing in an #include? */

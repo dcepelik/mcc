@@ -71,14 +71,8 @@ static inline bool token_is_expandable(struct token *token)
 
 	macro = token->symbol->def->macro;
 
-	DEBUG_MSG("At least a macro");
-
 	next = list_next(&token->list_node);
 	funclike = (next && next->type == TOKEN_LPAREN);
-
-	printf(funclike ? "inv funclike\n" : "inv objlike\n");
-	printf(macro->type == MACRO_TYPE_FUNCLIKE ? "macro funclike\n" : "macro objlike\n");
-	printf("%s\n", symbol_get_name(token->symbol));
 
 	if (funclike && macro->type == MACRO_TYPE_FUNCLIKE)
 		return true;
@@ -128,7 +122,7 @@ static struct token *macro_parse_args(struct cpp *cpp,
 		macro_init(argdef->macro);
 		argdef->macro->is_macro_arg = true;
 
-		while (token->type != TOKEN_EOF) {
+		while (token) {
 			if (token->type == TOKEN_LPAREN) {
 				parens_balance++;
 			}
@@ -175,9 +169,6 @@ void macro_expand_recursive(struct cpp *cpp, struct list *in, struct list *out)
 	struct token *end;
 	struct list expansion;
 
-	DEBUG_MSG("in toklist:");
-	token_list_dump(in, stderr);
-
 	while ((token = list_first(in)) != NULL) {
 		if (!token_is_expandable(token)) {
 			list_insert_last(out, list_remove_first(in));
@@ -205,6 +196,9 @@ static bool token_is_macro_arg(struct token *token)
 }
 
 
+/*
+ * 6.10.3.2/2
+ */
 static struct token *macro_stringify(struct cpp *cpp, struct list *tokens)
 {
 	struct strbuf str;
@@ -214,26 +208,17 @@ static struct token *macro_stringify(struct cpp *cpp, struct list *tokens)
 
 	strbuf_init(&str, 1024);
 	list_foreach(struct token, token, tokens, list_node) {
-		if (token != list_first(tokens) && token->preceded_by_whitespace)
+		if (token->preceded_by_whitespace && token != list_first(tokens))
 			strbuf_putc(&str, ' ');
 
 		switch (token->type) {
-		case TOKEN_NAME:
-			strbuf_printf(&str, symbol_get_name(token->symbol));
-			break;
-
-		case TOKEN_STRING:
-			print_string_stringify(token->spelling, &str);
-			DEBUG_PRINTF("Spelling: %s", token->spelling);
-			break;
-
-		case TOKEN_NUMBER:
 		case TOKEN_CHAR_CONST:
-			strbuf_putc(&str, token->c);
+		case TOKEN_STRING:
+			print_string_stringify(token_get_spelling(token), &str);
 			break;
 
 		default:
-			strbuf_printf(&str, (char *)token_get_name(token->type));
+			strbuf_printf(&str, token_get_spelling(token));
 		}
 	}
 
@@ -250,6 +235,7 @@ static struct token *macro_stringify(struct cpp *cpp, struct list *tokens)
 	strtoken->noexpand = false;
 
 	strbuf_free(&str);
+
 	return strtoken;
 }
 
@@ -302,15 +288,6 @@ struct token *macro_expand_internal(struct cpp *cpp, struct list *in, struct lis
 	struct list expansion;		/* copy of macro expansion list */
 	struct list replaced_args;	/* expansion with args fully expanded */
 
-	DEBUG_MSG("in toklist:");
-	token_list_dump(in, stderr);
-
-	if (!list_is_empty(in)) {
-		DEBUG_MSG("First token location:");
-		location_dump(&((struct token *)list_first(in))->startloc);
-		cpp_dump_file_stack(cpp);
-	}
-
 	token = list_first(in);
 	macro = token->symbol->def->macro;
 
@@ -342,9 +319,5 @@ struct token *macro_expand_internal(struct cpp *cpp, struct list *in, struct lis
 void macro_expand(struct cpp *cpp, struct list *invocation,
 	struct list *expansion)
 {
-	DEBUG_TRACE;
-
 	macro_expand_internal(cpp, invocation, expansion);
-	DEBUG_MSG("resulting toklist:");
-	token_list_dump(expansion, stderr);
 }

@@ -69,6 +69,24 @@ const char *token_get_name(enum token_type token)
 }
 
 
+char *token_get_spelling(struct token *token)
+{
+	switch (token->type)
+	{
+	case TOKEN_NAME:
+	case TOKEN_CHAR_CONST:
+	case TOKEN_HEADER_HNAME:
+	case TOKEN_HEADER_QNAME:
+	case TOKEN_NUMBER:
+	case TOKEN_STRING:
+		return token->spelling;
+
+	default:
+		return (char *)token_get_name(token->type);
+	}
+}
+
+
 bool token_is(struct token *token, enum token_type token_type)
 {
 	return token && token->type == token_type;
@@ -137,8 +155,8 @@ void token_print(struct token *token, struct strbuf *buf)
 
 	case TOKEN_STRING:
 		strbuf_putc(buf, '\"');
-		//print_string(token->str, buf);
-		strbuf_printf(buf, token->str);
+		print_string(token->str, buf);
+		//strbuf_printf(buf, token->str);
 		strbuf_putc(buf, '\"');
 		break;
 

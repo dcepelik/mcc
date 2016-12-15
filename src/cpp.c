@@ -60,16 +60,6 @@ static const char *include_dirs[] = {
 };
 
 
-void cpp_dump_file_stack(struct cpp *cpp)
-{
-	fprintf(stderr, "File stack:\n");
-	list_foreach(struct cpp_file, file, &cpp->file_stack, list_node) {
-		fprintf(stderr, "\t%s\n", file->filename);
-	}
-	fprintf(stderr, "\n");
-}
-
-
 static const struct {
 	char *name;
 	enum cpp_directive directive;
@@ -134,27 +124,109 @@ static void cpp_setup_symtab(struct symtab *table)
 }
 
 
+struct cpp_file *cpp_cur_file(struct cpp *cpp)
+{
+	return list_first(&cpp->file_stack);
+}
+
+
+static void cpp_next_token(struct cpp *cpp)
+{
+	if (!list_is_empty(&cpp->tokens))
+		cpp->token = list_remove_first(&cpp->tokens);
+	else
+		cpp->token = lexer_next(&cpp_cur_file(cpp)->lexer);
+
+	assert(cpp->token != NULL); /* invariant: EOF guards the list */
+}
+
+
 struct cpp *cpp_new(struct context *ctx)
 {
 	struct cpp *cpp;
 
 	cpp = malloc(sizeof(*cpp));
+	if (!cpp)
+		return NULL;
+
 	cpp->ctx = ctx;
+	cpp->symtab = &cpp->ctx->symtab; /* TODO */
+	cpp->token = NULL;
 
 	objpool_init(&cpp->macro_pool, sizeof(struct macro), MACRO_POOL_BLOCK_SIZE);
 	objpool_init(&cpp->file_pool, sizeof(struct cpp_file), FILE_POOL_BLOCK_SIZE);
 
 	list_init(&cpp->file_stack);
 	list_init(&cpp->tokens);
-	cpp->token = NULL;
 
 	list_init(&cpp->ifs);
 	list_insert_first(&cpp->ifs, &ifstack_bottom.list_node);
 
 	cpp_setup_symtab(&cpp->ctx->symtab);
-	cpp->symtab = &cpp->ctx->symtab;
 
 	return cpp;
+}
+
+
+static mcc_error_t cpp_file_init(struct cpp *cpp, struct cpp_file *file, char *filename)
+{
+	mcc_error_t err;
+
+	if ((err = lexer_init(&file->lexer, cpp->ctx, filename)) != MCC_ERROR_OK)
+		return err;
+	
+	file->filename = mempool_strdup(&cpp->ctx->token_data, filename);
+	if (!file->filename)
+		return MCC_ERROR_NOMEM;
+
+	return MCC_ERROR_OK;
+}
+
+
+static void cpp_file_free(struct cpp *cpp, struct cpp_file *file)
+{
+	lexer_free(&file->lexer);
+}
+
+
+static void cpp_file_include(struct cpp *cpp, struct cpp_file *file)
+{
+	list_insert_first(&cpp->file_stack, &file->list_node);
+}
+
+
+mcc_error_t cpp_open_file(struct cpp *cpp, char *filename)
+{
+	struct cpp_file *file;
+	mcc_error_t err;
+
+	file = objpool_alloc(&cpp->file_pool);
+	if (!file)
+		return MCC_ERROR_NOMEM;
+
+	if ((err = cpp_file_init(cpp, file, filename)) != MCC_ERROR_OK) {
+		objpool_dealloc(&cpp->file_pool, file);
+		return err;
+	}
+
+	cpp_file_include(cpp, file);
+	cpp_next_token(cpp);
+
+	return MCC_ERROR_OK;
+}
+
+
+void cpp_close_file(struct cpp *cpp)
+{
+	assert(!list_is_empty(&cpp->file_stack));
+
+	struct cpp_file *file;
+
+	file = list_first(&cpp->file_stack);
+	lexer_free(&file->lexer);
+	list_remove_first(&cpp->file_stack);
+
+	objpool_dealloc(&cpp->file_pool, file);
 }
 
 
@@ -168,12 +240,6 @@ void cpp_delete(struct cpp *cpp)
 }
 
 
-struct cpp_file *cpp_cur_file(struct cpp *cpp)
-{
-	return list_first(&cpp->file_stack);
-}
-
-
 static void cpp_error_internal(struct cpp *cpp, enum error_level level,
 	char *fmt, va_list args)
 {
@@ -183,7 +249,7 @@ static void cpp_error_internal(struct cpp *cpp, enum error_level level,
 	strbuf_vprintf_at(&msg, 0, fmt, args);
 	errlist_insert(&cpp->ctx->errlist,
 		level,
-		cpp_cur_file(cpp)->filename,
+		"some-file.c",
 		strbuf_get_string(&msg),
 		strbuf_get_string(&cpp_cur_file(cpp)->lexer.linebuf),
 		cpp->token->startloc);
@@ -201,13 +267,13 @@ static void cpp_error_internal(struct cpp *cpp, enum error_level level,
 //}
 
 
-//static void cpp_warning(struct cpp *cpp, char *fmt, ...)
-//{
-//	va_list args;
-//	va_start(args, fmt);
-//	cpp_error_internal(cpp, ERROR_LEVEL_WARNING, fmt, args);
-//	va_end(args);
-//}
+static void cpp_warn(struct cpp *cpp, char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	cpp_error_internal(cpp, ERROR_LEVEL_WARNING, fmt, args);
+	va_end(args);
+}
 
 
 static void cpp_error(struct cpp *cpp, char *fmt, ...)
@@ -219,55 +285,9 @@ static void cpp_error(struct cpp *cpp, char *fmt, ...)
 }
 
 
-static void cpp_next_token(struct cpp *cpp)
-{
-	if (!list_is_empty(&cpp->tokens))
-		cpp->token = list_remove_first(&cpp->tokens);
-	else
-		cpp->token = lexer_next(&cpp_cur_file(cpp)->lexer);
-
-	assert(cpp->token != NULL); /* invariant: EOF guards the list */
-}
-
-
 static void cpp_requeue_current(struct cpp *cpp)
 {
 	list_insert_first(&cpp->tokens, &cpp->token->list_node);
-}
-
-
-mcc_error_t cpp_open_file(struct cpp *cpp, char *filename)
-{
-	struct cpp_file *file;
-	mcc_error_t err;
-
-	file = objpool_alloc(&cpp->file_pool);
-
-	err = lexer_init(&file->lexer, cpp->ctx, filename);
-	if (err != MCC_ERROR_OK) {
-		objpool_dealloc(&cpp->file_pool, file);
-		return err;
-	}
-
-	list_insert_first(&cpp->file_stack, &file->list_node);
-	if (cpp->token == NULL)
-		cpp_next_token(cpp); 
-
-	return MCC_ERROR_OK;
-}
-
-
-void cpp_close_file(struct cpp *cpp)
-{
-	assert(!list_is_empty(&cpp->file_stack));
-
-	struct cpp_file *file;
-
-	file = list_first(&cpp->file_stack);
-	lexer_free(&file->lexer);
-	list_remove_first(&cpp->file_stack);
-
-	objpool_dealloc(&cpp->file_pool, file);
 }
 
 
@@ -340,7 +360,7 @@ static inline bool cpp_expect_directive(struct cpp *cpp)
 static inline void cpp_match_eol_or_eof(struct cpp *cpp)
 {
 	if (!token_is(cpp->token, TOKEN_EOL) && !token_is_eof(cpp->token)) {
-		cpp_error(cpp, "extra tokens will be skipped");
+		cpp_warn(cpp, "extra tokens will be skipped");
 		cpp_skip_till_eol(cpp);
 	}
 	else if (token_is(cpp->token, TOKEN_EOL)) {
@@ -496,77 +516,60 @@ static void cpp_parse_error(struct cpp *cpp)
 
 /*
  * TODO #include <header> vs #include "header".
+ * TODO warn if tokens skipped
  */
 static void cpp_parse_include(struct cpp *cpp)
 {
 	char *filename;
-	struct strbuf path_buf;
+	struct strbuf pathbuf;
 	char *path;
-	bool file_included = false;
+	struct cpp_file *file;
+	bool file_open = false;
 	size_t i;
 
-	strbuf_init(&path_buf, 128);
+	if (cpp_skipping(cpp)) {
+		cpp_skip_find_eol(cpp);
+		goto out;
+	}
 
 	if (cpp->token->type != TOKEN_HEADER_HNAME
 		&& cpp->token->type != TOKEN_HEADER_QNAME) {
 		cpp_error(cpp, "header name was expected, got %s",
 			token_get_name(cpp->token->type));
 
-		cpp_next_token(cpp);
 		cpp_skip_find_eol(cpp);
-	}
-
-	if (cpp_skipping(cpp)) {
-		cpp_next_token(cpp);
-		cpp_skip_find_eol(cpp);
-
 		goto out;
 	}
 
 	filename = cpp->token->str;
-	cpp_next_token(cpp);
-	cpp_skip_find_eol(cpp);
+	strbuf_init(&pathbuf, 128);
+	file = objpool_alloc(&cpp->file_pool);
 
 	for (i = 0; i < ARRAY_SIZE(include_dirs); i++) {
-		strbuf_reset(&path_buf);
-		strbuf_printf(&path_buf, "%s/%s", include_dirs[i], filename);
+		strbuf_reset(&pathbuf);
+		strbuf_printf(&pathbuf, "%s/%s", include_dirs[i], filename);
 
-		path = strbuf_get_string(&path_buf);
+		path = strbuf_get_string(&pathbuf);
 
-		if (cpp_open_file(cpp, path) == MCC_ERROR_OK) {
-			file_included = true;
-			cpp_cur_file(cpp)->filename = filename; // TODO this is hacky
-			cpp_cur_file(cpp)->lexer.filename = filename; // TODO this is hacky, too
+		if (cpp_file_init(cpp, file, path) == MCC_ERROR_OK) {
+			file_open = true;
 			break;
 		}
 	}
 
-	if (!file_included) {
-		cpp_error(cpp, "cannot include file %s", filename);
+	strbuf_free(&pathbuf);
+
+	if (file_open) {
+		cpp_skip_find_eol(cpp); /* get rid of those tokens now */
+		cpp_file_include(cpp, file);
 	}
-
-	assert(cpp->token != NULL);
-
-	cpp_dump_file_stack(cpp);
+	else {
+		cpp_error(cpp, "cannot include file %s", filename);
+		cpp_skip_find_eol(cpp); /* skip is delayed: error location */
+	}
 
 out:
-	strbuf_free(&path_buf);
 	cpp_cur_file(cpp)->lexer.inside_include = false;
-}
-
-void cpp_dump_ifstack(struct cpp *cpp)
-{
-	list_foreach(struct cpp_if, cpp_if, &cpp->ifs, list_node) {
-		if (!cpp_if->token)
-			continue;
-
-		fprintf(stderr, "%s at %s:%lu:%lu\n", symbol_get_name(cpp_if->token->symbol),
-			cpp_if->token->startloc.filename,
-			cpp_if->token->startloc.line_no,
-			cpp_if->token->startloc.column_no
-		);
-	}
-	putc('\n', stderr);
 }
 
 
@@ -619,9 +622,6 @@ push_if:
 conclude:
 		cpp_if->skip_this_branch = !test_cond || cpp_if->skip_next_branch;
 		cpp_if->skip_next_branch |= !cpp_if->skip_this_branch;
-
-		cpp_dump_ifstack(cpp);
-
 		break;
 	
 	case CPP_DIRECTIVE_ELSE:
@@ -637,12 +637,6 @@ conclude:
 			cpp_error(cpp, "endif without matching if/ifdef/ifndef");
 		else
 			cpp_ifstack_pop(cpp);
-
-		DEBUG_PRINTF("#endif at %s:%lu:%lu",
-			cpp_cur_file(cpp)->filename,
-			prev->startloc.line_no,
-			prev->startloc.column_no);
-		cpp_dump_ifstack(cpp);
 
 		break;
 

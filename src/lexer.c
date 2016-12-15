@@ -121,6 +121,26 @@ static void lexer_error_noctx(struct lexer *lexer, char *fmt, ...)
 }
 
 
+static inline void lexer_spelling_start(struct lexer *lexer)
+{
+	lexer->spelling_start = lexer->c;
+}
+
+
+static inline char *lexer_spelling_end(struct lexer *lexer)
+{
+	assert(lexer->c >= lexer->spelling_start);
+
+	char *c;
+
+	strbuf_reset(&lexer->spelling);
+	for (c = lexer->spelling_start; c < lexer->c; c++)
+		strbuf_putc(&lexer->spelling, *c);
+	
+	return strbuf_copy_to_mempool(&lexer->spelling, &lexer->ctx->token_data);
+}
+
+
 inline static bool is_letter(int c)
 {
 	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
@@ -259,6 +279,7 @@ struct token *lexer_lex_name(struct lexer *lexer, struct token *token)
 
 	token->type = TOKEN_NAME;
 	token->symbol = symtab_search_or_insert(&lexer->ctx->symtab, strbuf_get_string(&lexer->strbuf));
+	token->spelling = lexer_spelling_end(lexer);
 
 	if (!token->symbol)
 		return NULL;
@@ -303,6 +324,7 @@ static struct token *lexer_lex_char(struct lexer *lexer, struct token *token)
 
 	token->type = TOKEN_CHAR_CONST;
 	token->value = val;
+	token->spelling = lexer_spelling_end(lexer);
 
 	return token;
 }
@@ -346,6 +368,7 @@ struct token *lexer_lex_pp_number(struct lexer *lexer, struct token *token)
 
 	token->type = TOKEN_NUMBER;
 	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->ctx->token_data);
+	token->spelling = lexer_spelling_end(lexer);
 
 	if (!token->str)
 		return NULL;
@@ -354,28 +377,13 @@ struct token *lexer_lex_pp_number(struct lexer *lexer, struct token *token)
 }
 
 
-char *lexer_spell(struct lexer *lexer, char *start, char *end)
-{
-	char *c;
-
-	strbuf_reset(&lexer->spelling);
-	for (c = start; c != end; c++)
-		strbuf_putc(&lexer->spelling, *c);
-
-	return strbuf_copy_to_mempool(&lexer->spelling, &lexer->ctx->token_data);
-}
-
-
 struct token *lexer_lex_string(struct lexer *lexer, struct token *token)
 {
 	bool seen_delimiter = false;
 	size_t i;
-	char *start;
 
 	strbuf_reset(&lexer->strbuf);
 	assert(lexer->c[-1] == '\"');
-
-	start = lexer->c - 1;
 
 	for (i = 0; *lexer->c != '\0'; i++) {
 		if (*lexer->c == '\"') {
@@ -400,7 +408,7 @@ struct token *lexer_lex_string(struct lexer *lexer, struct token *token)
 
 	token->type = TOKEN_STRING;
 	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->ctx->token_data);
-	token->spelling = lexer_spell(lexer, start, lexer->c);
+	token->spelling = lexer_spelling_end(lexer);
 
 	if (!token->str)
 		return NULL;
@@ -459,6 +467,7 @@ struct token *lexer_lex_header_name(struct lexer *lexer, struct token *token,
 	// TODO Check (and warn about) presence of // and /* comments within header name
 
 	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->ctx->token_data);
+	token->spelling = lexer_spelling_end(lexer);
 
 	if (!token->str)
 		return NULL;
@@ -561,8 +570,7 @@ void eat_c_comment(struct lexer *lexer)
 
 search_comment_terminator:
 	while (!lexer_is_eol(lexer)) {
-		/* TODO Wrong, reading invalid memory in some cases */
-		if (*lexer->c == '/' && lexer->c[-1] == '*') {
+		if (*lexer->c == '*' && lexer->c[1] == '/') {
 			lexer->c += 2;
 			return;
 		}
@@ -583,6 +591,10 @@ static struct token *new_eol(struct lexer *lexer)
 
 	token = objpool_alloc(&lexer->ctx->token_pool);
 	token->type = TOKEN_EOL;
+	token->is_at_bol = lexer->next_at_bol;
+	token->noexpand = false;
+	token->preceded_by_whitespace = lexer->had_whitespace;
+	token->startloc = lexer->location;
 
 	return token;
 }
@@ -631,6 +643,8 @@ next_nonwhite_char:
 	token->startloc = lexer->location;
 	/* TODO unhack this */
 	token->startloc.filename = lexer->filename;
+
+	lexer_spelling_start(lexer);
 
 	lexer->c++;
 	switch (lexer->c[-1]) {

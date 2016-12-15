@@ -63,6 +63,7 @@ struct token
 };
 
 const char *token_get_name(enum token_type token);
+char *token_get_spelling(struct token *token);
 
 bool token_is(struct token *token, enum token_type token_type);
 bool token_is_name(struct token *token);
