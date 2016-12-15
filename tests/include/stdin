@@ -6,3 +6,4 @@ int a;
 #endif
 
 #include "/home/david/ideas/mcc/tests/cpp/include/inc.c"
+#include "/tmp/this-file-doesnt-exist.c"

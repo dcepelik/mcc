@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/bin/bash
 
 prog=../../src/mcc
 
@@ -17,7 +17,7 @@ test_file() {
 		return
 	fi
 
-	diff $1 $2 >/dev/null
+	diff <(cat $1 | tr -s '\n' | tr '\n' ' ') <(cat $1 | tr -s '\n' | tr '\n' ' ') >/dev/null
 
 	if [ $? -ne 0 ]; then
 		echo "    $1 differs"
@@ -32,7 +32,7 @@ test_valgrind() {
 
 	if [ "$valgrind_result" != "0 0" ]; then
 		num_errs=$(($num_errs + 1))
-		echo "    valgrind complains"
+		echo "    valgrind errors"
 	fi
 }
 

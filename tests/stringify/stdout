@@ -1,0 +1,1 @@
+"this is a series of preprocessing tokens" "same but withwhitespace" "this \\\"macro\\\" contains a \\\"string\\\"" "beware that \\\"strings\\\\tshould\\\\nbe   \\\\\\\"escaped\\\\\\\"\\\" specially" "p = \\\"foo\\\\n\\\";" <<EOF>>
