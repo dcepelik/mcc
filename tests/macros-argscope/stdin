@@ -1,0 +1,4 @@
+#define ctx1		b
+#define ctx2(a, b)	a + ctx1
+
+ctx2(1, 2)

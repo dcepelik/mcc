@@ -15,7 +15,9 @@ struct inbuf {
 };
 
 mcc_error_t inbuf_open(struct inbuf *inbuf, size_t size, const char *filename);
-int inbuf_get_char(struct inbuf *inbuf);
+mcc_error_t inbuf_open_mem(struct inbuf *inbuf, char *string, size_t len);
 void inbuf_close(struct inbuf *inbuf);
+
+int inbuf_get_char(struct inbuf *inbuf);
 
 #endif

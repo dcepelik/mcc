@@ -28,6 +28,28 @@ bool list_is_empty(struct list *lst)
 }
 
 
+void list_insert_after(struct list *lst, struct list_node *after, struct list_node *node)
+{
+	node->next = after->next;
+	after->next = node;
+
+	if (after == lst->last)
+		lst->last = node;
+}
+
+
+void list_insert_list_after(struct list *lst, struct list_node *after, struct list *lst_to_insert)
+{
+	if (!list_is_empty(lst_to_insert)) {
+		lst_to_insert->last->next = after->next;
+		after->next = lst_to_insert->head.next;
+
+		if (after == lst->last)
+			lst->last = lst_to_insert->last;
+	}
+}
+
+
 struct list_node *list_insert_last(struct list *lst, struct list_node *node)
 {
 	node->next = NULL;
@@ -64,6 +86,20 @@ void *list_remove_first(struct list *lst)
 	assert(list_length(lst) >= 0);
 	
 	return first;
+}
+
+
+void *list_remove_last(struct list *lst)
+{
+	struct list_node *last = lst->last;
+	struct list_node *pred = list_find_predecessor(lst, lst->last);
+
+	assert(pred != NULL);
+
+	pred->next = NULL;
+	lst->last = pred;
+
+	return last;
 }
 
 
@@ -119,6 +155,12 @@ void *list_first(struct list *lst)
 }
 
 
+struct list_node *list_head(struct list *lst)
+{
+	return &lst->head;
+}
+
+
 void *list_last(struct list *lst)
 {
 	return lst->last;
@@ -163,5 +205,19 @@ void list_append(struct list *lst, struct list *lst_to_append)
 	if (!list_is_empty(lst_to_append)) {
 		lst->last->next = list_first(lst_to_append);
 		lst->last = list_last(lst_to_append);
+	}
+}
+
+
+void list_insert_list_before(struct list *lst, struct list *to_insert, struct list_node *node)
+{
+	assert(node != &lst->head);
+
+	struct list_node *pred;
+
+	if (!list_is_empty(to_insert)) {
+		pred = list_find_predecessor(lst, node);
+		pred->next = list_first(to_insert);
+		((struct list_node *)list_last(to_insert))->next = node;
 	}
 }

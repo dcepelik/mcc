@@ -1,9 +1,9 @@
-#include "/home/david/ideas/mcc/tests/cpp/include/inc.c"
+#include "/home/david/ideas/mcc/tests/include/inc.c"
 #ifdef INC_INCLUDED_OK
 #ifdef INC2_INCLUDED_OK
 int a;
 #endif
 #endif
 
-#include "/home/david/ideas/mcc/tests/cpp/include/inc.c"
+#include "/home/david/ideas/mcc/tests/include/inc.c"
 #include "/tmp/this-file-doesnt-exist.c"

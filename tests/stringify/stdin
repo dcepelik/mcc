@@ -1,11 +1,26 @@
 #define str(x)	# x
+#define str2(x) str(x)
+#define eleven 11
+
+/*
+ * simple stringifications
+ */
 
 str(this is a series of preprocessing tokens)
-str(same   but	with/* a lot of */whitespace)
+str(same   but	with/* a lot of */whitespace) // TODO
 str(this "macro" contains a "string")
 str(beware that "strings\tshould\nbe   \"escaped\"" specially)
 
+str(2e+14)
+str('\n')
+str('\000')
+
+str2(eleven) /* should expand */
+str(p = "foo\n";) /* GCC docs example */
+
 /*
- * Taken from the GCC docs
+ * should not stringify because of # coming from an argument
  */
-str(p = "foo\n";)
+
+str(# hello)
+str2(# x please) /* x is an argument, but should not stringify either */

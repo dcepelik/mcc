@@ -17,7 +17,7 @@ test_file() {
 		return
 	fi
 
-	diff <(cat $1 | tr -s '\n' | tr '\n' ' ') <(cat $1 | tr -s '\n' | tr '\n' ' ') >/dev/null
+	diff <(cat $1 | tr -s '\n' | tr '\n' ' ') <(cat $2 | tr -s '\n' | tr '\n' ' ') >/dev/null
 
 	if [ $? -ne 0 ]; then
 		echo "    $1 differs"
@@ -33,6 +33,8 @@ test_valgrind() {
 	if [ "$valgrind_result" != "0 0" ]; then
 		num_errs=$(($num_errs + 1))
 		echo "    valgrind errors"
+	else
+		num_ok=$(($num_ok + 1))
 	fi
 }
 

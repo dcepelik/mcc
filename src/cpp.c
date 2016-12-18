@@ -4,19 +4,21 @@
  * TODO stringify and glue support
  */
 
-#include "context.h"
 #include "common.h"
+#include "context.h"
 #include "debug.h"
-#include "macro.h"
+#include "inbuf.h"
 #include "lexer.h"
-#include <unistd.h>
+#include "macro.h"
 #include <assert.h>
 #include <stdarg.h>
 #include <string.h>
+#include <unistd.h>
 
+#define FILE_POOL_BLOCK_SIZE	16
+#define INBUF_BLOCK_SIZE	2048
 #define MACRO_POOL_BLOCK_SIZE	32
 #define TOKEN_DATA_BLOCK_SIZE	1024
-#define FILE_POOL_BLOCK_SIZE	16
 #define VA_ARGS_NAME		"__VA_ARGS__"
 
 
@@ -25,6 +27,7 @@ struct cpp_file
 	struct list_node list_node;
 	char *filename;
 	struct lexer lexer;
+	struct inbuf inbuf;
 };
 
 
@@ -172,14 +175,28 @@ static mcc_error_t cpp_file_init(struct cpp *cpp, struct cpp_file *file, char *f
 {
 	mcc_error_t err;
 
-	if ((err = lexer_init(&file->lexer, cpp->ctx, filename)) != MCC_ERROR_OK)
-		return err;
+	if ((err = inbuf_open(&file->inbuf, INBUF_BLOCK_SIZE, filename)) != MCC_ERROR_OK)
+		goto out;
+
+	if ((err = lexer_init(&file->lexer, cpp->ctx, &file->inbuf)) != MCC_ERROR_OK)
+		goto out_inbuf;
 	
 	file->filename = mempool_strdup(&cpp->ctx->token_data, filename);
-	if (!file->filename)
-		return MCC_ERROR_NOMEM;
+	if (!file->filename) {
+		err = MCC_ERROR_NOMEM;
+		goto out_lexer;
+	}
 
 	return MCC_ERROR_OK;
+
+out_lexer:
+	lexer_free(&file->lexer);
+
+out_inbuf:
+	inbuf_close(&file->inbuf);
+
+out:
+	return err;
 }
 
 

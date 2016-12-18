@@ -9,7 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define INBUF_BLOCK_SIZE	2048
 #define STRBUF_INIT_SIZE	128
 
 static struct token eof = { .type = TOKEN_EOF };
@@ -29,32 +28,21 @@ static const char simple_escape_seq[256] = {
 };
 
 
-mcc_error_t lexer_init(struct lexer *lexer, struct context *ctx, char *filename)
+mcc_error_t lexer_init(struct lexer *lexer, struct context *ctx, struct inbuf *inbuf)
 {
-	mcc_error_t err;
-
 	if (!strbuf_init(&lexer->linebuf, STRBUF_INIT_SIZE))
-		return MCC_ERROR_NOMEM;
-
-	if (!strbuf_init(&lexer->strbuf, STRBUF_INIT_SIZE)) {
-		strbuf_free(&lexer->linebuf);
-		return MCC_ERROR_NOMEM;
-	}
-
-	if (!strbuf_init(&lexer->spelling, STRBUF_INIT_SIZE)) {
-		strbuf_free(&lexer->linebuf);
-		strbuf_free(&lexer->strbuf);
-		return MCC_ERROR_NOMEM;
-	}
-
-	err = inbuf_open(&lexer->inbuf, INBUF_BLOCK_SIZE, filename);
-	if (err != MCC_ERROR_OK)
 		goto out_err;
 
-	lexer->c = strbuf_get_string(&lexer->linebuf);
+	if (!strbuf_init(&lexer->strbuf, STRBUF_INIT_SIZE))
+		goto out_err_linebuf;
+
+	if (!strbuf_init(&lexer->spelling, STRBUF_INIT_SIZE))
+		goto out_err_strbuf;
 
 	lexer->ctx = ctx;
-	lexer->filename = filename;
+	lexer->inbuf = inbuf;
+
+	lexer->c = strbuf_get_string(&lexer->linebuf);
 	lexer->location.line_no = 0;
 	lexer->inside_include = false;
 	lexer->emit_eols = false;
@@ -62,14 +50,18 @@ mcc_error_t lexer_init(struct lexer *lexer, struct context *ctx, char *filename)
 	lexer->first_token = true;
 	lexer->had_whitespace = false;
 
+	lexer->filename = NULL; /* TODO */
+
 	return MCC_ERROR_OK;
 
-out_err:
-	strbuf_free(&lexer->linebuf);
+out_err_strbuf:
 	strbuf_free(&lexer->strbuf);
-	strbuf_free(&lexer->spelling);
 
-	return err;
+out_err_linebuf:
+	strbuf_free(&lexer->linebuf);
+
+out_err:
+	return MCC_ERROR_NOMEM;
 }
 
 
@@ -78,7 +70,6 @@ void lexer_free(struct lexer *lexer)
 	strbuf_free(&lexer->linebuf);
 	strbuf_free(&lexer->strbuf);
 	strbuf_free(&lexer->spelling);
-	inbuf_close(&lexer->inbuf);
 }
 
 
@@ -168,6 +159,28 @@ inline static bool is_hex_digit(int c)
 inline static bool is_octal_digit(int c)
 {
 	return c >= '0' && c <= '7';
+}
+
+
+static bool is_valid_qchar(char c)
+{
+	switch (c) {
+	case '\n':
+	case '\r':
+	case '\'':
+	case '\\':
+	case '\"':
+		return false;
+
+	default:
+		return true;
+	}
+}
+
+
+static bool is_valid_hchar(char c)
+{
+	return is_valid_qchar(c) || c != '\"';
 }
 
 
@@ -265,7 +278,7 @@ static uint32_t read_escape_sequence(struct lexer *lexer)
 }
 
 
-struct token *lexer_lex_name(struct lexer *lexer, struct token *token)
+static struct token *lexer_lex_name(struct lexer *lexer, struct token *token)
 {
 	strbuf_reset(&lexer->strbuf);
 
@@ -402,9 +415,8 @@ struct token *lexer_lex_string(struct lexer *lexer, struct token *token)
 		}
 	}
 
-	if (!seen_delimiter) {
+	if (!seen_delimiter)
 		lexer_error(lexer, "missing the final \"");
-	}
 
 	token->type = TOKEN_STRING;
 	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->ctx->token_data);
@@ -414,28 +426,6 @@ struct token *lexer_lex_string(struct lexer *lexer, struct token *token)
 		return NULL;
 
 	return token;
-}
-
-
-static bool is_valid_qchar(char c)
-{
-	switch (c) {
-	case '\n':
-	case '\r':
-	case '\'':
-	case '\\':
-	case '\"':
-		return false;
-
-	default:
-		return true;
-	}
-}
-
-
-static bool is_valid_hchar(char c)
-{
-	return is_valid_qchar(c) || c != '\"';
 }
 
 
@@ -494,6 +484,7 @@ struct token *lexer_lex_header_qname(struct lexer *lexer, struct token *token)
 
 /*
  * TODO Add trigraph support.
+ * TODO Refactor, don't use mcc_error_t to signalize EOF
  */
 static mcc_error_t lexer_read_line(struct lexer *lexer)
 {
@@ -502,7 +493,7 @@ static mcc_error_t lexer_read_line(struct lexer *lexer)
 
 	strbuf_reset(&lexer->linebuf);
 
-	for (lexer->location.column_no = 0; (c = inbuf_get_char(&lexer->inbuf)) != INBUF_EOF; lexer->location.column_no++) {
+	for (lexer->location.column_no = 0; (c = inbuf_get_char(lexer->inbuf)) != INBUF_EOF; lexer->location.column_no++) {
 		switch (c) {
 		case ' ':
 		case '\t':
@@ -526,6 +517,8 @@ static mcc_error_t lexer_read_line(struct lexer *lexer)
 				break;
 			}
 
+			/* fall-through */
+
 		default:
 			if (escape) {
 				strbuf_putc(&lexer->linebuf, '\\');
@@ -536,7 +529,7 @@ static mcc_error_t lexer_read_line(struct lexer *lexer)
 		}
 	}
 
-	if (c == INBUF_EOF)
+	if (strbuf_strlen(&lexer->linebuf) == 0)
 		return MCC_ERROR_EOF;
 
 eol_or_eof:
@@ -585,7 +578,7 @@ search_comment_terminator:
 }
 
 
-static struct token *new_eol(struct lexer *lexer)
+static struct token *lexer_new_eol(struct lexer *lexer)
 {
 	struct token *token;
 
@@ -618,10 +611,10 @@ next_nonwhite_char:
 			return NULL;
 
 		if (!lexer->first_token && lexer->emit_eols)
-			return new_eol(lexer);
+			return lexer_new_eol(lexer);
 	}
 
-	lexer->first_token = false;
+	lexer->first_token = false; /* move down? */
 
 	eat_whitespace(lexer);
 	if (lexer_is_eol(lexer))
@@ -702,7 +695,7 @@ next_nonwhite_char:
 			break;
 		}
 
-		/* fall-through to pp-number processing */ 
+		/* decimal dot, fall-through to pp-number processing */ 
 
 	case '0': case '1': case '2': case '3': case '4': case '5':
 	case '6': case '7': case '8': case '9':

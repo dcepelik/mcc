@@ -11,14 +11,11 @@ static void inbuf_fill(struct inbuf *buf)
 }
 
 
-mcc_error_t inbuf_open(struct inbuf *buf, size_t size, const char *filename)
+static mcc_error_t inbuf_open_internal(struct inbuf *buf, size_t size, FILE *file)
 {
 	assert(size > 0);
 
-	buf->file = fopen(filename, "r");
-	if (!buf->file)
-		return MCC_ERROR_ACCESS;
-
+	buf->file = file;
 	buf->size = size;
 	buf->count = 0;
 	buf->offset = 0;
@@ -30,6 +27,30 @@ mcc_error_t inbuf_open(struct inbuf *buf, size_t size, const char *filename)
 	}
 
 	return MCC_ERROR_OK;
+}
+
+
+mcc_error_t inbuf_open(struct inbuf *buf, size_t size, const char *filename)
+{
+	FILE *file;
+	
+	file = fopen(filename, "r");
+	if (!file)
+		return MCC_ERROR_ACCESS; /* TODO Error reporting */
+
+	return inbuf_open_internal(buf, size, file);
+}
+
+
+mcc_error_t inbuf_open_mem(struct inbuf *buf, char *str, size_t len)
+{
+	FILE *file;
+	
+	file = fmemopen(str, len, "r");
+	if (!file)
+		return MCC_ERROR_ACCESS; /* TODO Error reporting */
+
+	return inbuf_open_internal(buf, len, file);
 }
 
 

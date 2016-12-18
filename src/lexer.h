@@ -22,7 +22,7 @@ struct lexer
 	struct context *ctx;
 	char *filename;			/* TODO */
 
-	struct inbuf inbuf;		/* input buffer */
+	struct inbuf *inbuf;		/* input buffer */
 	struct strbuf linebuf;		/* buffer for current logical line */
 	char *c;			/* current character within linebuf */
 	struct location location;	/* location of c within inbuf */
@@ -38,7 +38,7 @@ struct lexer
 	bool had_whitespace;		/* whitespace before current token? */
 };
 
-mcc_error_t lexer_init(struct lexer *lexer, struct context *ctx, char *filename);
+mcc_error_t lexer_init(struct lexer *lexer, struct context *ctx, struct inbuf *inbuf);
 void lexer_free(struct lexer *lexer);
 struct token *lexer_next(struct lexer *lexer);
 
