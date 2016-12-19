@@ -8,6 +8,18 @@
 #ifndef MACRO_H
 #define MACRO_H
 
+/*
+ * Note on terminology used:
+ *
+ * 3.3:  argument: "... a sequence of preprocessing tokens in the
+ *       comma-separated list bounded by the parentheses in a function-like
+ *       macro invocation"
+ *
+ * 3.16: parameter: "... an identifer from the comma-separated list bounded
+ *       by the parentheses immediately following the macro name in
+ *       a function-like macro defnition"
+ */
+
 #include "list.h"
 
 enum macro_type
@@ -24,6 +36,12 @@ struct macro
 	enum macro_type type;	/* type of the macro */
 	bool is_macro_arg;	/* is this macro is another macro's argument? */
 	bool is_expanding;	/* is this macro just expanding? */
+};
+
+struct macro_arg
+{
+	struct list tokens;	/* tokens that constitute this argument */
+	struct list expansion;	/* complete macro expansion of @tokens */
 };
 
 struct cpp;

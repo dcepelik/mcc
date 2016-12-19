@@ -1,1 +1,6 @@
 12
+[hello_world]
+[abc]
+[a] [bc] [d]
+
+<<EOF>>

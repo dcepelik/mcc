@@ -60,6 +60,7 @@ const char *token_names[] = {
 	[TOKEN_STRING] = "string",
 	[TOKEN_XOR] = "^",
 	[TOKEN_XOR_EQ] = "^=",
+	[TOKEN_OTHER] = NULL,
 };
 
 
@@ -78,6 +79,7 @@ char *token_get_spelling(struct token *token)
 	case TOKEN_HEADER_HNAME:
 	case TOKEN_HEADER_QNAME:
 	case TOKEN_NUMBER:
+	case TOKEN_OTHER: /* TODO simplify this case */
 	case TOKEN_STRING:
 		return token->spelling;
 

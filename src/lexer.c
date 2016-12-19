@@ -597,7 +597,6 @@ struct token *lexer_next(struct lexer *lexer)
 {
 	struct token *token;
 	mcc_error_t err;
-	struct strbuf errbuf;
 
 next_nonwhite_char:
 	if (lexer_is_eol(lexer)) {
@@ -974,15 +973,9 @@ next_nonwhite_char:
 		break;
 
 	default:
-		strbuf_init(&errbuf, 4); // TODO get rid of the strbuf
-		print_char(*(lexer->c - 1), &errbuf);
-		lexer_error(lexer, "character %s was unexpected",
-			strbuf_get_string(&errbuf));
-		lexer_error(lexer, "line len was %lu", strbuf_strlen(&lexer->linebuf));
-		strbuf_free(&errbuf);
-
-		lexer->c++;
-		goto next_nonwhite_char;
+		token->type = TOKEN_OTHER;
+		token->c = lexer->c[-1];
+		token->spelling = lexer_spelling_end(lexer);
 	}
 
 	return token;

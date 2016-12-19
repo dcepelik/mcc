@@ -146,6 +146,9 @@ const char *symbol_type_to_string(enum symbol_type type)
 
 	case SYMBOL_TYPE_CPP_MACRO:
 		return "CPP macro";
+
+	case SYMBOL_TYPE_CPP_MACRO_ARG:
+		return "CPP macro arg";
 	
 	case SYMBOL_TYPE_CPP_BUILTIN:
 		return "CPP built-in macro";

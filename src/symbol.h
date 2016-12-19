@@ -9,6 +9,7 @@
 #include "cpp.h"
 #include "hashtab.h"
 #include "objpool.h"
+#include "macro.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,10 +45,11 @@ void symtab_dump(struct symtab *table, FILE *fout);
 
 enum symbol_type
 {
-	SYMBOL_TYPE_UNDEF,		/* symbol has no proper definition */
-	SYMBOL_TYPE_CPP_MACRO,		/* C preprocessor macro */
 	SYMBOL_TYPE_CPP_BUILTIN,	/* C preprocessor's built-in macro */
-	SYMBOL_TYPE_CPP_DIRECTIVE	/* C preprocessor directive */
+	SYMBOL_TYPE_CPP_DIRECTIVE,	/* C preprocessor directive */
+	SYMBOL_TYPE_CPP_MACRO,		/* C preprocessor macro */
+	SYMBOL_TYPE_CPP_MACRO_ARG,	/* C preprocessor's macro argument */
+	SYMBOL_TYPE_UNDEF		/* symbol has no proper definition */
 };
 
 const char *symbol_type_to_string(enum symbol_type type);
@@ -71,6 +73,7 @@ struct symdef
 	union {
 		enum cpp_directive directive;
 		struct macro *macro;
+		struct macro_arg macro_arg;
 	};
 };
 

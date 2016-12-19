@@ -191,8 +191,8 @@ static void copy_token_list(struct cpp *cpp, struct list *src, struct list *dst)
 
 static bool token_is_macro_arg(struct token *token)
 {
-	return token_is_expandable(token)
-		&& token->symbol->def->macro->is_macro_arg;
+	return token_is(token, TOKEN_NAME)
+		&& token->symbol->def->type == SYMBOL_TYPE_CPP_MACRO_ARG;
 }
 
 
@@ -252,13 +252,13 @@ static struct token *macro_parse_args(struct cpp *cpp, struct macro *macro, stru
 
 		argdef = symbol_define(&cpp->ctx->symtab, arg->symbol);
 		argdef->type = SYMBOL_TYPE_UNDEF;
-		argdef->macro = objpool_alloc(&cpp->macro_pool);
 
-		macro_init(argdef->macro);
-
-		macro_expand_recursive(cpp, &params, &argdef->macro->expansion);
-		argdef->macro->is_macro_arg = true; /* needs to be here */
-		argdef->type = SYMBOL_TYPE_CPP_MACRO;
+		list_init(&argdef->macro_arg.tokens);
+		copy_token_list(cpp, &params, &argdef->macro_arg.tokens);
+		
+		list_init(&argdef->macro_arg.expansion);
+		macro_expand_recursive(cpp, &params, &argdef->macro_arg.expansion);
+		argdef->type = SYMBOL_TYPE_CPP_MACRO_ARG;
 
 		if (args_ended)
 			break;
@@ -321,14 +321,20 @@ static void macro_replace_args(struct cpp *cpp, struct list *in, struct list *ou
 			list_remove(in, &arg1->list_node);
 			list_remove(in, &arg2->list_node);
 
-			assert(token_is_macro_arg(arg1));
-			assert(arg2 != NULL && token_is_macro_arg(arg2));
+			assert(arg2 != NULL);
 
 			list_init(&arg1_expansion);
 			list_init(&arg2_expansion);
 
-			copy_token_list(cpp, &arg1->symbol->def->macro->expansion, &arg1_expansion);
-			copy_token_list(cpp, &arg2->symbol->def->macro->expansion, &arg2_expansion);
+			if (token_is_macro_arg(arg1))
+				copy_token_list(cpp, &arg1->symbol->def->macro_arg.expansion, &arg1_expansion);
+			else
+				list_insert_last(&arg1_expansion, &arg1->list_node);
+
+			if (token_is_macro_arg(arg2))
+				copy_token_list(cpp, &arg2->symbol->def->macro_arg.expansion, &arg2_expansion);
+			else
+				list_insert_last(&arg2_expansion, &arg2->list_node);
 
 			paste1 = list_remove_last(&arg1_expansion);
 			paste2 = list_remove_first(&arg2_expansion);
@@ -350,7 +356,7 @@ static void macro_replace_args(struct cpp *cpp, struct list *in, struct list *ou
 		}
 		else {
 			list_init(&arg_expansion);
-			copy_token_list(cpp, &token->symbol->def->macro->expansion,
+			copy_token_list(cpp, &token->symbol->def->macro_arg.expansion,
 				&arg_expansion);
 
 			if (hash) {

@@ -3,4 +3,4 @@
 paste(1, 2)
 paste(paste(hello, _), world)
 paste(a, paste(b, c))
-paste(a b, c d);
+paste(a b, c d)
