@@ -38,6 +38,17 @@ struct list paste(struct cpp *cpp, struct token *a, struct token *b)
 	struct token *token;
 	size_t num_tokens = 0;
 
+	list_init(&tokens);
+	if (a->type == TOKEN_PLACEMARKER) {
+		list_insert_first(&tokens, &b->list_node);
+		return tokens;
+	}
+
+	if (b->type == TOKEN_PLACEMARKER) {
+		list_insert_first(&tokens, &a->list_node);
+		return tokens;
+	}
+
 	/* TODO Error checking */
 
 	strbuf_init(&buf, 32);
@@ -48,8 +59,6 @@ struct list paste(struct cpp *cpp, struct token *a, struct token *b)
 	inbuf_open_mem(&inbuf, strbuf_get_string(&buf), strbuf_strlen(&buf));
 
 	lexer_init(&lexer, cpp->ctx, &inbuf);
-
-	list_init(&tokens);
 
 	while ((token = lexer_next(&lexer))) {
 		if (token->type == TOKEN_EOF)
@@ -105,11 +114,14 @@ static struct token *macro_stringify(struct cpp *cpp, struct list *tokens)
 	strtoken = objpool_alloc(&cpp->ctx->token_pool);
 	strtoken->type = TOKEN_STRING;
 	strtoken->str = strbuf_copy_to_mempool(&str, &cpp->ctx->token_data);
-	strtoken->startloc = first->startloc;
-	strtoken->endloc = last->endloc;
-	strtoken->preceded_by_whitespace = first->preceded_by_whitespace;
-	strtoken->is_at_bol = first->is_at_bol;
 	strtoken->noexpand = false;
+
+	if (first && last) {
+		strtoken->startloc = first->startloc;
+		strtoken->endloc = last->endloc;
+		strtoken->is_at_bol = first->is_at_bol;
+		strtoken->preceded_by_whitespace = first->preceded_by_whitespace;
+	}
 
 	strbuf_free(&str);
 
@@ -155,7 +167,8 @@ static inline bool token_is_expandable(struct token *token)
 	bool funclike;
 
 	if (token->type != TOKEN_NAME
-		|| token->symbol->def->type != SYMBOL_TYPE_CPP_MACRO)
+		|| token->symbol->def->type != SYMBOL_TYPE_CPP_MACRO
+		|| token->noexpand)
 		return false;
 
 	macro = token->symbol->def->macro;
@@ -258,6 +271,7 @@ static struct token *macro_parse_args(struct cpp *cpp, struct macro *macro, stru
 		
 		list_init(&argdef->macro_arg.expansion);
 		macro_expand_recursive(cpp, &params, &argdef->macro_arg.expansion);
+
 		argdef->type = SYMBOL_TYPE_CPP_MACRO_ARG;
 
 		if (args_ended)
@@ -295,6 +309,17 @@ void macro_expand_recursive(struct cpp *cpp, struct list *in, struct list *out)
 }
 
 
+struct token *new_placemarker(struct cpp *cpp)
+{
+	struct token *token;
+
+	token = objpool_alloc(&cpp->ctx->token_pool);
+	token->type = TOKEN_PLACEMARKER;
+
+	return token;
+}
+
+
 static void macro_replace_args(struct cpp *cpp, struct list *in, struct list *out)
 {
 	struct token *token;
@@ -326,15 +351,25 @@ static void macro_replace_args(struct cpp *cpp, struct list *in, struct list *ou
 			list_init(&arg1_expansion);
 			list_init(&arg2_expansion);
 
-			if (token_is_macro_arg(arg1))
-				copy_token_list(cpp, &arg1->symbol->def->macro_arg.expansion, &arg1_expansion);
-			else
+			if (token_is_macro_arg(arg1)) {
+				if (list_is_empty(&arg1->symbol->def->macro_arg.tokens))
+					list_insert_first(&arg1_expansion, &new_placemarker(cpp)->list_node);
+				else 
+					copy_token_list(cpp, &arg1->symbol->def->macro_arg.tokens, &arg1_expansion);
+			}
+			else {
 				list_insert_last(&arg1_expansion, &arg1->list_node);
+			}
 
-			if (token_is_macro_arg(arg2))
-				copy_token_list(cpp, &arg2->symbol->def->macro_arg.expansion, &arg2_expansion);
-			else
+			if (token_is_macro_arg(arg2)) {
+				if (list_is_empty(&arg2->symbol->def->macro_arg.tokens))
+					list_insert_first(&arg2_expansion, &new_placemarker(cpp)->list_node);
+				else
+					copy_token_list(cpp, &arg2->symbol->def->macro_arg.tokens, &arg2_expansion);
+			}
+			else {
 				list_insert_last(&arg2_expansion, &arg2->list_node);
+			}
 
 			paste1 = list_remove_last(&arg1_expansion);
 			paste2 = list_remove_first(&arg2_expansion);

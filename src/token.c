@@ -61,6 +61,7 @@ const char *token_names[] = {
 	[TOKEN_XOR] = "^",
 	[TOKEN_XOR_EQ] = "^=",
 	[TOKEN_OTHER] = NULL,
+	[TOKEN_PLACEMARKER] = "{placemarker}",
 };
 
 
