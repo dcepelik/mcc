@@ -6,10 +6,9 @@
 #ifndef SYMBOL_H
 #define SYMBOL_H
 
-#include "cpp.h"
+#include "cpp-internal.h"
 #include "hashtab.h"
 #include "objpool.h"
-#include "macro.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>

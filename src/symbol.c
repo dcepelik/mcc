@@ -1,5 +1,4 @@
 #include "debug.h"
-#include "macro.h"
 #include "mempool.h"
 #include "symbol.h"
 #include "token.h"

@@ -1,8 +1,8 @@
 .PHONY: clean gdb tests all
 
 OBJS=mcc.o lexer.o inbuf.o symbol.o objpool.o cpp.o error.o token.o strbuf.o \
-	hashtab.o mempool.o array.o debug.o list.o macro.o errlist.o print.o \
-	context.o
+	hashtab.o mempool.o array.o debug.o list.o cpp-macros.o errlist.o print.o \
+	context.o cpp-directives.o cpp-files.o
 PROG=mcc
 CFLAGS+=-c -std=gnu11 -Wall -Wno-unused-function --pedantic -ggdb3 -DDEBUG
 LDFLAGS=-Wall
@@ -20,7 +20,7 @@ lexer.o: lexer.c lexer.h inbuf.o symbol.o error.o token.o strbuf.o cpp.o debug.h
 symbol.o: symbol.c symbol.h objpool.o error.o token.o hashtab.o debug.h common.h
 	$(CC) $(CFLAGS) -o $@ $<
 
-cpp.o: cpp.c cpp.h lexer.o error.o token.o list.o macro.o debug.h common.h
+cpp.o: cpp.c cpp.h lexer.o error.o token.o list.o cpp-directives.o cpp-macros.o cpp-files.o debug.h common.h
 	$(CC) $(CFLAGS) -o $@ $<
 
 objpool.o: objpool.c objpool.h debug.h common.h
