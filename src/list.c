@@ -50,7 +50,7 @@ void list_insert_list_after(struct list *lst, struct list_node *after, struct li
 }
 
 
-struct list_node *list_insert_last(struct list *lst, struct list_node *node)
+void *list_insert_last(struct list *lst, struct list_node *node)
 {
 	node->next = NULL;
 	lst->last->next = node;
@@ -60,7 +60,7 @@ struct list_node *list_insert_last(struct list *lst, struct list_node *node)
 }
 
 
-struct list_node *list_insert_first(struct list *lst, struct list_node *node)
+void *list_insert_first(struct list *lst, struct list_node *node)
 {
 	if (list_is_empty(lst))
 		lst->last = node;

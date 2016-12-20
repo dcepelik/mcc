@@ -1,13 +1,14 @@
 #ifndef CPP_INTERNAL_H
 #define CPP_INTERNAL_H
 
+#include "common.h"
 #include "debug.h"
 #include "error.h"
 #include "lexer.h"
-#include "list.h"
 #include "mempool.h"
 #include "objpool.h"
 #include "token.h"
+#include "toklist.h"
 #include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -25,7 +26,7 @@ struct cpp
 	struct objpool file_pool;	/* objpool for open files */
 
 	struct list file_stack;		/* stack of open files */
-	struct list tokens;		/* token queue */
+	struct toklist tokens;		/* token queue */
 	struct token *token;		/* last popped token */
 	struct list ifs;		/* if directive control stack */
 };
@@ -102,12 +103,11 @@ enum macro_type
  */
 struct macro
 {
-	char *name;		/* name of the macro */
-	struct list args;	/* argument list */
-	struct list expansion;	/* expansion list */
-	enum macro_type type;	/* type of the macro */
-	bool is_macro_arg;	/* is this macro is another macro's argument? */
-	bool is_expanding;	/* is this macro just expanding? */
+	char *name;			/* name of the macro */
+	struct toklist args;		/* argument list */
+	struct toklist expansion;	/* expansion list */
+	enum macro_type type;		/* type of the macro */
+	bool is_expanding;		/* is this macro being expanded? */
 };
 
 void macro_init(struct macro *macro);
@@ -115,15 +115,15 @@ void macro_free(struct macro *macro);
 
 void macro_dump(struct macro *macro);
 
-void macro_expand(struct cpp *file, struct list *invocation, struct list *expansion);
+void macro_expand(struct cpp *file, struct toklist *invocation, struct toklist *expansion);
 
 /*
  * C preprocessor macro argument.
  */
 struct macro_arg
 {
-	struct list tokens;	/* tokens that constitute this argument */
-	struct list expansion;	/* complete macro expansion of @tokens */
+	struct toklist tokens;		/* tokens that constitute this argument */
+	struct toklist expansion;	/* complete macro expansion of @tokens */
 };
 
 #endif

@@ -109,6 +109,13 @@ bool token_is_macro(struct token *token)
 }
 
 
+bool token_is_macro_arg(struct token *token)
+{
+	return token_is_name(token)
+		&& token->symbol->def->type == SYMBOL_TYPE_CPP_MACRO_ARG;
+}
+
+
 bool token_is_eof(struct token *token)
 {
 	return token_is(token, TOKEN_EOF);
@@ -182,32 +189,4 @@ void token_dump(struct token *token, FILE *fout)
 void location_dump(struct location *loc)
 {
 	fprintf(stderr, "%lu:%lu\n", loc->line_no, loc->column_no);
-}
-
-
-void token_list_print(struct list *tokens, struct strbuf *buf)
-{
-	int level = 0;
-
-	list_foreach(struct token, token, tokens, list_node) {
-		level++;
-		token_print(token, buf);
-		if (token != list_last(tokens))
-			strbuf_putc(buf, ' ');
-
-		if (level > 100) {
-			fprintf(stderr, "*** MAYBE RECURSION ***\n");
-			break;
-		}
-	}
-}
-
-
-void token_list_dump(struct list *tokens, FILE *fout)
-{
-	struct strbuf buf;
-	strbuf_init(&buf, 1024);
-	token_list_print(tokens, &buf);
-	fprintf(fout, "%s\n", strbuf_get_string(&buf));
-	strbuf_free(&buf);
 }

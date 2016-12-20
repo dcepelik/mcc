@@ -2,6 +2,7 @@
 #include "mempool.h"
 #include "symbol.h"
 #include "token.h"
+#include "toklist.h"
 #include <assert.h>
 #include <inttypes.h>
 #include <stddef.h>
@@ -246,7 +247,7 @@ void symtab_dump(struct symtab *table, FILE *fout)
 					fprintf(fout, "(expanding)");
 					fputc('\t', fout);
 				}
-				token_list_dump(&def->macro->expansion, fout);
+				toklist_dump(&def->macro->expansion, fout);
 
 			}
 			else {

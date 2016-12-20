@@ -4,15 +4,10 @@
  */
 
 #include "cpp-internal.h"
-#include "common.h"
 #include "context.h"
 #include "debug.h"
 #include "inbuf.h"
 #include "lexer.h"
-#include <assert.h>
-#include <stdarg.h>
-#include <string.h>
-#include <unistd.h>
 
 #define FILE_POOL_BLOCK_SIZE	16
 #define MACRO_POOL_BLOCK_SIZE	32
@@ -85,8 +80,8 @@ static void cpp_setup_symtab(struct symtab *table)
 
 void cpp_next_token(struct cpp *cpp)
 {
-	if (!list_is_empty(&cpp->tokens))
-		cpp->token = list_remove_first(&cpp->tokens);
+	if (!toklist_is_empty(&cpp->tokens))
+		cpp->token = toklist_remove_first(&cpp->tokens);
 	else
 		cpp->token = lexer_next(&cpp_cur_file(cpp)->lexer);
 
@@ -110,7 +105,7 @@ struct cpp *cpp_new(struct context *ctx)
 	objpool_init(&cpp->file_pool, sizeof(struct cpp_file), FILE_POOL_BLOCK_SIZE);
 
 	list_init(&cpp->file_stack);
-	list_init(&cpp->tokens);
+	toklist_init(&cpp->tokens);
 
 	cpp_init_ifstack(cpp);
 
@@ -124,7 +119,8 @@ void cpp_delete(struct cpp *cpp)
 {
 	objpool_free(&cpp->macro_pool);
 	objpool_free(&cpp->file_pool);
-	list_free(&cpp->tokens);
+	list_free(&cpp->file_stack);
+	toklist_free(&cpp->tokens);
 
 	free(cpp);
 }
@@ -177,7 +173,7 @@ void cpp_error(struct cpp *cpp, char *fmt, ...)
 
 static void cpp_requeue_current(struct cpp *cpp)
 {
-	list_insert_first(&cpp->tokens, &cpp->token->list_node);
+	toklist_insert_first(&cpp->tokens, cpp->token);
 }
 
 
@@ -186,16 +182,16 @@ static void cpp_parse_macro_invocation(struct cpp *cpp)
 	assert(token_is_macro(cpp->token));
 
 	struct macro *macro;
-	struct list invocation;
-	struct list expansion;
+	struct toklist invocation;
+	struct toklist expansion;
 	unsigned parens_balance = 0;
 	bool args_ended = false;
 
 	macro = cpp->token->symbol->def->macro;
-	list_init(&invocation);
-	list_init(&expansion);
+	toklist_init(&invocation);
+	toklist_init(&expansion);
 
-	list_insert_last(&invocation, &cpp->token->list_node); /* macro name */
+	toklist_insert_last(&invocation, cpp->token); /* macro name */
 	cpp_next_token(cpp);
 
 	/*
@@ -215,7 +211,7 @@ static void cpp_parse_macro_invocation(struct cpp *cpp)
 					args_ended = true;
 			}
 
-			list_insert_last(&invocation, &cpp->token->list_node);
+			toklist_insert_last(&invocation, cpp->token);
 			cpp_next_token(cpp);
 
 			if (args_ended)
@@ -225,7 +221,7 @@ static void cpp_parse_macro_invocation(struct cpp *cpp)
 
 	macro_expand(cpp, &invocation, &expansion);
 	cpp_requeue_current(cpp);
-	list_prepend(&cpp->tokens, &expansion);
+	toklist_prepend(&cpp->tokens, &expansion);
 	cpp_next_token(cpp);
 }
 
@@ -255,14 +251,14 @@ static void cpp_parse(struct cpp *cpp)
 				cpp_next_token(cpp);
 
 				if (cpp->token->type == TOKEN_LPAREN) {
-					list_insert_first(&cpp->tokens, &cpp->token->list_node);
+					toklist_insert_first(&cpp->tokens, cpp->token);
 					cpp->token = macro_name;
 					cpp_parse_macro_invocation(cpp);
 				}
 				else {
 					macro_name->noexpand = true;
 					cpp->token = macro_name;
-					list_insert_first(&cpp->tokens, &cpp->token->list_node);
+					toklist_insert_first(&cpp->tokens, cpp->token);
 				}
 
 			}

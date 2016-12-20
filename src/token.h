@@ -68,14 +68,12 @@ char *token_get_spelling(struct token *token);
 bool token_is(struct token *token, enum token_type token_type);
 bool token_is_name(struct token *token);
 bool token_is_macro(struct token *token);
+bool token_is_macro_arg(struct token *token);
 bool token_is_eof(struct token *token);
 bool token_is_eol(struct token *token);
 bool token_is_eol_or_eof(struct token *token);
 
 void token_print(struct token *token, struct strbuf *buf);
 void token_dump(struct token *token, FILE *fout);
-
-void token_list_print(struct list *tokens, struct strbuf *buf);
-void token_list_dump(struct list *tokens, FILE *fout);
 
 #endif

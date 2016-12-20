@@ -1,9 +1,5 @@
-#include "common.h"
 #include "context.h"
 #include "cpp-internal.h"
-#include "lexer.h"
-#include "symbol.h"
-#include <assert.h>
 
 #define VA_ARGS_NAME	"__VA_ARGS__"
 
@@ -175,7 +171,7 @@ static void cpp_parse_macro_arglist(struct cpp *cpp, struct macro *macro)
 		if (cpp->token->type == TOKEN_ELLIPSIS)
 			cpp->token->symbol = symtab_search_or_insert(&cpp->ctx->symtab, VA_ARGS_NAME);
 
-		list_insert_last(&macro->args, &cpp->token->list_node);
+		toklist_insert_last(&macro->args, cpp->token);
 		expect_comma = true;
 		cpp_next_token(cpp);
 	}
@@ -218,7 +214,7 @@ static void cpp_parse_define(struct cpp *cpp)
 		}
 
 		while (!token_is_eol_or_eof(cpp->token)) {
-			list_insert_last(&macro->expansion, &cpp->token->list_node);
+			toklist_insert_last(&macro->expansion, cpp->token);
 			cpp_next_token(cpp);
 		}
 	}
