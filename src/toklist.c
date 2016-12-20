@@ -103,8 +103,6 @@ void toklist_copy(struct context *ctx, struct toklist *src, struct toklist *dst)
 	}
 
 	/* TODO handle errors */
-
-	assert(toklist_length(dst) == toklist_length(src));
 }
 
 

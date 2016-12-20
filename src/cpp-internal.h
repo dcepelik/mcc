@@ -11,6 +11,7 @@
 #include "toklist.h"
 #include <assert.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
 
 /*
@@ -112,6 +113,8 @@ struct macro
 
 void macro_init(struct macro *macro);
 void macro_free(struct macro *macro);
+
+bool macro_is_funclike(struct macro *macro);
 
 void macro_dump(struct macro *macro);
 
