@@ -124,7 +124,7 @@ void *list_remove(struct list *lst, struct list_node *node)
 	assert(pred != NULL);
 
 	pred->next = node->next;
-	node->next = NULL;
+	//node->next = NULL;
 
 	return node;
 }

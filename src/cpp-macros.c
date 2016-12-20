@@ -410,6 +410,11 @@ struct token *macro_expand_internal(struct cpp *cpp, struct toklist *in, struct 
 	toklist_init(&replaced_args);
 	macro_replace_args(cpp, &expansion, &replaced_args);
 
+	toklist_foreach(token, &replaced_args) {
+		if (token->type == TOKEN_PLACEMARKER)
+			toklist_remove(&replaced_args, token);
+	}
+
 	/*
 	 * Notice: symtab scope ended prior to recursive expansion.
 	 */
