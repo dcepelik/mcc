@@ -242,6 +242,7 @@ struct toklist macro_paste_do(struct cpp *cpp, struct token *a, struct token *b)
 	size_t num_tokens = 0;
 
 	toklist_init(&tokens);
+
 	if (a->type == TOKEN_PLACEMARKER) {
 		toklist_insert_first(&tokens, b);
 		return tokens;
@@ -257,10 +258,7 @@ struct toklist macro_paste_do(struct cpp *cpp, struct token *a, struct token *b)
 	strbuf_init(&buf, 32);
 	strbuf_printf(&buf, "%s%s", token_get_spelling(a), token_get_spelling(b));
 
-	DEBUG_PRINTF("strbuf is %s", strbuf_get_string(&buf));
-
 	inbuf_open_mem(&inbuf, strbuf_get_string(&buf), strbuf_strlen(&buf));
-
 	lexer_init(&lexer, cpp->ctx, &inbuf);
 
 	while ((token = lexer_next(&lexer))) {
@@ -274,7 +272,7 @@ struct toklist macro_paste_do(struct cpp *cpp, struct token *a, struct token *b)
 	assert(token->type == TOKEN_EOF);
 
 	if (num_tokens != 1)
-		DEBUG_PRINTF("pasting %s and %s does not give a valid preprocessing token",
+		DEBUG_PRINTF("pasting %s and %s does not yield single valid preprocessing token",
 			token_get_spelling(a), token_get_spelling(b));
 
 	lexer_free(&lexer);

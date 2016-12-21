@@ -1,1 +1,1 @@
-[ident] [_ident] [ident2] [void] "string" "string" "string" "string" "string" 'c' 12.7e+3 & &= -> * : , -- / /= . ... = == >= > # ## ++ { [ < && || ( < - -= % %= *= ~ != ! | |= + += ? } ] ) ; << <<= >> >>= ^ ^= <<EOF>>
+[ident] [_ident] [ident2] [void] "stringstringstringstringstring" 'c' 12.7e+3 & &= -> * : , -- / /= . ... = == >= > # ## ++ { [ < && || ( < - -= % %= *= ~ != ! | |= + += ? } ] ) ; << <<= >> >>= ^ ^= <<EOF>>

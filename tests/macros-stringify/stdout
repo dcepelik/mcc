@@ -1,17 +1,3 @@
-"this is a series of preprocessing tokens"
-"same but withwhitespace"
-"this \\\"macro\\\" contains a \\\"string\\\""
-"beware that \\\"strings\\\\tshould\\\\nbe   \\\\\\\"escaped\\\\\\\"\\\" specially"
-
-"2e+14"
-"\'\\\\n\'"
-"\'\\\\000\'"
-
-"11"
-
-"p = \\\"foo\\\\n\\\";"
-
-"# hello"
-"# x please"
+"this is a series of preprocessing tokenssame but withwhitespacethis \\\"macro\\\" contains a \\\"string\\\"beware that \\\"strings\\\\tshould\\\\nbe   \\\\\\\"escaped\\\\\\\"\\\" specially2e+14\'\\\\n\'\'\\\\000\'11p = \\\"foo\\\\n\\\";# hello# x please"
 
 <<EOF>>

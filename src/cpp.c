@@ -177,6 +177,21 @@ static void cpp_requeue_current(struct cpp *cpp)
 }
 
 
+struct token *cpp_peek(struct cpp *cpp)
+{
+	struct token *tmp;
+	struct token *peek;
+
+	tmp = cpp->token;
+	cpp_next_token(cpp);
+	peek = cpp->token;
+	cpp_requeue_current(cpp);
+	cpp->token = tmp;
+
+	return peek;
+}
+
+
 static void cpp_parse_macro_invocation(struct cpp *cpp)
 {
 	assert(token_is_macro(cpp->token));
@@ -232,6 +247,37 @@ static inline bool cpp_got_hash(struct cpp *cpp)
 }
 
 
+static void cpp_parse(struct cpp *cpp);
+struct token *cpp_next(struct cpp *cpp);
+
+
+static struct token *cpp_cat_stringles(struct cpp *cpp, struct toklist *stringles)
+{
+	struct token *strtoken;
+	struct strbuf str;
+	struct token *first;
+	struct token *last;
+
+	strbuf_init(&str, 128);
+
+	toklist_foreach(stringle, stringles)
+		strbuf_printf(&str, "%s", stringle->str);
+
+	first = toklist_first(stringles);
+	last = toklist_last(stringles);
+
+	strtoken = objpool_alloc(&cpp->ctx->token_pool);
+	strtoken->type = TOKEN_STRING;
+	strtoken->str = strbuf_copy_to_mempool(&str, &cpp->ctx->token_data);
+	strtoken->startloc = first->startloc;
+	strtoken->endloc = last->endloc;
+	strtoken->is_at_bol = first->is_at_bol;
+	strtoken->preceded_by_whitespace = first->preceded_by_whitespace;
+
+	return strtoken;
+}
+
+
 static void cpp_parse(struct cpp *cpp)
 {
 	while (!token_is_eof(cpp->token)) {
@@ -241,16 +287,13 @@ static void cpp_parse(struct cpp *cpp)
 			cpp_parse_directive(cpp);
 
 		}
-		else if (cpp->token->type == TOKEN_NAME
-			&& cpp->token->symbol->def->type == SYMBOL_TYPE_CPP_MACRO
-			&& !cpp->token->noexpand) {
-
+		else if (token_is_macro(cpp->token) && !cpp->token->noexpand) {
 			/* TODO no cpp_next_token(cpp) here */
-			if (cpp->token->symbol->def->macro->type == MACRO_TYPE_FUNCLIKE) {
+			if (macro_is_funclike(cpp->token->symbol->def->macro)) {
 				struct token *macro_name = cpp->token;
 				cpp_next_token(cpp);
 
-				if (cpp->token->type == TOKEN_LPAREN) {
+				if (token_is(cpp->token, TOKEN_LPAREN)) {
 					toklist_insert_first(&cpp->tokens, cpp->token);
 					cpp->token = macro_name;
 					cpp_parse_macro_invocation(cpp);
@@ -281,11 +324,24 @@ struct token *cpp_next(struct cpp *cpp)
 	assert(!list_is_empty(&cpp->file_stack));
 
 	struct token *tmp;
+	struct toklist stringles;
+
+	toklist_init(&stringles);
 
 again:
 	cpp_parse(cpp);
+	tmp = cpp->token;
 
-	if (token_is_eof(cpp->token)) {
+	if (token_is(cpp->token, TOKEN_STRING)) {
+		cpp_next_token(cpp);
+		toklist_insert_last(&stringles, tmp);
+		goto again;
+	}
+	else if (!toklist_is_empty(&stringles)) {
+		cpp_requeue_current(cpp);
+		tmp = cpp_cat_stringles(cpp, &stringles);
+	}
+	else if (token_is_eof(cpp->token)) {
 		if (list_length(&cpp->file_stack) == 1)
 			return cpp->token;
 
@@ -293,8 +349,12 @@ again:
 		cpp_next_token(cpp);
 		goto again;
 	}
+	else {
+		DEBUG_MSG("Token is:");
+		token_dump(cpp->token, stderr);
+	}
 
-	tmp = cpp->token;
+
 	cpp_next_token(cpp);
 	return tmp;
 }
