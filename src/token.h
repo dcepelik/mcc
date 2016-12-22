@@ -9,11 +9,11 @@
 
 enum token_type
 {
-	/* pp-token categories (except punctuators) */
+	/* preprocessing tokens (see 6.4 Lexical categories) */
 	TOKEN_CHAR_CONST, TOKEN_HEADER_HNAME, TOKEN_HEADER_QNAME, TOKEN_NAME,
-	TOKEN_NUMBER, TOKEN_STRING, TOKEN_OTHER, TOKEN_PLACEMARKER,
+	TOKEN_NUMBER, TOKEN_STRING, TOKEN_OTHER,
 
-	/* punctuators */
+	/* punctuators (see 6.4.6 Punctuators) */
 	TOKEN_AMPERSAND, TOKEN_AND_EQ, TOKEN_ARROW, TOKEN_ASTERISK, TOKEN_COLON,
 	TOKEN_COMMA, TOKEN_DEC, TOKEN_DIV, TOKEN_DIV_EQ, TOKEN_DOT,
 	TOKEN_ELLIPSIS, TOKEN_EQ, TOKEN_EQ_EQ, TOKEN_GE, TOKEN_GT, TOKEN_HASH,
@@ -26,7 +26,7 @@ enum token_type
 	TOKEN_SHR_EQ, TOKEN_XOR, TOKEN_XOR_EQ,
 
 	/* internal markers */
-	TOKEN_EOF, TOKEN_EOL
+	TOKEN_EOF, TOKEN_EOL, TOKEN_PLACEMARKER
 };
 
 struct location

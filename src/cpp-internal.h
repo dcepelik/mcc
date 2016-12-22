@@ -28,8 +28,8 @@ struct cpp
 
 	struct list file_stack;		/* stack of open files */
 	struct toklist tokens;		/* token queue */
-	struct token *token;		/* last popped token */
-	struct list ifs;		/* if directive control stack */
+	struct token *token;		/* most recent token */
+	struct list ifs;		/* if-directive control stack */
 };
 
 void cpp_dump_toklist(struct list *lst, FILE *fout);
@@ -100,6 +100,20 @@ enum macro_type
 };
 
 /*
+ * C preprocessor macro flags.
+ */
+enum macro_flags
+{
+	MACRO_FLAGS_FUNCLIKE	= 1 << 0,
+	MACRO_FLAGS_VARIADIC	= 1 << 1,
+	MACRO_FLAGS_BUILTIN	= 1 << 2,
+	MACRO_FLAGS_HANDLED	= 1 << 3,
+};
+
+struct macro;
+typedef void (macro_handler_t)(struct cpp *cpp, struct macro *macro, struct toklist *out);
+
+/*
  * C preprocessor macro.
  */
 struct macro
@@ -107,18 +121,20 @@ struct macro
 	char *name;			/* name of the macro */
 	struct toklist args;		/* argument list */
 	struct toklist expansion;	/* expansion list */
+	macro_handler_t *handler;	/* handler (optional, rare) */
 	enum macro_type type;		/* type of the macro */
 	bool is_expanding;		/* is this macro being expanded? */
+	enum macro_flags flags;
 };
 
 void macro_init(struct macro *macro);
+void macro_init_parse(struct macro *macro, char *input);
 void macro_free(struct macro *macro);
 
-bool macro_is_funclike(struct macro *macro);
-
-void macro_dump(struct macro *macro);
-
 void macro_expand(struct cpp *file, struct toklist *invocation, struct toklist *expansion);
+
+bool macro_is_funclike(struct macro *macro);
+void macro_dump(struct macro *macro);
 
 /*
  * C preprocessor macro argument.

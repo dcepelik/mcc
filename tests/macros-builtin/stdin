@@ -1,0 +1,4 @@
+Its __TIME__ of __DATE__
+__STDC__
+__FILE__
+__LINE__

@@ -1,6 +1,8 @@
 /*
  * TODO add #pragma and #line support
  * TODO cexpr support in if conditionals
+ * TODO predefined macros
+ * TODO directive ends when EOL is met x function-like macro invocation
  */
 
 #include "cpp-internal.h"
@@ -8,6 +10,7 @@
 #include "debug.h"
 #include "inbuf.h"
 #include "lexer.h"
+#include <time.h>
 
 #define FILE_POOL_BLOCK_SIZE	16
 #define MACRO_POOL_BLOCK_SIZE	32
@@ -17,7 +20,8 @@
 static const struct {
 	char *name;
 	enum cpp_directive directive;
-} directives[] = {
+}
+directives[] = {
 	{ .name = "if", .directive = CPP_DIRECTIVE_IF },
 	{ .name = "ifdef", .directive = CPP_DIRECTIVE_IFDEF },
 	{ .name = "ifndef", .directive = CPP_DIRECTIVE_IFNDEF },
@@ -33,48 +37,112 @@ static const struct {
 };
 
 
+/*
+ * Setup CPP directives. See 6.10 Preprocessing directives.
+ */
 static void cpp_setup_symtab_directives(struct symtab *table)
 {
 	struct symbol *symbol;
-	struct symdef *symdef;
+	struct symdef *def;
 	size_t i;
 
 	for (i = 0; i < ARRAY_SIZE(directives); i++) {
 		symbol = symtab_insert(table, directives[i].name);
 
-		symdef = symbol_define(table, symbol);
-		symdef->type = SYMBOL_TYPE_CPP_DIRECTIVE;
-		symdef->directive = directives[i].directive;
-		symdef->symbol = symbol;
+		def = symbol_define(table, symbol);
+		def->type = SYMBOL_TYPE_CPP_DIRECTIVE;
+		def->directive = directives[i].directive;
 	}
 }
 
 
-static void cpp_setup_symtab_builtins(struct symtab *table)
+static void cpp_setup_builtin_handled(struct cpp *cpp, char *name, macro_handler_t *handler)
 {
 	struct symbol *symbol;
-	struct symdef *symdef;
-	size_t i;
+	struct symdef *def;
 
-	char *builtins[] = {
-		"__""LINE__", // TODO better way to escape this?
-		"__""FILE__",
-		"__""TIME__"
-	};
+	symbol = symtab_search_or_insert(&cpp->ctx->symtab, name);
 
-	for (i = 0; i < ARRAY_SIZE(builtins); i++) {
-		symbol = symtab_insert(table, builtins[i]);
+	def = symbol_define(&cpp->ctx->symtab, symbol);
+	def->type = SYMBOL_TYPE_CPP_MACRO;
 
-		symdef = symbol_define(table, symbol);
-		symdef->type = SYMBOL_TYPE_CPP_BUILTIN;
-	}
+	macro_init(&def->macro);
+	def->macro.flags = MACRO_FLAGS_BUILTIN | MACRO_FLAGS_HANDLED;
+	def->macro.handler = handler;
 }
 
 
-static void cpp_setup_symtab(struct symtab *table)
+/*
+ * Setup CPP built-in macro.
+ */
+static void cpp_setup_builtin(struct cpp *cpp, char *name, char *fmt, ...)
 {
-	cpp_setup_symtab_directives(table);
-	cpp_setup_symtab_builtins(table);
+	struct symbol *symbol;
+	struct symdef *def;
+	struct strbuf str;
+	va_list args;
+
+	symbol = symtab_search_or_insert(&cpp->ctx->symtab, name);
+
+	strbuf_init(&str, 16);
+	va_start(args, fmt);
+	strbuf_vprintf_at(&str, 0, fmt, args);
+	va_end(args);
+	
+	def = symbol_define(&cpp->ctx->symtab, symbol);
+	def->type = SYMBOL_TYPE_CPP_MACRO;
+
+	macro_init(&def->macro);
+	def->macro.flags = MACRO_FLAGS_BUILTIN;
+	toklist_load_from_strbuf(&def->macro.expansion, cpp->ctx, &str);
+
+	strbuf_free(&str);
+}
+
+
+static void cpp_builtin_file(struct cpp *cpp, struct macro *macro, struct toklist *out)
+{
+	toklist_load_from_string(out, cpp->ctx, "\"%s\"", "some-file.c");
+}
+
+
+static void cpp_builtin_line(struct cpp *cpp, struct macro *macro, struct toklist *out)
+{
+	toklist_load_from_string(out, cpp->ctx, "%lu", 128);
+}
+
+
+/*
+ * Setup CPP built-ins. See 6.10.8 Predefined macros.
+ */
+static void cpp_setup_symtab_builtins(struct cpp *cpp)
+{
+	time_t rawtime;
+	struct tm *timeinfo;
+	char timestr[32];
+
+	time(&rawtime);
+	timeinfo = localtime(&rawtime);
+
+	strftime(timestr, sizeof(timestr), "\"%T\"", timeinfo);
+	cpp_setup_builtin(cpp, "__TIME__", timestr);
+
+	strftime(timestr, sizeof(timestr), "\"%b %e %Y\"", timeinfo); /* TODO shall be non-localized */
+	cpp_setup_builtin(cpp, "__DATE__", timestr);
+
+	cpp_setup_builtin(cpp, "__STDC__", "1");
+	cpp_setup_builtin(cpp, "__STDC_VERSION__", "201102L"); /* TODO check */
+	cpp_setup_builtin(cpp, "__STDC_HOSTED__", "0");
+
+	cpp_setup_builtin_handled(cpp, "__FILE__", cpp_builtin_file);
+	cpp_setup_builtin_handled(cpp, "__LINE__", cpp_builtin_line);
+}
+
+
+static void cpp_setup_symtab(struct cpp *cpp)
+{
+	cpp_setup_symtab_directives(&cpp->ctx->symtab);
+	cpp_setup_symtab_builtins(cpp);
 }
 
 
@@ -109,7 +177,7 @@ struct cpp *cpp_new(struct context *ctx)
 
 	cpp_init_ifstack(cpp);
 
-	cpp_setup_symtab(&cpp->ctx->symtab);
+	cpp_setup_symtab(cpp);
 
 	return cpp;
 }
@@ -202,7 +270,7 @@ static void cpp_parse_macro_invocation(struct cpp *cpp)
 	unsigned parens_balance = 0;
 	bool args_ended = false;
 
-	macro = cpp->token->symbol->def->macro;
+	macro = &cpp->token->symbol->def->macro;
 	toklist_init(&invocation);
 	toklist_init(&expansion);
 
@@ -289,7 +357,7 @@ static void cpp_parse(struct cpp *cpp)
 		}
 		else if (token_is_macro(cpp->token) && !cpp->token->noexpand) {
 			/* TODO no cpp_next_token(cpp) here */
-			if (macro_is_funclike(cpp->token->symbol->def->macro)) {
+			if (macro_is_funclike(&cpp->token->symbol->def->macro)) {
 				struct token *macro_name = cpp->token;
 				cpp_next_token(cpp);
 
@@ -349,11 +417,6 @@ again:
 		cpp_next_token(cpp);
 		goto again;
 	}
-	else {
-		DEBUG_MSG("Token is:");
-		token_dump(cpp->token, stderr);
-	}
-
 
 	cpp_next_token(cpp);
 	return tmp;

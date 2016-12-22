@@ -44,7 +44,6 @@ void symtab_dump(struct symtab *table, FILE *fout);
 
 enum symbol_type
 {
-	SYMBOL_TYPE_CPP_BUILTIN,	/* C preprocessor's built-in macro */
 	SYMBOL_TYPE_CPP_DIRECTIVE,	/* C preprocessor directive */
 	SYMBOL_TYPE_CPP_MACRO,		/* C preprocessor macro */
 	SYMBOL_TYPE_CPP_MACRO_ARG,	/* C preprocessor's macro argument */
@@ -71,7 +70,7 @@ struct symdef
 	enum symbol_type type;
 	union {
 		enum cpp_directive directive;
-		struct macro *macro;
+		struct macro macro;
 		struct macro_arg macro_arg;
 	};
 };

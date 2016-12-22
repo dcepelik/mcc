@@ -1,4 +1,5 @@
 #include "toklist.h"
+#include "inbuf.h"
 #include "context.h"
 
 
@@ -131,4 +132,41 @@ void toklist_dump(struct toklist *tokens, FILE *fout)
 	toklist_print(tokens, &buf);
 	fprintf(fout, "%s\n", strbuf_get_string(&buf));
 	strbuf_free(&buf);
+}
+
+
+void toklist_load_from_strbuf(struct toklist *lst, struct context *ctx, struct strbuf *str)
+{
+	struct inbuf inbuf;
+	struct lexer lexer;
+	struct token *token;
+
+	inbuf_open_mem(&inbuf, strbuf_get_string(str), strbuf_strlen(str));
+	lexer_init(&lexer, ctx, &inbuf);
+
+	while ((token = lexer_next(&lexer))) {
+		if (token->type == TOKEN_EOF)
+			break;
+
+		toklist_insert_last(lst, token);
+	}
+
+	lexer_free(&lexer);
+	inbuf_close(&inbuf);
+}
+
+
+void toklist_load_from_string(struct toklist *lst, struct context *ctx, char *fmt, ...)
+{
+	va_list args;
+	struct strbuf str;
+
+	va_start(args, fmt);
+	strbuf_init(&str, 128);
+	strbuf_vprintf_at(&str, 0, fmt, args);
+	va_end(args);
+
+	toklist_load_from_strbuf(lst, ctx, &str);
+
+	strbuf_free(&str);
 }

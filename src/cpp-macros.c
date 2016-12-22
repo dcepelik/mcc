@@ -9,9 +9,11 @@
 
 void macro_init(struct macro *macro)
 {
+	macro->name = NULL;
 	toklist_init(&macro->args);
 	toklist_init(&macro->expansion);
 	macro->is_expanding = false;
+	macro->flags = 0;
 }
 
 
@@ -25,6 +27,24 @@ void macro_free(struct macro *macro)
 bool macro_is_funclike(struct macro *macro)
 {
 	return macro->type == MACRO_TYPE_FUNCLIKE;
+}
+
+
+static inline bool token_is_expandable_macro(struct token *token)
+{
+	struct macro *macro;
+	struct token *peek;
+
+	if (!token_is_macro(token) || token->noexpand)
+		return false;
+
+	macro = &token->symbol->def->macro;
+
+	peek = toklist_next(token);
+	if (macro_is_funclike(macro) && (!peek || !token_is(peek, TOKEN_LPAREN)))
+		return false;
+
+	return true;
 }
 
 
@@ -48,24 +68,6 @@ static void macro_print(struct macro *macro, struct strbuf *buf)
 		token_print(repl, buf);
 		strbuf_putc(buf, ' ');
 	}
-}
-
-
-static inline bool token_is_expandable_macro(struct token *token)
-{
-	struct macro *macro;
-	struct token *peek;
-
-	if (!token_is_macro(token) || token->noexpand)
-		return false;
-
-	macro = token->symbol->def->macro;
-
-	peek = toklist_next(token);
-	if (macro_is_funclike(macro) && (!peek || !token_is(peek, TOKEN_LPAREN)))
-		return false;
-
-	return true;
 }
 
 
@@ -120,8 +122,8 @@ static struct token *cpp_stringify(struct cpp *cpp, struct token *token)
 }
 
 
-struct token *macro_expand_internal(struct cpp *cpp, struct toklist *in, struct toklist *out);
-void macro_expand_recursive(struct cpp *cpp, struct toklist *in, struct toklist *out);
+static struct token *macro_expand_internal(struct cpp *cpp, struct toklist *in, struct toklist *out);
+static void macro_expand_rescan(struct cpp *cpp, struct toklist *in, struct toklist *out);
 
 
 /*
@@ -182,7 +184,7 @@ static struct token *macro_parse_args(struct cpp *cpp, struct macro *macro, stru
 		toklist_copy(cpp->ctx, &args, &def->macro_arg.tokens);
 
 		toklist_init(&def->macro_arg.expansion);
-		macro_expand_recursive(cpp, &args, &def->macro_arg.expansion);
+		macro_expand_rescan(cpp, &args, &def->macro_arg.expansion);
 
 		def->type = SYMBOL_TYPE_CPP_MACRO_ARG;
 
@@ -195,7 +197,7 @@ static struct token *macro_parse_args(struct cpp *cpp, struct macro *macro, stru
 }
 
 
-void macro_expand_recursive(struct cpp *cpp, struct toklist *in, struct toklist *out)
+static void macro_expand_rescan(struct cpp *cpp, struct toklist *in, struct toklist *out)
 {
 	struct token *token;
 	struct token *end;
@@ -207,7 +209,7 @@ void macro_expand_recursive(struct cpp *cpp, struct toklist *in, struct toklist 
 			continue;
 		}
 
-		if (token->symbol->def->macro->is_expanding) {
+		if (token->symbol->def->macro.is_expanding) {
 			token->noexpand = true;
 			toklist_insert_last(out, toklist_remove_first(in));
 			continue;
@@ -221,7 +223,7 @@ void macro_expand_recursive(struct cpp *cpp, struct toklist *in, struct toklist 
 }
 
 
-struct token *new_placemarker(struct cpp *cpp)
+static struct token *new_placemarker(struct cpp *cpp)
 {
 	struct token *token;
 
@@ -232,7 +234,7 @@ struct token *new_placemarker(struct cpp *cpp)
 }
 
 
-struct toklist macro_paste_do(struct cpp *cpp, struct token *a, struct token *b)
+static struct toklist macro_paste_do(struct cpp *cpp, struct token *a, struct token *b)
 {
 	struct strbuf buf;
 	struct inbuf inbuf;
@@ -380,7 +382,7 @@ static void macro_replace_args(struct cpp *cpp, struct toklist *in, struct tokli
 }
 
 
-struct token *macro_expand_internal(struct cpp *cpp, struct toklist *in, struct toklist *out)
+static struct token *macro_expand_internal(struct cpp *cpp, struct toklist *in, struct toklist *out)
 {
 	struct macro *macro;
 	struct token *token;
@@ -391,9 +393,24 @@ struct token *macro_expand_internal(struct cpp *cpp, struct toklist *in, struct 
 	token = toklist_first(in);
 
 	assert(token_is_expandable_macro(token));
-	macro = token->symbol->def->macro;
+	macro = &token->symbol->def->macro;
+
+	toklist_init(&expansion);
+	toklist_init(&replaced_args);
 
 	assert(!macro->is_expanding);
+
+	if (macro->flags & MACRO_FLAGS_HANDLED) {
+		/*
+		 * Temporary assert. Right now, we're only using handled
+		 * macros to implement CPP built-ins, all of which are
+		 * object-like.
+		 */
+		assert(!macro_is_funclike(macro));
+
+		macro->handler(cpp, macro, out);
+		return token;
+	}
 
 	symtab_scope_begin(&cpp->ctx->symtab);
 
@@ -402,10 +419,7 @@ struct token *macro_expand_internal(struct cpp *cpp, struct toklist *in, struct 
 	else
 		end = token;
 
-	toklist_init(&expansion);
 	toklist_copy(cpp->ctx, &macro->expansion, &expansion);
-
-	toklist_init(&replaced_args);
 	macro_replace_args(cpp, &expansion, &replaced_args);
 
 	toklist_foreach(token, &replaced_args) {
@@ -419,7 +433,7 @@ struct token *macro_expand_internal(struct cpp *cpp, struct toklist *in, struct 
 	symtab_scope_end(&cpp->ctx->symtab);
 
 	macro->is_expanding = true;
-	macro_expand_recursive(cpp, &replaced_args, out);
+	macro_expand_rescan(cpp, &replaced_args, out);
 	macro->is_expanding = false;
 
 	return end;

@@ -184,7 +184,6 @@ static void cpp_parse_macro_arglist(struct cpp *cpp, struct macro *macro)
 static void cpp_parse_define(struct cpp *cpp)
 {
 	struct symdef *symdef;
-	struct macro *macro;
 
 	if (!cpp_expect(cpp, TOKEN_NAME)) {
 		cpp_skip_till_eol(cpp);
@@ -192,29 +191,27 @@ static void cpp_parse_define(struct cpp *cpp)
 	}
 
 	if (!cpp_skipping(cpp)) {
-		macro = objpool_alloc(&cpp->macro_pool);
-		macro_init(macro);
-		macro->name = symbol_get_name(cpp->token->symbol);
-
 		symdef = symbol_define(&cpp->ctx->symtab, cpp->token->symbol);
 		symdef->type = SYMBOL_TYPE_CPP_MACRO;
-		symdef->macro = macro;
+
+		macro_init(&symdef->macro);
+		symdef->macro.name = symbol_get_name(cpp->token->symbol);
 
 		cpp_next_token(cpp);
 
 		if (cpp->token->type == TOKEN_LPAREN && !cpp->token->preceded_by_whitespace) {
 			cpp_next_token(cpp);
-			cpp_parse_macro_arglist(cpp, macro);
-			macro->type = MACRO_TYPE_FUNCLIKE;
+			cpp_parse_macro_arglist(cpp, &symdef->macro);
+			symdef->macro.type = MACRO_TYPE_FUNCLIKE;
 			//macro_dump(macro);
 		}
 		else {
-			macro->type = MACRO_TYPE_OBJLIKE;
+			symdef->macro.type = MACRO_TYPE_OBJLIKE;
 			//macro_dump(macro);
 		}
 
 		while (!token_is_eol_or_eof(cpp->token)) {
-			toklist_insert_last(&macro->expansion, cpp->token);
+			toklist_insert_last(&symdef->macro.expansion, cpp->token);
 			cpp_next_token(cpp);
 		}
 	}
@@ -317,6 +314,9 @@ void cpp_parse_directive(struct cpp *cpp)
 	enum cpp_directive dir;
 	bool skipping;
 	bool test_cond;
+
+	if (token_is(cpp->token, TOKEN_EOL))
+		return; /* null directive */
 
 	if (!cpp_expect_directive(cpp)) {
 		cpp_skip_till_eol(cpp);

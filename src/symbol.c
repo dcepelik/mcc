@@ -150,9 +150,6 @@ const char *symbol_type_to_string(enum symbol_type type)
 	case SYMBOL_TYPE_CPP_MACRO_ARG:
 		return "CPP macro arg";
 	
-	case SYMBOL_TYPE_CPP_BUILTIN:
-		return "CPP built-in macro";
-
 	case SYMBOL_TYPE_CPP_DIRECTIVE:
 		return "CPP directive";
 	}
@@ -243,11 +240,11 @@ void symtab_dump(struct symtab *table, FILE *fout)
 				symbol_type_to_string(def->type));
 
 			if (def->type == SYMBOL_TYPE_CPP_MACRO) {
-				if (def->macro->is_expanding) {
+				if (def->macro.is_expanding) {
 					fprintf(fout, "(expanding)");
 					fputc('\t', fout);
 				}
-				toklist_dump(&def->macro->expansion, fout);
+				toklist_dump(&def->macro.expansion, fout);
 
 			}
 			else {
