@@ -27,6 +27,18 @@ static const char simple_escape_seq[256] = {
 	['\?'] = '\?',
 };
 
+static const char trigraph[256] = {
+	['='] = '#',
+	['('] = '[',
+	['/'] = '\\',
+	[')'] = ']',
+	['\''] = '^',
+	['<'] = '{',
+	['!'] = '|',
+	['>'] = '}',
+	['-'] = '~',
+};
+
 
 mcc_error_t lexer_init(struct lexer *lexer, struct context *ctx, struct inbuf *inbuf)
 {
@@ -483,17 +495,47 @@ struct token *lexer_lex_header_qname(struct lexer *lexer, struct token *token)
 
 
 /*
- * TODO Add trigraph support.
  * TODO Refactor, don't use mcc_error_t to signalize EOF
  */
 static mcc_error_t lexer_read_line(struct lexer *lexer)
 {
 	int c;
 	bool escape = false;
+	size_t num_qmarks = 0;	/* number of consecutive question-marks '?' */
 
 	strbuf_reset(&lexer->linebuf);
 
-	for (lexer->location.column_no = 0; (c = inbuf_get_char(lexer->inbuf)) != INBUF_EOF; lexer->location.column_no++) {
+	while ((c = inbuf_get_char(lexer->inbuf)) != INBUF_EOF) {
+		/* basically Aho-Corasick matcher for trigraph sequences */
+		if (num_qmarks == 2) {
+			if (!trigraph[c]) {
+				if (c == '?') {
+					strbuf_putc(&lexer->linebuf, '?');
+					continue;
+				}
+
+				strbuf_printf(&lexer->linebuf, "??");
+				num_qmarks = 0;
+			}
+			else {
+				c = trigraph[c];
+				num_qmarks = 0;
+			}
+		}
+
+		if (c == '?') {
+			num_qmarks++;
+			continue;
+		}
+		else {
+			if (num_qmarks > 0) {
+				assert(num_qmarks == 1);
+				strbuf_printf(&lexer->linebuf, "?");
+			}
+
+			num_qmarks = 0;
+		}
+
 		switch (c) {
 		case ' ':
 		case '\t':

@@ -114,9 +114,8 @@ struct macro
 	struct toklist args;		/* argument list */
 	struct toklist expansion;	/* expansion list */
 	macro_handler_t *handler;	/* handler (optional, rare) */
-	//enum macro_type type;		/* type of the macro */
 	bool is_expanding;		/* is this macro being expanded? */
-	enum macro_flags flags;
+	enum macro_flags flags;		/* see enum macro_flags */
 };
 
 void macro_init(struct macro *macro);
