@@ -1,7 +1,6 @@
 /*
  * TODO add #pragma and #line support
  * TODO cexpr support in if conditionals
- * TODO predefined macros
  * TODO directive ends when EOL is met x function-like macro invocation
  */
 
@@ -284,7 +283,7 @@ static void cpp_parse_macro_invocation(struct cpp *cpp)
 	 * This is to avoid duplication of the arglist parsing logic contained
 	 * in the macro module.
 	 */
-	if (macro->type == MACRO_TYPE_FUNCLIKE && token_is(cpp->token, TOKEN_LPAREN)) {
+	if (macro->flags & MACRO_FLAGS_FUNCLIKE && token_is(cpp->token, TOKEN_LPAREN)) {
 		while (!token_is_eof(cpp->token)) {
 			if (token_is(cpp->token, TOKEN_LPAREN)) {
 				parens_balance++;

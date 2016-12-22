@@ -91,23 +91,15 @@ void cpp_init_ifstack(struct cpp *cpp);
 
 
 /*
- * C preprocessor macro type.
- */
-enum macro_type
-{
-	MACRO_TYPE_OBJLIKE,	/* an object-like macro */
-	MACRO_TYPE_FUNCLIKE,	/* a function-like macro */
-};
-
-/*
  * C preprocessor macro flags.
  */
 enum macro_flags
 {
 	MACRO_FLAGS_FUNCLIKE	= 1 << 0,
-	MACRO_FLAGS_VARIADIC	= 1 << 1,
-	MACRO_FLAGS_BUILTIN	= 1 << 2,
-	MACRO_FLAGS_HANDLED	= 1 << 3,
+	MACRO_FLAGS_OBJLIKE	= 1 << 1,
+	MACRO_FLAGS_VARIADIC	= 1 << 2,
+	MACRO_FLAGS_BUILTIN	= 1 << 3,
+	MACRO_FLAGS_HANDLED	= 1 << 4,
 };
 
 struct macro;
@@ -122,7 +114,7 @@ struct macro
 	struct toklist args;		/* argument list */
 	struct toklist expansion;	/* expansion list */
 	macro_handler_t *handler;	/* handler (optional, rare) */
-	enum macro_type type;		/* type of the macro */
+	//enum macro_type type;		/* type of the macro */
 	bool is_expanding;		/* is this macro being expanded? */
 	enum macro_flags flags;
 };

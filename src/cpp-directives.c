@@ -202,11 +202,11 @@ static void cpp_parse_define(struct cpp *cpp)
 		if (cpp->token->type == TOKEN_LPAREN && !cpp->token->preceded_by_whitespace) {
 			cpp_next_token(cpp);
 			cpp_parse_macro_arglist(cpp, &symdef->macro);
-			symdef->macro.type = MACRO_TYPE_FUNCLIKE;
+			symdef->macro.flags = MACRO_FLAGS_FUNCLIKE;
 			//macro_dump(macro);
 		}
 		else {
-			symdef->macro.type = MACRO_TYPE_OBJLIKE;
+			symdef->macro.flags = MACRO_FLAGS_OBJLIKE;
 			//macro_dump(macro);
 		}
 

@@ -26,7 +26,7 @@ void macro_free(struct macro *macro)
 
 bool macro_is_funclike(struct macro *macro)
 {
-	return macro->type == MACRO_TYPE_FUNCLIKE;
+	return macro->flags & MACRO_FLAGS_FUNCLIKE;
 }
 
 
