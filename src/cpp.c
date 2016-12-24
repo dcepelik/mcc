@@ -318,24 +318,28 @@ static void cpp_parse(struct cpp *cpp);
 struct token *cpp_next(struct cpp *cpp);
 
 
-static struct token *cpp_cat_stringles(struct cpp *cpp, struct toklist *stringles)
+static struct token *cpp_cat_literals(struct cpp *cpp, struct toklist *literals)
 {
 	struct token *strtoken;
 	struct strbuf str;
 	struct token *first;
 	struct token *last;
+	size_t len_total = 0;
 
 	strbuf_init(&str, 128);
 
-	toklist_foreach(stringle, stringles)
-		strbuf_printf(&str, "%s", stringle->str);
+	toklist_foreach(literal, literals) {
+		strbuf_printf(&str, "%s", literal->lstr.str);
+		len_total += literal->lstr.len;
+	}
 
-	first = toklist_first(stringles);
-	last = toklist_last(stringles);
+	first = toklist_first(literals);
+	last = toklist_last(literals);
 
 	strtoken = objpool_alloc(&cpp->ctx->token_pool);
-	strtoken->type = TOKEN_STRING;
-	strtoken->str = strbuf_copy_to_mempool(&str, &cpp->ctx->token_data);
+	strtoken->type = TOKEN_STRING_LITERAL;
+	strtoken->lstr.str = strbuf_copy_to_mempool(&str, &cpp->ctx->token_data);
+	strtoken->lstr.len = strbuf_strlen(&str);
 	strtoken->startloc = first->startloc;
 	strtoken->endloc = last->endloc;
 	strtoken->is_at_bol = first->is_at_bol;
@@ -399,14 +403,14 @@ again:
 	cpp_parse(cpp);
 	tmp = cpp->token;
 
-	if (token_is(cpp->token, TOKEN_STRING)) {
+	if (token_is(cpp->token, TOKEN_STRING_LITERAL)) {
 		cpp_next_token(cpp);
 		toklist_insert_last(&stringles, tmp);
 		goto again;
 	}
 	else if (!toklist_is_empty(&stringles)) {
 		cpp_requeue_current(cpp);
-		tmp = cpp_cat_stringles(cpp, &stringles);
+		tmp = cpp_cat_literals(cpp, &stringles);
 	}
 	else if (token_is_eof(cpp->token)) {
 		if (list_length(&cpp->file_stack) == 1)

@@ -72,7 +72,7 @@ void print_char_stringify(char c, struct strbuf *buf)
 }
 
 
-void print_string(char *str, struct strbuf *buf)
+void print_string(utf8_t *str, struct strbuf *buf)
 {
 	char c;
 	size_t i = 0;

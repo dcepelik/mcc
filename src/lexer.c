@@ -13,6 +13,7 @@
 
 static struct token eof = { .type = TOKEN_EOF };
 
+
 static const char simple_escape_seq[256] = {
 	['a'] = '\a',
 	['b'] = '\b',
@@ -27,6 +28,10 @@ static const char simple_escape_seq[256] = {
 	['\?'] = '\?',
 };
 
+
+/*
+ * See 5.2.1.1 Trigraph sequences
+ */
 static const char trigraph[256] = {
 	['='] = '#',
 	['('] = '[',
@@ -144,7 +149,7 @@ static inline char *lexer_spelling_end(struct lexer *lexer)
 }
 
 
-inline static bool is_letter(int c)
+inline static bool is_ascii_letter(int c)
 {
 	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
 }
@@ -294,7 +299,7 @@ static struct token *lexer_lex_name(struct lexer *lexer, struct token *token)
 {
 	strbuf_reset(&lexer->strbuf);
 
-	while (is_letter(*lexer->c)
+	while (is_ascii_letter(*lexer->c)
 		|| is_digit(*lexer->c)
 		|| *lexer->c == '_'
 		|| *lexer->c == '\\') {
@@ -383,7 +388,7 @@ struct token *lexer_lex_pp_number(struct lexer *lexer, struct token *token)
 			lexer->c++;
 			continue;
 		}
-		else if (!is_digit(*lexer->c) && !is_letter(*lexer->c) && *lexer->c != '.' && *lexer->c != '_') {
+		else if (!is_digit(*lexer->c) && !is_ascii_letter(*lexer->c) && *lexer->c != '.' && *lexer->c != '_') {
 			break;
 		}
 
@@ -395,24 +400,21 @@ struct token *lexer_lex_pp_number(struct lexer *lexer, struct token *token)
 	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->ctx->token_data);
 	token->spelling = lexer_spelling_end(lexer);
 
-	if (!token->str)
-		return NULL;
-
 	return token;
 }
 
 
-struct token *lexer_lex_string(struct lexer *lexer, struct token *token)
+struct token *lexer_lex_string_literal(struct lexer *lexer, struct token *token)
 {
-	bool seen_delimiter = false;
+	bool seen_delim = false;
 	size_t i;
 
 	strbuf_reset(&lexer->strbuf);
 	assert(lexer->c[-1] == '\"');
 
-	for (i = 0; *lexer->c != '\0'; i++) {
+	for (i = 0; !lexer_is_eol(lexer); i++) {
 		if (*lexer->c == '\"') {
-			seen_delimiter = true;
+			seen_delim = true;
 			lexer->c++;
 			break;
 		}
@@ -427,15 +429,13 @@ struct token *lexer_lex_string(struct lexer *lexer, struct token *token)
 		}
 	}
 
-	if (!seen_delimiter)
+	if (!seen_delim)
 		lexer_error(lexer, "missing the final \"");
 
-	token->type = TOKEN_STRING;
-	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->ctx->token_data);
+	token->type = TOKEN_STRING_LITERAL;
+	token->lstr.str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->ctx->token_data);
+	token->lstr.len = strbuf_strlen(&lexer->strbuf);
 	token->spelling = lexer_spelling_end(lexer);
-
-	if (!token->str)
-		return NULL;
 
 	return token;
 }
@@ -470,9 +470,6 @@ struct token *lexer_lex_header_name(struct lexer *lexer, struct token *token,
 
 	token->str = strbuf_copy_to_mempool(&lexer->strbuf, &lexer->ctx->token_data);
 	token->spelling = lexer_spelling_end(lexer);
-
-	if (!token->str)
-		return NULL;
 
 	return token;
 }
@@ -686,7 +683,7 @@ next_nonwhite_char:
 		/* u8"string" */
 		if (*lexer->c == '8' && lexer->c[1] == '\"') {
 			lexer->c += 2;
-			return lexer_lex_string(lexer, token);
+			return lexer_lex_string_literal(lexer, token);
 		}
 
 	case 'U':
@@ -700,7 +697,7 @@ next_nonwhite_char:
 		/* L"string" or U"string" or u"string" */
 		if (*lexer->c == '\"') {
 			lexer->c++;
-			return lexer_lex_string(lexer, token);
+			return lexer_lex_string_literal(lexer, token);
 		}
 
 	case '_': case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
@@ -718,7 +715,7 @@ next_nonwhite_char:
 		if (lexer->inside_include)
 			return lexer_lex_header_qname(lexer, token);
 		else
-			return lexer_lex_string(lexer, token);
+			return lexer_lex_string_literal(lexer, token);
 
 	case '\'':
 		return lexer_lex_char(lexer, token);

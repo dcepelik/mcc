@@ -275,6 +275,10 @@ static void cpp_parse_include(struct cpp *cpp)
 		goto out;
 	}
 
+	/*
+	 * TODO Disallow presence of NULs in header names.
+	 */
+
 	filename = cpp->token->str;
 	strbuf_init(&pathbuf, 128);
 	file = objpool_alloc(&cpp->file_pool);

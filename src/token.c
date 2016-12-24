@@ -57,10 +57,10 @@ const char *token_names[] = {
 	[TOKEN_SHL_EQ] = "<<=",
 	[TOKEN_SHR] = ">>",
 	[TOKEN_SHR_EQ] = ">>=",
-	[TOKEN_STRING] = "string",
+	[TOKEN_STRING_LITERAL] = "string",
 	[TOKEN_XOR] = "^",
 	[TOKEN_XOR_EQ] = "^=",
-	[TOKEN_OTHER] = NULL,
+	[TOKEN_OTHER] = "^@",
 	[TOKEN_PLACEMARKER] = "{placemarker}",
 };
 
@@ -81,7 +81,7 @@ char *token_get_spelling(struct token *token)
 	case TOKEN_HEADER_QNAME:
 	case TOKEN_NUMBER:
 	case TOKEN_OTHER: /* TODO simplify this case */
-	case TOKEN_STRING:
+	case TOKEN_STRING_LITERAL:
 		return token->spelling;
 
 	default:
@@ -163,9 +163,9 @@ void token_print(struct token *token, struct strbuf *buf)
 		strbuf_printf(buf, "%s", token->str);
 		break;
 
-	case TOKEN_STRING:
+	case TOKEN_STRING_LITERAL:
 		strbuf_putc(buf, '\"');
-		print_string(token->str, buf);
+		print_string(token->lstr.str, buf);
 		//strbuf_printf(buf, token->str);
 		strbuf_putc(buf, '\"');
 		break;

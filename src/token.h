@@ -2,6 +2,7 @@
 #define TOKINFO_H
 
 #include "list.h"
+#include "lstr.h"
 #include "strbuf.h"
 #include <stdbool.h>
 #include <stdio.h>
@@ -9,11 +10,11 @@
 
 enum token_type
 {
-	/* preprocessing tokens (see 6.4 Lexical categories) */
+	/* 6.4 Lexical categories */
 	TOKEN_CHAR_CONST, TOKEN_HEADER_HNAME, TOKEN_HEADER_QNAME, TOKEN_NAME,
-	TOKEN_NUMBER, TOKEN_STRING, TOKEN_OTHER,
+	TOKEN_NUMBER, TOKEN_STRING_LITERAL, TOKEN_OTHER,
 
-	/* punctuators (see 6.4.6 Punctuators) */
+	/* 6.4.6 Punctuators */
 	TOKEN_AMPERSAND, TOKEN_AND_EQ, TOKEN_ARROW, TOKEN_ASTERISK, TOKEN_COLON,
 	TOKEN_COMMA, TOKEN_DEC, TOKEN_DIV, TOKEN_DIV_EQ, TOKEN_DOT,
 	TOKEN_ELLIPSIS, TOKEN_EQ, TOKEN_EQ_EQ, TOKEN_GE, TOKEN_GT, TOKEN_HASH,
@@ -46,7 +47,8 @@ struct token
 	union
 	{
 		struct symbol *symbol;	/* for name tokens */
-		char *str;		/* for string tokens */
+		char *str;		/* for pp-numbers, header names */
+		struct lstr lstr;	/* for string literals */
 		int value;		/* for number tokens */
 		int c;			/* for char const tokens */
 	};

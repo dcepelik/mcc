@@ -72,7 +72,8 @@ static void macro_print(struct macro *macro, struct strbuf *buf)
 
 
 /*
- * 6.10.3.2-2
+ * See 6.10.3.2 The # operator, par. 2.
+ * TODO Work correctly with the lstrs.
  */
 static struct token *cpp_stringify(struct cpp *cpp, struct token *token)
 {
@@ -92,7 +93,7 @@ static struct token *cpp_stringify(struct cpp *cpp, struct token *token)
 
 		switch (t->type) {
 		case TOKEN_CHAR_CONST:
-		case TOKEN_STRING:
+		case TOKEN_STRING_LITERAL:
 			print_string_stringify(token_get_spelling(t), &str);
 			break;
 
@@ -102,8 +103,9 @@ static struct token *cpp_stringify(struct cpp *cpp, struct token *token)
 	}
 
 	result = objpool_alloc(&cpp->ctx->token_pool);
-	result->type = TOKEN_STRING;
-	result->str = strbuf_copy_to_mempool(&str, &cpp->ctx->token_data);
+	result->type = TOKEN_STRING_LITERAL;
+	result->lstr.str = strbuf_copy_to_mempool(&str, &cpp->ctx->token_data);
+	result->lstr.len = strbuf_strlen(&str);
 	result->noexpand = false;
 
 	first = toklist_first(repl_list);
