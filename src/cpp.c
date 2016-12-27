@@ -347,7 +347,7 @@ static struct token *cpp_cat_literals(struct cpp *cpp, struct toklist *literals)
 	strtoken->startloc = first->startloc;
 	strtoken->endloc = last->endloc;
 	strtoken->is_at_bol = first->is_at_bol;
-	strtoken->preceded_by_whitespace = first->preceded_by_whitespace;
+	strtoken->after_white = first->after_white;
 
 	strbuf_free(&str);
 

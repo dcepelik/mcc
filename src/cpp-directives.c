@@ -199,7 +199,7 @@ static void cpp_parse_define(struct cpp *cpp)
 
 		cpp_next_token(cpp);
 
-		if (cpp->token->type == TOKEN_LPAREN && !cpp->token->preceded_by_whitespace) {
+		if (cpp->token->type == TOKEN_LPAREN && !cpp->token->after_white) {
 			cpp_next_token(cpp);
 			cpp_parse_macro_arglist(cpp, &symdef->macro);
 			symdef->macro.flags = MACRO_FLAGS_FUNCLIKE;

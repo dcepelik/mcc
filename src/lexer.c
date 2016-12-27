@@ -633,7 +633,7 @@ static struct token *lexer_new_eol(struct lexer *lexer)
 	token->type = TOKEN_EOL;
 	token->is_at_bol = lexer->next_at_bol;
 	token->noexpand = false;
-	token->preceded_by_whitespace = lexer->had_whitespace;
+	token->after_white = lexer->had_whitespace;
 	token->startloc = lexer->location;
 
 	return token;
@@ -671,7 +671,7 @@ next_nonwhite_char:
 		return NULL;
 
 	token->is_at_bol = lexer->next_at_bol;
-	token->preceded_by_whitespace = lexer->had_whitespace;
+	token->after_white = lexer->had_whitespace;
 	token->noexpand = false;
 
 	lexer->next_at_bol = false;

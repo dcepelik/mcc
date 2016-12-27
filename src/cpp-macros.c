@@ -88,7 +88,7 @@ static struct token *cpp_stringify(struct cpp *cpp, struct token *token)
 
 	strbuf_init(&str, 128);
 	toklist_foreach(t, repl_list) {
-		if (t->preceded_by_whitespace && t != toklist_first(repl_list))
+		if (t->after_white && t != toklist_first(repl_list))
 			strbuf_putc(&str, ' ');
 
 		switch (t->type) {
@@ -115,7 +115,7 @@ static struct token *cpp_stringify(struct cpp *cpp, struct token *token)
 		result->startloc = first->startloc;
 		result->endloc = last->endloc;
 		result->is_at_bol = first->is_at_bol;
-		result->preceded_by_whitespace = first->preceded_by_whitespace;
+		result->after_white = first->after_white;
 	}
 
 	strbuf_free(&str);

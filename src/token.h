@@ -58,9 +58,9 @@ struct token
 	enum token_type type;		/* token type */
 
 	/* flags */
-	bool preceded_by_whitespace;
-	bool is_at_bol;
-	bool noexpand;			/* don't expand this token */
+	bool after_white:1;
+	bool is_at_bol:1;
+	bool noexpand:1;		/* don't expand this token */
 };
 
 const char *token_get_name(enum token_type token);
