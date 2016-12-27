@@ -640,6 +640,24 @@ static struct token *lexer_new_eol(struct lexer *lexer)
 }
 
 
+/*
+ * This is a utility function used by lexer_next.
+ */
+static inline enum enc_prefix get_enc_prefix(char c)
+{
+	assert(c == 'u' || c == 'U' || c == 'L');
+
+	if (c == 'u')
+		return ENC_PREFIX_U;
+	else if (c == 'U')
+		return ENC_PREFIX_UPPER_U;
+	else if (c == 'L')
+		return ENC_PREFIX_L;
+
+	return ENC_PREFIX_NONE;
+}
+
+
 struct token *lexer_next(struct lexer *lexer)
 {
 	struct token *token;
@@ -673,6 +691,7 @@ next_nonwhite_char:
 	token->is_at_bol = lexer->next_at_bol;
 	token->after_white = lexer->had_whitespace;
 	token->noexpand = false;
+	token->enc_prefix = ENC_PREFIX_NONE;
 
 	lexer->next_at_bol = false;
 	lexer->had_whitespace = false;
@@ -691,6 +710,7 @@ next_nonwhite_char:
 		/* u8"string" */
 		if (*lexer->c == '8' && lexer->c[1] == '\"') {
 			lexer->c += 2;
+			token->enc_prefix = ENC_PREFIX_U8;
 			return lexer_lex_string_literal(lexer, token);
 		}
 
@@ -698,15 +718,19 @@ next_nonwhite_char:
 	case 'L':
 		/* L'char' or U'char' or u'char' */
 		if (*lexer->c == '\'') {
+			token->enc_prefix = get_enc_prefix(lexer->c[-1]);
 			lexer->c++;
 			return lexer_lex_char(lexer, token);
 		}
 		
 		/* L"string" or U"string" or u"string" */
 		if (*lexer->c == '\"') {
+			token->enc_prefix = get_enc_prefix(lexer->c[-1]);
 			lexer->c++;
 			return lexer_lex_string_literal(lexer, token);
 		}
+
+		/* fall-through: it's just a regular letter, not a prefix */
 
 	case '_': case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
 	case 'g': case 'h': case 'i': case 'j': case 'k': case 'l': case 'm':

@@ -15,8 +15,8 @@
  */
 struct lstr
 {
-	utf8_t *str;	/* bytes making up the literal (valid C string) */
-	size_t len;	/* length, in bytes, of the literal (excl. the \0) */
+	utf8_t *str;			/* the string itself */
+	size_t len;			/* length of the literal (in bytes) */
 };
 
 #endif

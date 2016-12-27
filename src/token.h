@@ -39,10 +39,22 @@ struct location
 
 void location_dump(struct location *loc);
 
+/*
+ * See 6.4.5 String literals syntax (encoding-prefix)
+ */
+enum enc_prefix
+{
+	ENC_PREFIX_NONE,	/* "string" or 'char' */
+	ENC_PREFIX_L,		/* L"string" or L'char' */
+	ENC_PREFIX_U,		/* u"string" or u'char' */
+	ENC_PREFIX_UPPER_U,	/* U"string" or U'char' */
+	ENC_PREFIX_U8,		/* u8"string */
+};
+
 struct token
 {
-	struct list_node list_node;
-	char *spelling;			/* input that constitutes the token */
+	struct list_node list_node;	/* node for token lists */
+	char *spelling;			/* token as given in input */
 
 	union
 	{
@@ -52,15 +64,16 @@ struct token
 		int value;		/* for number tokens */
 	};
 
-	struct location startloc;	/* beginning of the token */
-	struct location endloc;		/* end of the token */
+	struct location startloc;	/* location where the token begins */
+	struct location endloc;		/* location where the token ends */
 
 	enum token_type type;		/* token type */
 
 	/* flags */
-	bool after_white:1;
-	bool is_at_bol:1;
+	bool after_white:1;		/* preceded by whitespace? */
+	bool is_at_bol:1;		/* is at beginning of line? */
 	bool noexpand:1;		/* don't expand this token */
+	int enc_prefix:4;		/* encoding prefix */
 };
 
 const char *token_get_name(enum token_type token);
