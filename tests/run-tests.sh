@@ -12,7 +12,7 @@ stderr_test=$stderr-test
 num_ok=0
 num_errs=0
 
-test_file() {
+validate_output() {
 	if [ ! -f $1 ] || [ ! -f $2 ]; then
 		return
 	fi
@@ -52,8 +52,8 @@ for test in *; do
 		echo "    runtime error"
 		num_errs=$(($num_errs + 1))
 	else
-		test_file $stdout $stdout_test
-		test_file $stderr $stderr_test
+		validate_output $stdout $stdout_test
+		validate_output $stderr $stderr_test
 	fi
 	test_valgrind
 

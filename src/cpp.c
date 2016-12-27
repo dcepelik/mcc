@@ -197,14 +197,18 @@ static void cpp_error_internal(struct cpp *cpp, enum error_level level,
 	char *fmt, va_list args)
 {
 	struct strbuf msg;
+	struct cpp_file *file;
+
 	strbuf_init(&msg, 64);
+	file = cpp_cur_file(cpp);
 
 	strbuf_vprintf_at(&msg, 0, fmt, args);
 	errlist_insert(&cpp->ctx->errlist,
 		level,
 		"some-file.c",
 		strbuf_get_string(&msg),
-		strbuf_get_string(&cpp_cur_file(cpp)->lexer.linebuf),
+		strbuf_get_string(&file->lexer.linebuf),
+		strbuf_strlen(&file->lexer.linebuf) + 1, // TODO
 		cpp->token->startloc);
 
 	strbuf_free(&msg);
@@ -344,6 +348,8 @@ static struct token *cpp_cat_literals(struct cpp *cpp, struct toklist *literals)
 	strtoken->endloc = last->endloc;
 	strtoken->is_at_bol = first->is_at_bol;
 	strtoken->preceded_by_whitespace = first->preceded_by_whitespace;
+
+	strbuf_free(&str);
 
 	return strtoken;
 }

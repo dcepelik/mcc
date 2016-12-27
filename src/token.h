@@ -50,7 +50,6 @@ struct token
 		char *str;		/* for pp-numbers, header names */
 		struct lstr lstr;	/* for string literals */
 		int value;		/* for number tokens */
-		int c;			/* for char const tokens */
 	};
 
 	struct location startloc;	/* beginning of the token */

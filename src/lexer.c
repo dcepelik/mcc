@@ -91,7 +91,8 @@ void lexer_free(struct lexer *lexer)
 
 
 static void lexer_error_internal(struct lexer *lexer, enum error_level level,
-	char *fmt, va_list args, char *context, struct location location)
+	char *fmt, va_list args, char *context, size_t context_len,
+	struct location location)
 {
 	struct strbuf msg;
 
@@ -103,7 +104,8 @@ static void lexer_error_internal(struct lexer *lexer, enum error_level level,
 		lexer->filename,
 		strbuf_get_string(&msg),
 		context,
-		lexer->location);
+		context_len,
+		location);
 
 	strbuf_free(&msg);
 }
@@ -112,9 +114,14 @@ static void lexer_error_internal(struct lexer *lexer, enum error_level level,
 static void lexer_error(struct lexer *lexer, char *fmt, ...)
 {
 	va_list args;
+
+	/* TODO unhack this */
+	lexer->location.column_no = lexer->c - strbuf_get_string(&lexer->linebuf);
+
 	va_start(args, fmt);
 	lexer_error_internal(lexer, ERROR_LEVEL_ERROR, fmt, args,
-		strbuf_get_string(&lexer->linebuf), lexer->location);
+		strbuf_get_string(&lexer->linebuf), strbuf_strlen(&lexer->linebuf) + 1, // TODO
+		lexer->location);
 	va_end(args);
 }
 
@@ -123,7 +130,7 @@ static void lexer_error_noctx(struct lexer *lexer, char *fmt, ...)
 {
 	va_list args;
 	va_start(args, fmt);
-	lexer_error_internal(lexer, ERROR_LEVEL_ERROR, fmt, args, NULL,
+	lexer_error_internal(lexer, ERROR_LEVEL_ERROR, fmt, args, NULL, 0,
 		lexer->location);
 	va_end(args);
 }
@@ -320,7 +327,7 @@ static struct token *lexer_lex_name(struct lexer *lexer, struct token *token)
 
 static struct token *lexer_lex_char(struct lexer *lexer, struct token *token)
 {
-	uint32_t val;
+	uint32_t val = 0;
 	bool seen_delimiter = false;
 	size_t i;
 
@@ -574,6 +581,7 @@ static mcc_error_t lexer_read_line(struct lexer *lexer)
 eol_or_eof:
 	lexer->c = strbuf_get_string(&lexer->linebuf);
 	lexer->location.line_no++;
+	lexer->location.column_no = 0;
 
 	return MCC_ERROR_OK;
 }
@@ -1013,7 +1021,7 @@ next_nonwhite_char:
 
 	default:
 		token->type = TOKEN_OTHER;
-		token->c = lexer->c[-1];
+		token->value = lexer->c[-1];
 		token->spelling = lexer_spelling_end(lexer);
 	}
 

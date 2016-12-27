@@ -41,6 +41,7 @@ out:
 
 void cpp_file_free(struct cpp *cpp, struct cpp_file *file)
 {
+	inbuf_close(&file->inbuf);
 	lexer_free(&file->lexer);
 }
 
@@ -79,8 +80,8 @@ void cpp_close_file(struct cpp *cpp)
 	struct cpp_file *file;
 
 	file = list_first(&cpp->file_stack);
-	lexer_free(&file->lexer);
 	list_remove_first(&cpp->file_stack);
 
+	cpp_file_free(cpp, file);
 	objpool_dealloc(&cpp->file_pool, file);
 }

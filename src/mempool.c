@@ -135,6 +135,24 @@ void mempool_print_stats(struct mempool *pool)
 }
 
 
+char *mempool_memcpy(struct mempool *pool, char *src, size_t len)
+{
+	char *dst;
+
+	if (!src)
+		return NULL;
+
+	dst = mempool_alloc(pool, len);
+	if (!dst)
+		return NULL;
+
+	DEBUG_EXPR("%lu", len);
+
+	memcpy(dst, src, len);
+	return dst;
+}
+
+
 char *mempool_strdup(struct mempool *pool, char *orig)
 {
 	char *dup;
@@ -151,5 +169,5 @@ char *mempool_strdup(struct mempool *pool, char *orig)
 	memcpy(dup, orig, len + 1);
 	dup[len] = '\0';
 
-	return dup;
+	return dup;	
 }

@@ -29,13 +29,14 @@ void errlist_free(struct errlist *errlist)
 
 
 void errlist_insert(struct errlist *errlist, enum error_level level,
-	char *filename, char *message, char *context, struct location location)
+	char *filename, char *message, char *context, size_t context_len,
+	struct location location)
 {
 	struct error *error = objpool_alloc(&errlist->error_pool);
 	error->level = level;
 	error->filename = mempool_strdup(&errlist->string_pool, filename);
 	error->message = mempool_strdup(&errlist->string_pool, message);
-	error->context = mempool_strdup(&errlist->string_pool, context);
+	error->context = mempool_memcpy(&errlist->string_pool, context, context_len);
 	error->location = location;
 
 	assert(error->level < ARRAY_SIZE(errlist->num_errors_by_level));
@@ -73,7 +74,7 @@ static void error_dump(struct error *error, FILE *fout)
 		error->location.line_no, error_level_to_string(error->level),
 		error->message);
 
-	if (error->context != NULL) {
+	if (error->context) {
 		fprintf(fout, "%s\n", error->context);
 
 		/* print the problem-mark */

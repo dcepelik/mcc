@@ -56,7 +56,7 @@ bool strbuf_putc(struct strbuf *buf, char c)
 
 char *strbuf_get_string(struct strbuf *buf)
 {
-	buf->str[buf->len] = '\0'; /* there's room */
+	buf->str[buf->len] = '\0'; /* there's room for the NUL */
 	return buf->str;
 }
 

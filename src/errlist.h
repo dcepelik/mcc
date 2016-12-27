@@ -45,6 +45,7 @@ struct error
 };
 
 void errlist_insert(struct errlist *errlist, enum error_level level,
-	char *filename, char *message, char *context, struct location location);
+	char *filename, char *message, char *context, size_t context_len,
+	struct location location);
 
 #endif
