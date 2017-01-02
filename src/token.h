@@ -61,7 +61,7 @@ struct token
 		struct symbol *symbol;	/* for name tokens */
 		char *str;		/* for pp-numbers, header names */
 		struct lstr lstr;	/* for string literals */
-		int value;		/* for number tokens */
+		int value;		/* for number and char const tokens */
 	};
 
 	struct location startloc;	/* location where the token begins */

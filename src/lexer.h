@@ -38,7 +38,7 @@ struct lexer
 	bool had_whitespace;		/* whitespace before current token? */
 };
 
-mcc_error_t lexer_init(struct lexer *lexer, struct context *ctx, struct inbuf *inbuf);
+void lexer_init(struct lexer *lexer, struct context *ctx, struct inbuf *inbuf);
 void lexer_free(struct lexer *lexer);
 struct token *lexer_next(struct lexer *lexer);
 

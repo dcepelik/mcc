@@ -19,7 +19,7 @@ struct hashtab
 	size_t size;
 };
 
-bool hashtab_init(struct hashtab *table, struct objpool *pool, size_t init_size);
+void hashtab_init(struct hashtab *table, struct objpool *pool, size_t init_size);
 void hashtab_free(struct hashtab *table);
 
 size_t hashtab_count(struct hashtab *table);

@@ -1,3 +1,4 @@
+#include "common.h"
 #include "inbuf.h"
 #include "debug.h"
 #include <assert.h>
@@ -11,7 +12,7 @@ static void inbuf_fill(struct inbuf *buf)
 }
 
 
-static mcc_error_t inbuf_open_internal(struct inbuf *buf, size_t size, FILE *file)
+static void inbuf_open_internal(struct inbuf *buf, size_t size, FILE *file)
 {
 	assert(size > 0);
 
@@ -20,13 +21,7 @@ static mcc_error_t inbuf_open_internal(struct inbuf *buf, size_t size, FILE *fil
 	buf->count = 0;
 	buf->offset = 0;
 
-	buf->data = malloc(buf->size);
-	if (!buf->data) {
-		fclose(buf->file);
-		return MCC_ERROR_NOMEM;
-	}
-
-	return MCC_ERROR_OK;
+	buf->data = mcc_malloc(buf->size);
 }
 
 
@@ -38,7 +33,8 @@ mcc_error_t inbuf_open(struct inbuf *buf, size_t size, const char *filename)
 	if (!file)
 		return MCC_ERROR_ACCESS; /* TODO Error reporting */
 
-	return inbuf_open_internal(buf, size, file);
+	inbuf_open_internal(buf, size, file);
+	return MCC_ERROR_OK;
 }
 
 
@@ -50,7 +46,8 @@ mcc_error_t inbuf_open_mem(struct inbuf *buf, char *str, size_t len)
 	if (!file)
 		return MCC_ERROR_ACCESS; /* TODO Error reporting */
 
-	return inbuf_open_internal(buf, len, file);
+	inbuf_open_internal(buf, len, file);
+	return MCC_ERROR_OK;
 }
 
 

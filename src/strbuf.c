@@ -1,3 +1,4 @@
+#include "common.h"
 #include "strbuf.h"
 #include <assert.h>
 #include <stdio.h>
@@ -7,23 +8,19 @@
 #define MAX(a, b) ((a) >= (b) ? (a) : (b))
 
 
-static bool strbuf_resize(struct strbuf *buf, size_t new_size)
+static void strbuf_resize(struct strbuf *buf, size_t new_size)
 {
 	assert(new_size > 0);
 
-	buf->str = realloc(buf->str, new_size);
-	if (!buf->str)
-		return false;
+	buf->str = mcc_realloc(buf->str, new_size);
 
 	buf->size = new_size;
 	if (buf->len > buf->size - 1)
 		buf->len = buf->size - 1;
-
-	return true;
 }
 
 
-bool strbuf_init(struct strbuf *buf, size_t init_size)
+void strbuf_init(struct strbuf *buf, size_t init_size)
 {
 	assert(init_size > 0);
 
@@ -31,26 +28,21 @@ bool strbuf_init(struct strbuf *buf, size_t init_size)
 	buf->len = 0;
 	buf->size = 0;
 
-	return strbuf_resize(buf, init_size);
+	strbuf_resize(buf, init_size);
 }
 
 
-bool strbuf_prepare_write(struct strbuf *buf, size_t count)
+void strbuf_prepare_write(struct strbuf *buf, size_t count)
 {
 	if (buf->len + count >= buf->size) /* >= because of the '\0' */
-		return strbuf_resize(buf, MAX(count, 2 * buf->size));
-
-	return true;
+		strbuf_resize(buf, MAX(count, 2 * buf->size));
 }
 
 
-bool strbuf_putc(struct strbuf *buf, char c)
+void strbuf_putc(struct strbuf *buf, char c)
 {
-	if (!strbuf_prepare_write(buf, 1))
-		return false;
-
+	strbuf_prepare_write(buf, 1);
 	buf->str[buf->len++] = c;
-	return true;
 }
 
 
@@ -72,8 +64,6 @@ char *strbuf_copy_to_mempool(struct strbuf *buf, struct mempool *pool)
 	char *str;
 
 	str = mempool_alloc(pool, buf->len + 1);
-	if (!str)
-		return NULL;
 
 	memcpy(str, buf->str, buf->len + 1);
 	str[buf->len] = '\0';
@@ -107,8 +97,7 @@ size_t strbuf_vprintf_at(struct strbuf *buf, size_t offset, char *fmt, va_list a
 
 	size_needed = offset + num_written + 1;
 	if (size_needed > buf->size)
-		if (!strbuf_resize(buf, MAX(2 * buf->size, size_needed)))
-			return -1;
+		strbuf_resize(buf, MAX(2 * buf->size, size_needed));
 
 	vsnprintf(buf->str + offset, (num_written + 1), fmt, args);
 	buf->len = MAX(buf->len, offset + num_written);

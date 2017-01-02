@@ -18,12 +18,12 @@ struct strbuf
 	size_t len;		/* length of the string */
 };
 
-bool strbuf_init(struct strbuf *buf, size_t init_size);
+void strbuf_init(struct strbuf *buf, size_t init_size);
 void strbuf_free(struct strbuf *buf);
 void strbuf_reset(struct strbuf *buf);
-bool strbuf_putc(struct strbuf *buf, char c);
+void strbuf_putc(struct strbuf *buf, char c);
 
-bool strbuf_prepare_write(struct strbuf *buf, size_t count);
+void strbuf_prepare_write(struct strbuf *buf, size_t count);
 
 size_t strbuf_strlen(struct strbuf *buf);
 char *strbuf_get_string(struct strbuf *buf);

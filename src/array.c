@@ -1,3 +1,4 @@
+#include "common.h"
 #include "array.h"
 #include "debug.h"
 
@@ -28,10 +29,7 @@ static void *array_resize(void *arr, size_t new_capacity, size_t item_size)
 
 	actual_size = sizeof(struct array_header) + new_capacity * item_size;
 
-	header = realloc(header, actual_size);
-	if (!header)
-		return NULL;
-
+	header = mcc_realloc(header, actual_size);
 	header->item_size = item_size;
 	header->capacity = new_capacity; 
 
@@ -56,9 +54,6 @@ void *array_claim(void *arr, size_t num_items)
 	header = array_get_header(arr);
 	if (header->num_items + num_items > header->capacity) {
 		arr = array_resize(arr, 2 * header->capacity, header->item_size);
-		if (!arr)
-			return NULL;
-
 		header = array_get_header(arr);
 	}
 

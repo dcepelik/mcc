@@ -1,3 +1,4 @@
+#include "common.h"
 #include "debug.h"
 #include "error.h"
 #include "objpool.h"
@@ -26,16 +27,14 @@ void objpool_init(struct objpool *objpool, size_t obj_size, size_t objs_per_bloc
 }
 
 
-static mcc_error_t alloc_new_block(struct objpool *pool)
+static void alloc_new_block(struct objpool *pool)
 {
 	struct objpool_block *new_block;
 	struct objpool_unused *new_unused;
 	void *mem;
 	size_t i;
 
-	new_block = malloc(pool->block_size);
-	if (new_block == NULL)
-		return MCC_ERROR_NOMEM;
+	new_block = mcc_malloc(pool->block_size);
 
 	DEBUG_PRINTF("Allocated new block, alloc_size = %zu B", pool->block_size);
 
@@ -53,8 +52,6 @@ static mcc_error_t alloc_new_block(struct objpool *pool)
 	}
 
 	pool->num_blocks++;
-
-	return MCC_ERROR_OK;
 }
 
 
@@ -65,8 +62,7 @@ void *objpool_alloc(struct objpool *pool)
 	void *mem;
 
 	if (pool->first_unused == NULL)
-		if (alloc_new_block(pool) != MCC_ERROR_OK)
-			return NULL;
+		alloc_new_block(pool);
 
 	assert(pool->first_unused != NULL);
 

@@ -160,9 +160,7 @@ struct cpp *cpp_new(struct context *ctx)
 {
 	struct cpp *cpp;
 
-	cpp = malloc(sizeof(*cpp));
-	if (!cpp)
-		return NULL;
+	cpp = mcc_malloc(sizeof(*cpp));
 
 	cpp->ctx = ctx;
 	cpp->symtab = &cpp->ctx->symtab; /* TODO */

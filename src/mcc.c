@@ -31,8 +31,6 @@ int main(int argc, char *argv[])
 
 
 	cpp = cpp_new(&ctx);
-	if (!cpp)
-		return EXIT_FAILURE;
 
 	err = cpp_open_file(cpp, filename);
 	if (err != MCC_ERROR_OK) {
@@ -59,11 +57,6 @@ int main(int argc, char *argv[])
 
 		if (token->type == TOKEN_EOF)
 			break;
-	}
-
-	if (!token) {
-		fprintf(stderr, "Out of memory.\n");
-		return EXIT_FAILURE;
 	}
 
 	printf("%s\n", strbuf_get_string(&buf));

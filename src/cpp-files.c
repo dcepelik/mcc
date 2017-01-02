@@ -15,27 +15,12 @@ mcc_error_t cpp_file_init(struct cpp *cpp, struct cpp_file *file, char *filename
 	mcc_error_t err;
 
 	if ((err = inbuf_open(&file->inbuf, INBUF_BLOCK_SIZE, filename)) != MCC_ERROR_OK)
-		goto out;
+		return err;
 
-	if ((err = lexer_init(&file->lexer, cpp->ctx, &file->inbuf)) != MCC_ERROR_OK)
-		goto out_inbuf;
-	
+	lexer_init(&file->lexer, cpp->ctx, &file->inbuf);
 	file->filename = mempool_strdup(&cpp->ctx->token_data, filename);
-	if (!file->filename) {
-		err = MCC_ERROR_NOMEM;
-		goto out_lexer;
-	}
 
 	return MCC_ERROR_OK;
-
-out_lexer:
-	lexer_free(&file->lexer);
-
-out_inbuf:
-	inbuf_close(&file->inbuf);
-
-out:
-	return err;
 }
 
 
@@ -58,8 +43,6 @@ mcc_error_t cpp_open_file(struct cpp *cpp, char *filename)
 	mcc_error_t err;
 
 	file = objpool_alloc(&cpp->file_pool);
-	if (!file)
-		return MCC_ERROR_NOMEM;
 
 	if ((err = cpp_file_init(cpp, file, filename)) != MCC_ERROR_OK) {
 		objpool_dealloc(&cpp->file_pool, file);

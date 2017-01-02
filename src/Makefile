@@ -2,7 +2,7 @@
 
 OBJS=mcc.o lexer.o inbuf.o symbol.o objpool.o cpp.o error.o token.o strbuf.o \
 	hashtab.o mempool.o array.o debug.o list.o cpp-macros.o errlist.o print.o \
-	context.o cpp-directives.o cpp-files.o toklist.o
+	context.o cpp-directives.o cpp-files.o toklist.o common.o
 PROG=mcc
 CFLAGS+=-c -std=gnu11 -Wall -Werror -Wno-unused-function --pedantic -ggdb3 -DDEBUG
 LDFLAGS=-Wall

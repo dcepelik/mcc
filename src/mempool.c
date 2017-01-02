@@ -1,3 +1,4 @@
+#include "common.h"
 #include "debug.h"
 #include "mempool.h"
 #include <assert.h>
@@ -42,9 +43,7 @@ struct mempool_block *mempool_new_block(struct mempool_chain *chain, size_t size
 
 	alloc_size = size + sizeof(*new_block);
 	
-	mem = malloc(alloc_size);
-	if (!mem)
-		return NULL;
+	mem = mcc_malloc(alloc_size);
 
 	DEBUG_PRINTF("Alocated new block, alloc_size = %zu B and size = %zu B",
 		alloc_size, size);
@@ -143,8 +142,6 @@ char *mempool_memcpy(struct mempool *pool, char *src, size_t len)
 		return NULL;
 
 	dst = mempool_alloc(pool, len);
-	if (!dst)
-		return NULL;
 
 	DEBUG_EXPR("%lu", len);
 
@@ -163,8 +160,6 @@ char *mempool_strdup(struct mempool *pool, char *orig)
 
 	len = strlen(orig);
 	dup = mempool_alloc(pool, len + 1);
-	if (!dup)
-		return NULL;
 
 	memcpy(dup, orig, len + 1);
 	dup[len] = '\0';

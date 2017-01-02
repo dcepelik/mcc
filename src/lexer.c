@@ -45,16 +45,11 @@ static const char trigraph[256] = {
 };
 
 
-mcc_error_t lexer_init(struct lexer *lexer, struct context *ctx, struct inbuf *inbuf)
+void lexer_init(struct lexer *lexer, struct context *ctx, struct inbuf *inbuf)
 {
-	if (!strbuf_init(&lexer->linebuf, STRBUF_INIT_SIZE))
-		goto out_err;
-
-	if (!strbuf_init(&lexer->strbuf, STRBUF_INIT_SIZE))
-		goto out_err_linebuf;
-
-	if (!strbuf_init(&lexer->spelling, STRBUF_INIT_SIZE))
-		goto out_err_strbuf;
+	strbuf_init(&lexer->linebuf, STRBUF_INIT_SIZE);
+	strbuf_init(&lexer->strbuf, STRBUF_INIT_SIZE);
+	strbuf_init(&lexer->spelling, STRBUF_INIT_SIZE);
 
 	lexer->ctx = ctx;
 	lexer->inbuf = inbuf;
@@ -68,17 +63,6 @@ mcc_error_t lexer_init(struct lexer *lexer, struct context *ctx, struct inbuf *i
 	lexer->had_whitespace = false;
 
 	lexer->filename = NULL; /* TODO */
-
-	return MCC_ERROR_OK;
-
-out_err_strbuf:
-	strbuf_free(&lexer->strbuf);
-
-out_err_linebuf:
-	strbuf_free(&lexer->linebuf);
-
-out_err:
-	return MCC_ERROR_NOMEM;
 }
 
 
@@ -317,9 +301,6 @@ static struct token *lexer_lex_name(struct lexer *lexer, struct token *token)
 	token->type = TOKEN_NAME;
 	token->symbol = symtab_search_or_insert(&lexer->ctx->symtab, strbuf_get_string(&lexer->strbuf));
 	token->spelling = lexer_spelling_end(lexer);
-
-	if (!token->symbol)
-		return NULL;
 
 	return token;
 }
@@ -685,9 +666,6 @@ next_nonwhite_char:
 		goto next_nonwhite_char;
 
 	token = objpool_alloc(&lexer->ctx->token_pool);
-	if (!token)
-		return NULL;
-
 	token->is_at_bol = lexer->next_at_bol;
 	token->after_white = lexer->had_whitespace;
 	token->noexpand = false;

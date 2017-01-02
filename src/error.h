@@ -4,7 +4,6 @@
 enum mcc_error {
 	MCC_ERROR_ACCESS,
 	MCC_ERROR_EOF,
-	MCC_ERROR_NOMEM,
 	MCC_ERROR_OK,
 };
 

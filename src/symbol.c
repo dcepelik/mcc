@@ -63,7 +63,7 @@ static inline void scope_delete(struct symtab *table, struct scope *scope)
 }
 
 
-bool symtab_init(struct symtab *table)
+void symtab_init(struct symtab *table)
 {
 	objpool_init(&table->symbol_pool, sizeof(struct symbol), 256);
 	objpool_init(&table->scope_pool, sizeof(struct scope), 8);
@@ -73,7 +73,7 @@ bool symtab_init(struct symtab *table)
 	scope_init(&table->file_scope);
 	list_insert_first(&table->scope_stack, &table->file_scope.scope_stack_node);
 
-	return hashtab_init(&table->table, &table->symbol_pool, 256);
+	hashtab_init(&table->table, &table->symbol_pool, 256);
 }
 
 
@@ -93,10 +93,8 @@ static inline struct symbol *symbol_new(struct symtab *table)
 	struct symbol *symbol;
 
 	symbol = objpool_alloc(&table->symbol_pool);
-	if (symbol) {
-		list_init(&symbol->def_stack);
-		symbol->def = &symbol_undef;
-	}
+	list_init(&symbol->def_stack);
+	symbol->def = &symbol_undef;
 
 	return symbol;
 }
@@ -118,14 +116,13 @@ struct symdef *symbol_define(struct symtab *table, struct symbol *symbol)
 	assert(scope != NULL);
 
 	def = objpool_alloc(&table->symdef_pool);
-	if (!def)
-		return NULL;
-
 	def->symbol = symbol;
 	list_insert_last(&scope->defs, &def->scope_list_node);
 	list_insert_first(&symbol->def_stack, &def->def_stack_node);
 
-	return symbol->def = def;
+	symbol->def = def;
+
+	return symbol->def;
 }
 
 
@@ -163,8 +160,7 @@ struct symbol *symtab_insert(struct symtab *table, char *name)
 	struct symbol *symbol;
 	
 	symbol = symbol_new(table);
-	if (symbol)
-		hashtab_insert(&table->table, name, &symbol->hashnode);
+	hashtab_insert(&table->table, name, &symbol->hashnode);
 
 	return symbol;
 }
@@ -182,16 +178,10 @@ struct symbol *symtab_search_or_insert(struct symtab *table, char *name)
 }
 
 
-bool symtab_scope_begin(struct symtab *table)
+void symtab_scope_begin(struct symtab *table)
 {
-	struct scope *scope;
-
-	scope = scope_new(table);
-	if (!scope)
-		return false;
-
+	struct scope *scope = scope_new(table);
 	list_insert_first(&table->scope_stack, &scope->scope_stack_node);
-	return true;
 }
 
 
