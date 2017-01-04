@@ -286,16 +286,39 @@ static uint32_t read_escape_sequence(struct lexer *lexer)
 }
 
 
+static uint64_t lexer_read_ucn(struct lexer *lexer)
+{
+	switch (*lexer->c++) {
+		case 'u':
+			return read_hex_number(lexer, 4, 4);
+
+		case 'U':
+			return read_hex_number(lexer, 8, 8);
+	}
+
+	assert(false);
+}
+
+
 static struct token *lexer_lex_name(struct lexer *lexer, struct token *token)
 {
 	strbuf_reset(&lexer->strbuf);
 
-	while (is_ascii_letter(*lexer->c)
-		|| is_digit(*lexer->c)
-		|| *lexer->c == '_'
-		|| *lexer->c == '\\') {
-		strbuf_putc(&lexer->strbuf, *lexer->c); // TODO UCN support affects this
-		lexer->c++;
+	while (is_ascii_letter(*lexer->c) || is_digit(*lexer->c) || *lexer->c == '_' || *lexer->c == '\\') {
+		if (*lexer->c == '\\') {
+			DEBUG_TRACE;
+			if (lexer->c[1] == 'u' || lexer->c[1] == 'U') {
+				lexer->c++;
+				strbuf_putwc(&lexer->strbuf, lexer_read_ucn(lexer));
+			}
+			else {
+				break;
+			}
+		}
+		else {
+			strbuf_putc(&lexer->strbuf, *lexer->c);
+			lexer->c++;
+		}
 	}
 
 	token->type = TOKEN_NAME;
@@ -717,7 +740,7 @@ next_nonwhite_char:
 	case 'C': case 'D': case 'E': case 'F': case 'G': case 'H': case 'I':
 	case 'J': case 'K': case 'M': case 'N': case 'O': case 'P': case 'Q':
 	case 'R': case 'S': case 'T': case 'V': case 'W': case 'X': case 'Y':
-	case 'Z': case '\\':
+	case 'Z':
 		lexer->c--;
 		return lexer_lex_name(lexer, token);
 
@@ -1020,6 +1043,12 @@ next_nonwhite_char:
 		}
 
 		break;
+
+	case '\\':
+		if (*lexer->c == 'u' || *lexer->c == 'U')
+			return lexer_lex_name(lexer, token);
+		
+		/* fall through to default lexeme handling */
 
 	default:
 		token->type = TOKEN_OTHER;

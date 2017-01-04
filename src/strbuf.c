@@ -1,5 +1,6 @@
 #include "common.h"
 #include "strbuf.h"
+#include "utf8.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -43,6 +44,18 @@ void strbuf_putc(struct strbuf *buf, char c)
 {
 	strbuf_prepare_write(buf, 1);
 	buf->str[buf->len++] = c;
+}
+
+
+void strbuf_putwc(struct strbuf *buf, wchar_t wc)
+{
+	utf8_t bytes[5];
+	int i;
+
+	utf8_from_wchar(wc, bytes);
+
+	for (i = 0; bytes[i] != 0; i++)
+		strbuf_putc(buf, bytes[i]);
 }
 
 
