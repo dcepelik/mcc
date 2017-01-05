@@ -53,6 +53,8 @@ mcc_error_t cpp_file_init(struct cpp *cpp, struct cpp_file *file, char *filename
 
 mcc_error_t cpp_open_file(struct cpp *cpp, char *filename);
 void cpp_close_file(struct cpp *cpp);
+mcc_error_t cpp_file_include_hheader(struct cpp *cpp, char *filename, struct cpp_file *file);
+mcc_error_t cpp_file_include_qheader(struct cpp *cpp, char *filename, struct cpp_file *file);
 void cpp_file_include(struct cpp *cpp, struct cpp_file *file);
 
 struct cpp_file *cpp_cur_file(struct cpp *cpp);

@@ -16,17 +16,6 @@ static struct cpp_if ifstack_bottom = {
 };
 
 
-/*
- * <include> search paths.
- */
-static const char *include_dirs[] = {
-	".",
-	"",
-	"/usr/include",
-	"../include"
-};
-
-
 void cpp_init_ifstack(struct cpp *cpp)
 {
 	list_init(&cpp->ifs);
@@ -249,30 +238,17 @@ static void cpp_parse_error(struct cpp *cpp)
 
 
 /*
- * TODO #include <header> vs #include "header".
  * TODO warn if tokens skipped
  */
 static void cpp_parse_include(struct cpp *cpp)
 {
 	char *filename;
-	struct strbuf pathbuf;
-	char *path;
+	mcc_error_t err;
 	struct cpp_file *file;
-	bool file_open = false;
-	size_t i;
 
 	if (cpp_skipping(cpp)) {
 		cpp_skip_find_eol(cpp);
-		goto out;
-	}
-
-	if (cpp->token->type != TOKEN_HEADER_HNAME
-		&& cpp->token->type != TOKEN_HEADER_QNAME) {
-		cpp_error(cpp, "header name was expected, got %s",
-			token_get_name(cpp->token->type));
-
-		cpp_skip_find_eol(cpp);
-		goto out;
+		return;
 	}
 
 	/*
@@ -280,33 +256,29 @@ static void cpp_parse_include(struct cpp *cpp)
 	 */
 
 	filename = cpp->token->str;
-	strbuf_init(&pathbuf, 128);
 	file = objpool_alloc(&cpp->file_pool);
 
-	for (i = 0; i < ARRAY_SIZE(include_dirs); i++) {
-		strbuf_reset(&pathbuf);
-		strbuf_printf(&pathbuf, "%s/%s", include_dirs[i], filename);
-
-		path = strbuf_get_string(&pathbuf);
-
-		if (cpp_file_init(cpp, file, path) == MCC_ERROR_OK) {
-			file_open = true;
-			break;
-		}
+	if (token_is(cpp->token, TOKEN_HEADER_HNAME)) {
+		err = cpp_file_include_hheader(cpp, filename, file);
+	}
+	else if (token_is(cpp->token, TOKEN_HEADER_QNAME)) {
+		err = cpp_file_include_qheader(cpp, filename, file);
+	}
+	else {
+		cpp_error(cpp, "header name was expected, got %s", token_get_name(cpp->token->type));
+		cpp_skip_find_eol(cpp);
+		return;
 	}
 
-	strbuf_free(&pathbuf);
-
-	if (file_open) {
+	if (err == MCC_ERROR_OK) {
 		cpp_skip_find_eol(cpp); /* get rid of those tokens now */
 		cpp_file_include(cpp, file);
 	}
 	else {
-		cpp_error(cpp, "cannot include file %s", filename);
+		cpp_error(cpp, "cannot include file %s: %s", filename, error_str(err));
 		cpp_skip_find_eol(cpp); /* skip is delayed: error location */
 	}
 
-out:
 	cpp_cur_file(cpp)->lexer.inside_include = false;
 }
 

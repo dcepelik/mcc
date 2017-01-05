@@ -1,7 +1,18 @@
 #include "cpp-internal.h"
 #include "context.h"
+#include <unistd.h>
 
 #define INBUF_BLOCK_SIZE	2048
+
+/*
+ * #include <file> search paths.
+ */
+static const char *include_dirs[] = {
+	"",
+	".",
+	"/usr/include",
+	NULL,
+};
 
 
 struct cpp_file *cpp_cur_file(struct cpp *cpp)
@@ -24,16 +35,70 @@ mcc_error_t cpp_file_init(struct cpp *cpp, struct cpp_file *file, char *filename
 }
 
 
+void cpp_file_include(struct cpp *cpp, struct cpp_file *file)
+{
+	list_insert_first(&cpp->file_stack, &file->list_node);
+}
+
+
+static mcc_error_t cpp_file_include_searchpath_do(struct cpp *cpp, const char **search_dirs, char *filename, struct cpp_file *file)
+{
+	bool file_found;
+	struct strbuf pathbuf;
+	char *path;
+	size_t i;
+	mcc_error_t err;
+
+	strbuf_init(&pathbuf, 128);
+
+	file_found = false;
+
+	if (filename[0] == '/') {
+		file_found = (access(filename, F_OK) == 0);
+		path = filename;
+	}
+	else {
+		for (i = 0; i < ARRAY_SIZE(include_dirs); i++) {
+			strbuf_reset(&pathbuf);
+			strbuf_printf(&pathbuf, "%s/%s", include_dirs[i], filename);
+
+			path = strbuf_get_string(&pathbuf);
+
+			DEBUG_PRINTF("Testing: %s\n", path);
+
+			if (access(path, F_OK) == 0) {
+				file_found = true;
+				break;
+			}
+		}
+	}
+
+	if (!file_found)
+		return MCC_ERROR_NOENT;
+
+	err = cpp_file_init(cpp, file, path); 
+	strbuf_free(&pathbuf);
+
+	return err;
+}
+
+
+mcc_error_t cpp_file_include_qheader(struct cpp *cpp, char *filename, struct cpp_file *file)
+{
+	return cpp_file_include_searchpath_do(cpp, include_dirs, filename, file);
+}
+
+
+mcc_error_t cpp_file_include_hheader(struct cpp *cpp, char *filename, struct cpp_file *file)
+{
+	return cpp_file_include_searchpath_do(cpp, include_dirs, filename, file);
+}
+
+
 void cpp_file_free(struct cpp *cpp, struct cpp_file *file)
 {
 	inbuf_close(&file->inbuf);
 	lexer_free(&file->lexer);
-}
-
-
-void cpp_file_include(struct cpp *cpp, struct cpp_file *file)
-{
-	list_insert_first(&cpp->file_stack, &file->list_node);
 }
 
 

@@ -13,6 +13,9 @@ const char *error_str(mcc_error_t err)
 
 	case MCC_ERROR_OK:
 		return "No error.";
+
+	case MCC_ERROR_NOENT:
+		return "File not found.";
 	}
 
 	return NULL;
