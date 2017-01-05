@@ -1,7 +1,6 @@
 /*
  * TODO add #pragma and #line support
  * TODO cexpr support in if conditionals
- * TODO directive ends when EOL is met x function-like macro invocation
  */
 
 #include "cpp-internal.h"

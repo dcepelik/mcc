@@ -288,15 +288,30 @@ static uint32_t read_escape_sequence(struct lexer *lexer)
 
 static uint64_t lexer_read_ucn(struct lexer *lexer)
 {
+	uint32_t number;
+
 	switch (*lexer->c++) {
 		case 'u':
-			return read_hex_number(lexer, 4, 4);
+			number = read_hex_number(lexer, 4, 4);
+			break;
 
 		case 'U':
-			return read_hex_number(lexer, 8, 8);
+			number = read_hex_number(lexer, 8, 8);
+			break;
+
+		default:
+			assert(false);
 	}
 
-	assert(false);
+	if (number < 0x00A0 && number != 0x0024 && number != 0x0040 && number != 0x0060) {
+		lexer_error(lexer, "invalid UCN character name: less than 0x00A0 and none of @, $ or `");
+		/* TODO make that error fatal? */
+	}
+	if (number >= 0xD800 && number <= 0xDFFF) {
+		lexer_error(lexer, "invalid UCN character name: in the range D800 through DFFF inclusive");
+	}
+
+	return number;
 }
 
 
@@ -390,14 +405,19 @@ struct token *lexer_lex_pp_number(struct lexer *lexer, struct token *token)
 			assert(lexer->c != strbuf_get_string(&lexer->linebuf));
 
 			c = lexer->c[-1];
-			if (c != 'e' && c != 'E' && c != 'p' && c != 'P') {
+			if (c != 'e' && c != 'E' && c != 'p' && c != 'P')
 				break;
-			}
 		}
 		else if (*lexer->c == '\\') {
-			// process UCN
-			lexer->c++;
-			continue;
+			if (lexer->c[1] == 'u' || lexer->c[1] == 'U') {
+				lexer->c++;
+				strbuf_putwc(&lexer->strbuf, lexer_read_ucn(lexer));
+				continue;
+			}
+			else {
+				break;
+			}
+
 		}
 		else if (!is_digit(*lexer->c) && !is_ascii_letter(*lexer->c) && *lexer->c != '.' && *lexer->c != '_') {
 			break;

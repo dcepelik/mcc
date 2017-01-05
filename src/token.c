@@ -160,7 +160,7 @@ void token_print(struct token *token, struct strbuf *buf)
 		break;
 
 	case TOKEN_NUMBER:
-		strbuf_printf(buf, "%s", token->str);
+		strbuf_printf(buf, "%s{number}", token->str);
 		break;
 
 	case TOKEN_STRING_LITERAL:
