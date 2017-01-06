@@ -1,10 +1,10 @@
 .PHONY: clean gdb tests all
 
-OBJS=mcc.o lexer.o inbuf.o symbol.o objpool.o cpp.o error.o token.o strbuf.o \
+OBJS=main.o lexer.o inbuf.o symbol.o objpool.o cpp.o error.o token.o strbuf.o \
 	hashtab.o mempool.o array.o debug.o list.o cpp-macros.o errlist.o print.o \
-	context.o cpp-directives.o cpp-files.o toklist.o common.o utf8.o
+	context.o cpp-directives.o cpp-files.o toklist.o common.o utf8.o parser.o ast.o
 PROG=mcc
-CFLAGS+=-c -std=gnu11 -Wall -Werror -Wno-unused-function --pedantic -ggdb3 -DDEBUG
+CFLAGS+=-c -std=gnu11 -Wall -Werror -Wno-unused-function -Wno-unused-variable --pedantic -ggdb3 -DDEBUG
 LDFLAGS=-Wall
 
 $(PROG): $(OBJS)
@@ -41,3 +41,6 @@ gdb: $(PROG)
 
 tests: $(PROG)
 	cd ../tests; ./run-tests.sh
+
+metrics:
+	find . -name "*.c" -or -name "*.h" | xargs cat | wc -l

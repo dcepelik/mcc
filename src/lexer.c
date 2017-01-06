@@ -14,6 +14,9 @@
 static struct token eof = { .type = TOKEN_EOF };
 
 
+/*
+ * Single-char escape sequences: mapping from what follows the \ to the resulting character.
+ */
 static const char simple_escape_seq[256] = {
 	['a'] = '\a',
 	['b'] = '\b',
@@ -472,8 +475,7 @@ struct token *lexer_lex_string_literal(struct lexer *lexer, struct token *token)
 }
 
 
-struct token *lexer_lex_header_name(struct lexer *lexer, struct token *token,
-	bool (*is_valid_char)(char c), char delim)
+struct token *lexer_lex_header_name(struct lexer *lexer, struct token *token, bool (*is_valid_char)(char c), char delim)
 {
 	char c;
 	bool seen_delim = false;

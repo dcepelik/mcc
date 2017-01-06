@@ -1,6 +1,7 @@
+#include "print.h"
 #include "symbol.h"
 #include "token.h"
-#include "print.h"
+#include <string.h>
 
 
 const char *token_names[] = {
@@ -134,6 +135,12 @@ bool token_is_eol_or_eof(struct token *token)
 }
 
 
+bool token_is_keyword(struct token *token, char *keyword)
+{
+	return token_is_name(token) && strcmp(symbol_get_name(token->symbol), keyword) == 0;
+}
+
+
 void token_print(struct token *token, struct strbuf *buf)
 {
 	const char *name;
@@ -160,7 +167,7 @@ void token_print(struct token *token, struct strbuf *buf)
 		break;
 
 	case TOKEN_NUMBER:
-		strbuf_printf(buf, "%s{number}", token->str);
+		strbuf_printf(buf, "%s", token->str);
 		break;
 
 	case TOKEN_STRING_LITERAL:

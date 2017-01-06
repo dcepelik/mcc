@@ -28,5 +28,8 @@ bool shall_debug_file(const char *filename)
 	if (strcmp(filename, "cpp-files.c") == 0)
 		return true;
 
+	if (strcmp(filename, "parser.c") == 0)
+		return true;
+
 	return false;
 }
