@@ -9,5 +9,4 @@ struct ast_node *ast_node_new(struct context *ctx)
 
 void ast_node_init(struct ast_node *node)
 {
-	node->target = NULL;
 }
