@@ -1,16 +1,11 @@
 #!/bin/bash
 
-prog=../../src/mcc
-
 stdin=stdin
 stdout=stdout
 stderr=stderr
 
 stdout_test=$stdout-test
 stderr_test=$stderr-test
-
-num_ok=0
-num_errs=0
 
 validate_output() {
 	if [ ! -f $1 ] || [ ! -f $2 ]; then
@@ -20,7 +15,7 @@ validate_output() {
 	diff <(cat $1 | tr -s '\n' | tr '\n' ' ') <(cat $2 | tr -s '\n' | tr '\n' ' ') >/dev/null
 
 	if [ $? -ne 0 ]; then
-		echo "    $1 differs"
+		echo -n "  !$1"
 		num_errs=$(($num_errs + 1))
 	else
 		num_ok=$(($num_ok + 1))
@@ -32,24 +27,44 @@ test_valgrind() {
 
 	if [ "$valgrind_result" != "0 0" ]; then
 		num_errs=$(($num_errs + 1))
-		echo "    valgrind errors"
+		echo -n "  !valgrind"
 	else
 		num_ok=$(($num_ok + 1))
 	fi
 }
 
+suite=$1
+
+num_ok=0
+num_errs=0
+prog=../../../src/$suite
+
+if [ -z "$suite" ]; then
+	echo "$0: usage: $0 SUITE"
+	exit 1
+fi
+
+cd $suite
+
+num_tests=$(ls | wc -l)
+i=0
+
 for test in *; do
+	num_errs_orig=$num_errs
+
 	if [ ! -d "$test" ]; then
 		continue
 	fi
 
 	cd $test
+	i=$(($i + 1))
+	printf "\r\033[K%02i/%02i %s" $i $num_tests $test
 
-	printf "%-20s\n" $test
+	#printf "%s:\n" $test
 
 	$prog $stdin 2>$stderr_test | grep -v '^$' > $stdout_test
 	if [ $? -ne 0 ]; then
-		echo "    runtime error"
+		echo -n "  !runtime"
 		num_errs=$(($num_errs + 1))
 	else
 		validate_output $stdout $stdout_test
@@ -57,11 +72,13 @@ for test in *; do
 	fi
 	test_valgrind
 
-	#rm -f -- $stdout_test
-	#rm -f -- $stderr_test
+	if [ $num_errs_orig -lt $num_errs ]; then
+		echo
+	fi
 
 	cd ..
 done
 
-echo
-echo "$num_ok OK, $num_errs FAILED"
+cd ..
+
+echo -e "\r\033[K\n$suite: $num_ok OK, $num_errs FAILED"

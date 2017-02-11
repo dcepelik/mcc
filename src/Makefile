@@ -1,29 +1,52 @@
-.PHONY: clean gdb tests all
+.PHONY: all clean metrics mcc-tests mcpp-tests tests
 
-OBJS=main.o lexer.o inbuf.o symbol.o objpool.o cpp.o error.o token.o strbuf.o \
-	hashtab.o mempool.o array.o debug.o list.o cpp-macros.o errlist.o print.o \
-	context.o cpp-directives.o cpp-files.o toklist.o common.o utf8.o parser.o ast.o
-PROG=mcc
+BINS=mcc mcpp
+OBJS=\
+	array.o \
+	ast.o \
+	common.o \
+	context.o \
+	cpp-directives.o \
+	cpp-files.o \
+	cpp-macros.o \
+	cpp.o \
+	debug.o \
+	errlist.o \
+	error.o \
+	hashtab.o \
+	inbuf.o \
+	lexer.o \
+	list.o \
+	mempool.o \
+	objpool.o \
+	parser.o \
+	print.o \
+	strbuf.o \
+	symbol.o \
+	token.o \
+	toklist.o \
+	utf8.o
+
 CFLAGS+=-c -std=gnu11 -Wall -Werror -Wno-unused-function -Wno-unused-variable --pedantic -ggdb3 -DDEBUG
-LDFLAGS=-Wall
+LDFLAGS+=-Wall
 
-$(PROG): $(OBJS)
+
+all: $(BINS)
+
+mcc: mcc-main.o $(OBJS)
+	$(CC) $(LDFALGS) -o $@ $^
+
+mcpp: mcpp-main.o $(OBJS)
 	$(CC) $(LDFALGS) -o $@ $^
 
 
-array.o: array.c array.h debug.h
+lexer.o: lexer.c lexer.h cpp.o error.o inbuf.o strbuf.o symbol.o token.o debug.h common.h
 	$(CC) $(CFLAGS) -o $@ $<
 
-lexer.o: lexer.c lexer.h inbuf.o symbol.o error.o token.o strbuf.o cpp.o debug.h common.h
+symbol.o: symbol.c symbol.h error.o hashtab.o objpool.o token.o debug.h common.h
 	$(CC) $(CFLAGS) -o $@ $<
 
-symbol.o: symbol.c symbol.h objpool.o error.o token.o hashtab.o debug.h common.h
-	$(CC) $(CFLAGS) -o $@ $<
-
-cpp.o: cpp.c cpp.h lexer.o error.o token.o list.o cpp-directives.o cpp-macros.o cpp-files.o debug.h common.h toklist.o
-	$(CC) $(CFLAGS) -o $@ $<
-
-objpool.o: objpool.c objpool.h debug.h common.h
+cpp.o: cpp.c cpp.h cpp-directives.o cpp-files.o cpp-macros.o error.o lexer.o list.o token.o toklist.o debug.h common.h
 	$(CC) $(CFLAGS) -o $@ $<
 
 mempool.o: mempool.c mempool.h strbuf.o debug.h common.h
@@ -34,13 +57,15 @@ mempool.o: mempool.c mempool.h strbuf.o debug.h common.h
 
 
 clean:
-	rm -f -- $(PROG) $(OBJS)
+	rm -f -- $(BINS) *.o
 
-gdb: $(PROG)
-	gdb --args $(PROG) ../tests/pp/ifs.c
+tests: mcc-tests mcpp-tests
 
-tests: $(PROG)
-	cd ../tests; ./run-tests.sh
+mcc-tests: mcc	
+	cd ../tests/; ./run-tests.sh mcc
+
+mcpp-tests: mcpp
+	cd ../tests/; ./run-tests.sh mcpp
 
 metrics:
 	find . -name "*.c" -or -name "*.h" | xargs cat | wc -l

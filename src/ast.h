@@ -6,6 +6,7 @@
 enum ast_node_type
 {
 	AST_NODE_TYPE,
+	AST_NODE_DECL,
 };
 
 enum ctype
@@ -26,6 +27,7 @@ struct ast_node
 			enum ctype ctype;
 			struct ast_node *ptr_to;
 			struct ast_node *array_of;
+			struct ast_node *of;
 			bool const_flag;
 		};
 	};
