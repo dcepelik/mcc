@@ -9,6 +9,16 @@ static void parser_next(struct parser *parser)
 }
 
 
+/*
+ * Wrapper arround parser_next. To make it stand out when tokens
+ * are deliberately skipped.
+ */
+static void parser_skip(struct parser *parser)
+{
+	parser_next(parser);
+}
+
+
 static void parser_next_push(struct parser *parser, struct toklist *toklist)
 {
 	toklist_insert_last(toklist, parser->token);
@@ -41,135 +51,70 @@ static void parser_skip_rest(struct parser *parser)
 }
 
 
-static void parser_parse_declarator(struct parser *parser, struct ast_node *parent);
-
-
-//static void parser_parse_direct_declarator(struct parser *parser, struct ast_node *parent)
-//{
-//again:
-//	if (token_is(parser->token, TOKEN_LPAREN)) {
-//		parser_next(parser);
-//		parser_parse_declarator(parser, parent);
-//		assert(token_is(parser->token, TOKEN_RPAREN));
-//	}
-//	else if (token_is_name(parser->token)) {
-//	}
-//	else if (token_is(parser->token, TOKEN_LBRACKET)) {
-//		parser_next(parser);
-//		assert(token_is(parser->token, TOKEN_RBRACKET));
-//	}
-//	else {
-//		return;
-//	}
-//
-//	parser_next(parser);
-//	goto again;
-//}
-//
-//
-///*
-// * Note: there's no one-to-one correspondence between these coroutines and the productions
-// * of the language. The reason for this is that, although a regular recursive descent
-// * parser is easy to write, the construction of the declarator is tangled. Put in
-// * a different way, the structure of the calls may be the same for different declarators:
-// * declarators *a[] and *(a[]) will result in
-// *
-// *     declarator -> pointer direct-declarator -> * direct-declarator [] -> * identifier []
-// *
-// * and
-// *
-// *     declarator -> pointer direct-declarator -> * ( declarator ) -> * ( direct-declarator ) ->
-// *                -> * ( direct-declarator [] ) -> * ( identifier [] )
-// *
-// * which are produced by similar calls, but the types differ fundamentally (pointer to array
-// * vs. array of pointers).
-// *
-// * This is caused by operator priorities, which are not reflected in the productions of the
-// * language.
-// *
-// * For this reason, if the production
-// *
-// *     direct-declarator -> ( declarator )
-// *
-// * is not used, this function reads the identifier otherwise handled by the function
-// * parser-parse-direct-declarator.
-// */
-
-
-static struct ast_node *parser_parse_declaration_suffixes(struct parser *parser, struct ast_node *decl)
+/*
+ * Actually parse the declaration.
+ *
+ * Examples of various declarations:
+ *
+ *     int a
+ *     int * const *b[]
+ *     const int * const c
+ *     volatile int *d[][]
+ *     int *(*f(int a))
+ *
+ */
+static void parser_parse_declaration_do(struct parser *parser, struct ast_node *parent, struct toklist *stack)
 {
 	struct ast_node *node;
+	struct token *last;
+	struct ast_node **child = &parent->of;
+	
+	while (true) {
+		if (token_is(parser->token, TOKEN_RPAREN)) {
+			assert(!toklist_is_empty(stack));
+			last = toklist_remove_last(stack);
 
-	if (token_is(parser->token, TOKEN_LBRACKET)) {
-		parser_next(parser);
-		assert(token_is(parser->token, TOKEN_RBRACKET));
-		parser_next(parser);
+			switch (last->type) {
+			case TOKEN_ASTERISK:
+				*child = ast_node_new(&parser->ctx);
+				(*child)->type = AST_NODE_TYPE;
+				(*child)->ctype = CTYPE_POINTER;
+				child = &((*child)->ptr_to);
+				break;
 
-		node = ast_node_new(&parser->ctx);
-		node->type = AST_NODE_TYPE;
-		node->ctype = CTYPE_ARRAY;
-		node->array_of = decl;
+			case TOKEN_LPAREN:
+				parser_skip(parser);
+				break;
 
-		if (!token_is_eof(parser->token) && !token_is(parser->token, TOKEN_RPAREN))
-			return parser_parse_declaration_suffixes(parser, node);
+			default:
+				assert(false);
+			}
+		}
+		else if (token_is(parser->token, TOKEN_LBRACKET)) {
+			parser_skip(parser);
+			assert(token_is(parser->token, TOKEN_RBRACKET));
+			parser_skip(parser);
 
-		return node;
-	}
-	else {
-		return decl;
+			*child = ast_node_new(&parser->ctx);
+			(*child)->type = AST_NODE_TYPE;
+			(*child)->ctype = CTYPE_ARRAY;
+			child = &((*child)->array_of);
+		}
+		else {
+			*child = ast_node_new(&parser->ctx);
+			(*child)->type = AST_NODE_TYPE;
+			(*child)->ctype = CTYPE_INT;
+
+			break;
+		}
 	}
 }
 
 
 /*
- * int a
- * int * const_flag *b[]
- * const_flag int * const_flag c
- * const_flag int *d[][]
+ * Buffer tokens up to the name (or EOF), let others do the hard work
+ * and then synthesize the final result.
  */
-static struct ast_node *parser_parse_declaration_r(struct parser *parser, struct toklist *stack)
-{
-	struct ast_node *node;
-	
-	if (token_is(parser->token, TOKEN_RPAREN)) {
-		switch (toklist_last(stack)->type) {
-		case TOKEN_ASTERISK:
-			toklist_remove_last(stack);
-			node = ast_node_new(&parser->ctx);
-			node->type = AST_NODE_TYPE;
-			node->ctype = CTYPE_POINTER;
-			node->ptr_to = parser_parse_declaration_r(parser, stack);
-			return node;
-
-		case TOKEN_LPAREN:
-			toklist_remove_last(stack);
-			parser_next(parser);
-			return parser_parse_declaration_r(parser, stack);
-
-		default:
-			assert(false);
-		}
-	}
-	else if (token_is(parser->token, TOKEN_LBRACKET)) {
-		parser_next(parser);
-		assert(token_is(parser->token, TOKEN_RBRACKET));
-		parser_next(parser);
-
-		node = ast_node_new(&parser->ctx);
-		node->type = AST_NODE_TYPE;
-		node->ctype = CTYPE_ARRAY;
-		node->array_of = parser_parse_declaration_r(parser, stack);
-	}
-	else {
-		node = ast_node_new(&parser->ctx);
-		node->type = AST_NODE_TYPE;
-		node->ctype = CTYPE_INT;
-	}
-
-	return node;
-}
-
-
 struct ast_node *parser_parse_declaration(struct parser *parser)
 {
 	struct toklist stack;
@@ -182,9 +127,12 @@ struct ast_node *parser_parse_declaration(struct parser *parser)
 		parser_next(parser);
 	}
 
-	parser_next(parser);
+	parser_skip(parser); /* name */
 
-	decl = parser_parse_declaration_r(parser, &stack);
+	decl = ast_node_new(&parser->ctx);
+	decl->type = AST_NODE_DECL;
+	parser_parse_declaration_do(parser, decl, &stack);
+
 	toklist_free(&stack);
 
 	return decl;
@@ -228,5 +176,5 @@ void parser_build_ast(struct parser *parser, struct ast *tree, char *cfile)
 	decl = parser_parse_declaration(parser);
 	cpp_close_file(parser->cpp);
 
-	dump_decl(decl);
+	dump_decl(decl->of);
 }
