@@ -18,17 +18,16 @@ enum ctype
 
 struct ast_node
 {
-	enum ast_node_type type;
+	enum ast_node_type node_type;
 
 	union
 	{
 		struct
 		{
 			enum ctype ctype;
-			struct ast_node *ptr_to;
-			struct ast_node *array_of;
-			struct ast_node *of;
+			struct ast_node *type;
 			bool const_flag;
+			size_t size;
 		};
 	};
 };

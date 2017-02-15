@@ -49,6 +49,9 @@ symbol.o: symbol.c symbol.h error.o hashtab.o objpool.o token.o debug.h common.h
 cpp.o: cpp.c cpp.h cpp-directives.o cpp-files.o cpp-macros.o error.o lexer.o list.o token.o toklist.o debug.h common.h
 	$(CC) $(CFLAGS) -o $@ $<
 
+parser.o: parser.c parser.h common.h debug.h ast.h
+	$(CC) $(CFLAGS) -o $@ $<
+
 mempool.o: mempool.c mempool.h strbuf.o debug.h common.h
 	$(CC) $(CFLAGS) -o $@ $<
 

@@ -51,6 +51,56 @@ static void parser_skip_rest(struct parser *parser)
 }
 
 
+static struct ast_node *parser_parse_declaration_part(struct parser *parser, struct toklist *stack)
+{
+	struct ast_node *node;
+	struct token *top;
+
+	node = ast_node_new(&parser->ctx);
+	node->node_type = AST_NODE_TYPE;
+
+again:
+	if (token_is(parser->token, TOKEN_RPAREN)) {
+		assert(!toklist_is_empty(stack));
+		top = toklist_remove_last(stack);
+
+		if (token_is_keyword(top, "const")) {
+			node->const_flag = true;
+			goto again;
+		}
+		else if (top->type == TOKEN_ASTERISK) {
+			node->ctype = CTYPE_POINTER;
+		}
+		else if (top->type == TOKEN_LPAREN) {
+			parser_next(parser);
+			DEBUG_MSG("Again");
+			goto again;
+		}
+		else {
+			assert(false);
+		}
+	}
+	else if (token_is(parser->token, TOKEN_LBRACKET)) {
+		parser_next(parser);
+
+		if (token_is(parser->token, TOKEN_NUMBER)) {
+			node->size = atoi(parser->token->str);
+			parser_next(parser);
+		}
+
+		assert(token_is(parser->token, TOKEN_RBRACKET));
+		parser_next(parser);
+
+		node->ctype = CTYPE_ARRAY;
+	}
+	else {
+		node->ctype = CTYPE_INT;
+	}
+
+	return node;
+}
+
+
 /*
  * Actually parse the declaration.
  *
@@ -65,48 +115,18 @@ static void parser_skip_rest(struct parser *parser)
  */
 static void parser_parse_declaration_do(struct parser *parser, struct ast_node *parent, struct toklist *stack)
 {
-	struct ast_node *node;
-	struct token *last;
-	struct ast_node **child = &parent->of;
-	
+	struct ast_node *prev = parent;
+	struct ast_node *child;
+
 	while (true) {
-		if (token_is(parser->token, TOKEN_RPAREN)) {
-			assert(!toklist_is_empty(stack));
-			last = toklist_remove_last(stack);
-
-			switch (last->type) {
-			case TOKEN_ASTERISK:
-				*child = ast_node_new(&parser->ctx);
-				(*child)->type = AST_NODE_TYPE;
-				(*child)->ctype = CTYPE_POINTER;
-				child = &((*child)->ptr_to);
-				break;
-
-			case TOKEN_LPAREN:
-				parser_skip(parser);
-				break;
-
-			default:
-				assert(false);
-			}
-		}
-		else if (token_is(parser->token, TOKEN_LBRACKET)) {
-			parser_skip(parser);
-			assert(token_is(parser->token, TOKEN_RBRACKET));
-			parser_skip(parser);
-
-			*child = ast_node_new(&parser->ctx);
-			(*child)->type = AST_NODE_TYPE;
-			(*child)->ctype = CTYPE_ARRAY;
-			child = &((*child)->array_of);
-		}
-		else {
-			*child = ast_node_new(&parser->ctx);
-			(*child)->type = AST_NODE_TYPE;
-			(*child)->ctype = CTYPE_INT;
-
+		if (prev->node_type == AST_NODE_TYPE && prev->ctype == CTYPE_INT)
 			break;
-		}
+
+		child = parser_parse_declaration_part(parser, stack);
+		prev->type = child;
+		prev = child;
+
+		DEBUG_MSG("Through");
 	}
 }
 
@@ -122,7 +142,7 @@ struct ast_node *parser_parse_declaration(struct parser *parser)
 	
 	toklist_init(&stack);
 
-	while (!token_is_name(parser->token) && !token_is_eof(parser->token)) {
+	while ((!token_is_name(parser->token) || token_is_keyword(parser->token, "const"))  && !token_is_eof(parser->token)) {
 		toklist_insert_last(&stack, parser->token);
 		parser_next(parser);
 	}
@@ -130,7 +150,7 @@ struct ast_node *parser_parse_declaration(struct parser *parser)
 	parser_skip(parser); /* name */
 
 	decl = ast_node_new(&parser->ctx);
-	decl->type = AST_NODE_DECL;
+	decl->node_type = AST_NODE_DECL;
 	parser_parse_declaration_do(parser, decl, &stack);
 
 	toklist_free(&stack);
@@ -141,28 +161,30 @@ struct ast_node *parser_parse_declaration(struct parser *parser)
 
 void dump_decl(struct ast_node *decl)
 {
-	assert(decl->type == AST_NODE_TYPE);
+	assert(decl->node_type == AST_NODE_TYPE);
+
+	if (decl->const_flag)
+		fprintf(stderr, "constant ");
 
 	switch (decl->ctype) {
-	case CTYPE_INT:
-		fprintf(stderr, "int");
-		break;
-
 	case CTYPE_POINTER:
 		fprintf(stderr, "pointer to ");
-		dump_decl(decl->ptr_to);
 		break;
 
 	case CTYPE_ARRAY:
-		fprintf(stderr, "array of ");
-		dump_decl(decl->array_of);
+		fprintf(stderr, "array[%lu] of ", decl->size);
 		break;
+
+	case CTYPE_INT:
+		fprintf(stderr, "int");
+		return;
 
 	default:
 		fprintf(stderr, "(unknown)");
-		break;
+		return;
 	}
 
+	dump_decl(decl->type);
 	fprintf(stderr, "\n");
 }
 
@@ -176,5 +198,5 @@ void parser_build_ast(struct parser *parser, struct ast *tree, char *cfile)
 	decl = parser_parse_declaration(parser);
 	cpp_close_file(parser->cpp);
 
-	dump_decl(decl->of);
+	dump_decl(decl->type);
 }
