@@ -28,6 +28,7 @@ void strbuf_prepare_write(struct strbuf *buf, size_t count);
 
 size_t strbuf_strlen(struct strbuf *buf);
 char *strbuf_get_string(struct strbuf *buf);
+char *strbuf_strcpy(struct strbuf *buf);
 char *strbuf_copy_to_mempool(struct strbuf *buf, struct mempool *pool);
 
 size_t strbuf_printf(struct strbuf *buf, char *fmt, ...);

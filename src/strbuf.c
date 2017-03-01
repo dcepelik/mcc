@@ -72,6 +72,17 @@ size_t strbuf_strlen(struct strbuf *buf)
 }
 
 
+char *strbuf_strcpy(struct strbuf *buf)
+{
+	char *copy;
+
+	copy = mcc_malloc(buf->len + 1);
+	strncpy(copy, buf->str, buf->len + 1);
+
+	return copy;
+}
+
+
 char *strbuf_copy_to_mempool(struct strbuf *buf, struct mempool *pool)
 {
 	char *str;

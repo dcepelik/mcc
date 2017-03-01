@@ -4,6 +4,7 @@
 #include "list.h"
 #include "lstr.h"
 #include "strbuf.h"
+#include "keyword.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -86,8 +87,9 @@ bool token_is_macro_arg(struct token *token);
 bool token_is_eof(struct token *token);
 bool token_is_eol(struct token *token);
 bool token_is_eol_or_eof(struct token *token);
-bool token_is_keyword(struct token *token, char *keyword);
+bool token_is_keyword(struct token *token, enum c_keyword keyword);
 
+char *token_to_string(struct token *token);
 void token_print(struct token *token, struct strbuf *buf);
 void token_dump(struct token *token, FILE *fout);
 

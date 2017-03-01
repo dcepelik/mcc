@@ -172,7 +172,6 @@ struct cpp *cpp_new(struct context *ctx)
 	toklist_init(&cpp->tokens);
 
 	cpp_init_ifstack(cpp);
-
 	cpp_setup_symtab(cpp);
 
 	return cpp;

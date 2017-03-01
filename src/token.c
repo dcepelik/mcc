@@ -135,9 +135,26 @@ bool token_is_eol_or_eof(struct token *token)
 }
 
 
-bool token_is_keyword(struct token *token, char *keyword)
+bool token_is_keyword(struct token *token, enum c_keyword keyword)
 {
-	return token_is_name(token) && strcmp(symbol_get_name(token->symbol), keyword) == 0;
+	return token_is_name(token)
+		&& token->symbol->def->type == SYMBOL_TYPE_C_KEYWORD
+		&& token->symbol->def->keyword == keyword;
+}
+
+
+char *token_to_string(struct token *token)
+{
+	struct strbuf buf;
+	char *copy;
+
+	strbuf_init(&buf, 1024);
+	token_print(token, &buf);
+
+	copy = strbuf_strcpy(&buf);
+	strbuf_free(&buf);
+
+	return copy;
 }
 
 

@@ -9,9 +9,16 @@ enum ast_node_type
 	AST_NODE_DECL,
 };
 
+enum type_flag
+{
+	TYPE_FLAG_CONST = 1,
+	TYPE_FLAG_VOLATILE = 2,
+	TYPE_FLAG_RESTRICT = 4,
+};
+
 enum ctype
 {
-	CTYPE_INT,
+	CTYPE_INT = 1,
 	CTYPE_POINTER,
 	CTYPE_ARRAY,
 };
@@ -26,7 +33,7 @@ struct ast_node
 		{
 			enum ctype ctype;
 			struct ast_node *type;
-			bool const_flag;
+			enum type_flag flags;
 			size_t size;
 		};
 	};

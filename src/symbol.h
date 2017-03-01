@@ -8,6 +8,7 @@
 
 #include "cpp-internal.h"
 #include "hashtab.h"
+#include "keyword.h"
 #include "objpool.h"
 #include <stdbool.h>
 #include <stdio.h>
@@ -47,6 +48,7 @@ enum symbol_type
 	SYMBOL_TYPE_CPP_DIRECTIVE,	/* C preprocessor directive */
 	SYMBOL_TYPE_CPP_MACRO,		/* C preprocessor macro */
 	SYMBOL_TYPE_CPP_MACRO_ARG,	/* C preprocessor's macro argument */
+	SYMBOL_TYPE_C_KEYWORD,		/* C language keyword */
 	SYMBOL_TYPE_UNDEF		/* symbol has no proper definition */
 };
 
@@ -70,6 +72,7 @@ struct symdef
 	enum symbol_type type;
 	union {
 		enum cpp_directive directive;
+		enum c_keyword keyword;
 		struct macro macro;
 		struct macro_arg macro_arg;
 	};
