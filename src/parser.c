@@ -224,11 +224,7 @@ struct ast_node *parser_parse_declaration(struct parser *parser)
 	
 	toklist_init(&stack);
 
-	while ((!token_is_name(parser->token)
-		|| token_is_keyword(parser->token, C_KEYWORD_CONST)
-		|| token_is_keyword(parser->token, C_KEYWORD_RESTRICT)
-		|| token_is_keyword(parser->token, C_KEYWORD_VOLATILE)
-		|| token_is_keyword(parser->token, C_KEYWORD_INT))
+	while ((!token_is_name(parser->token) || token_is_any_keyword(parser->token))
 		&& !token_is_eof(parser->token)) {
 		toklist_insert_last(&stack, parser->token);
 		parser_next(parser);

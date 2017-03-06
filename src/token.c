@@ -137,9 +137,14 @@ bool token_is_eol_or_eof(struct token *token)
 
 bool token_is_keyword(struct token *token, enum c_keyword keyword)
 {
+	return token_is_any_keyword(token) && token->symbol->def->keyword == keyword;
+}
+
+
+bool token_is_any_keyword(struct token *token)
+{
 	return token_is_name(token)
-		&& token->symbol->def->type == SYMBOL_TYPE_C_KEYWORD
-		&& token->symbol->def->keyword == keyword;
+		&& token->symbol->def->type == SYMBOL_TYPE_C_KEYWORD;
 }
 
 
