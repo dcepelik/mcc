@@ -2,58 +2,6 @@
 #include "keyword.h"
 
 
-static const struct {
-	char *name;
-	enum c_keyword keyword;
-}
-keywords[] = {
-	{ .name = "auto", .keyword = C_KEYWORD_AUTO },
-	{ .name = "break", .keyword = C_KEYWORD_BREAK },
-	{ .name = "case", .keyword = C_KEYWORD_CASE },
-	{ .name = "char", .keyword = C_KEYWORD_CHAR },
-	{ .name = "const", .keyword = C_KEYWORD_CONST },
-	{ .name = "continue", .keyword = C_KEYWORD_CONTINUE },
-	{ .name = "default", .keyword = C_KEYWORD_DEFAULT },
-	{ .name = "do",  .keyword = C_KEYWORD_DO },
-	{ .name = "double", .keyword = C_KEYWORD_DOUBLE },
-	{ .name = "else", .keyword = C_KEYWORD_ELSE },
-	{ .name = "enum", .keyword = C_KEYWORD_ENUM },
-	{ .name = "extern", .keyword = C_KEYWORD_EXTERN },
-	{ .name = "float", .keyword = C_KEYWORD_FLOAT },
-	{ .name = "for", .keyword = C_KEYWORD_FOR },
-	{ .name = "goto", .keyword = C_KEYWORD_GOTO },
-	{ .name = "if",  .keyword = C_KEYWORD_IF },
-	{ .name = "inline", .keyword = C_KEYWORD_INLINE },
-	{ .name = "int", .keyword = C_KEYWORD_INT },
-	{ .name = "long", .keyword = C_KEYWORD_LONG },
-	{ .name = "register", .keyword = C_KEYWORD_REGISTER },
-	{ .name = "restrict", .keyword = C_KEYWORD_RESTRICT },
-	{ .name = "return", .keyword = C_KEYWORD_RETURN },
-	{ .name = "short", .keyword = C_KEYWORD_SHORT },
-	{ .name = "signed", .keyword = C_KEYWORD_SIGNED },
-	{ .name = "sizeof", .keyword = C_KEYWORD_SIZEOF },
-	{ .name = "static", .keyword = C_KEYWORD_STATIC },
-	{ .name = "struct", .keyword = C_KEYWORD_STRUCT },
-	{ .name = "switch", .keyword = C_KEYWORD_SWITCH },
-	{ .name = "typedef", .keyword = C_KEYWORD_TYPEDEF },
-	{ .name = "union", .keyword = C_KEYWORD_UNION },
-	{ .name = "unsigned", .keyword = C_KEYWORD_UNSIGNED },
-	{ .name = "void", .keyword = C_KEYWORD_VOID },
-	{ .name = "volatile", .keyword = C_KEYWORD_VOLATILE },
-	{ .name = "while", .keyword = C_KEYWORD_WHILE },
-	{ .name = "_Alignas", .keyword = C_KEYWORD_ALIGNAS },
-	{ .name = "_Alignof", .keyword = C_KEYWORD_ALIGNOF },
-	{ .name = "_Atomic", .keyword = C_KEYWORD_ATOMIC },
-	{ .name = "_Bool", .keyword = C_KEYWORD_BOOL },
-	{ .name = "_Complex", .keyword = C_KEYWORD_COMPLEX },
-	{ .name = "_Generic", .keyword = C_KEYWORD_GENERIC },
-	{ .name = "_Imaginary", .keyword = C_KEYWORD_IMAGINARY },
-	{ .name = "_Noreturn", .keyword = C_KEYWORD_NORETURN },
-	{ .name = "_Static_assert", .keyword = C_KEYWORD_STATIC_ASSERT },
-	{ .name = "_Thread_local", .keyword = C_KEYWORD_THREAD_LOCAL },
-};
-
-
 static void parser_next(struct parser *parser)
 {
 	parser->token = cpp_next(parser->cpp);
@@ -66,7 +14,7 @@ static void parser_next(struct parser *parser)
  */
 static void parser_skip(struct parser *parser)
 {
-	parser_next(parser);
+	(void) parser_next(parser);
 }
 
 
@@ -88,7 +36,7 @@ void parser_setup_symtab(struct symtab *table)
 
 		def = symbol_define(table, symbol);
 		def->type = SYMBOL_TYPE_C_KEYWORD;
-		def->keyword = keywords[i].keyword;
+		def->keyword = &keywords[i];
 	}
 }
 
@@ -126,11 +74,11 @@ static void parser_parse_type_qual(struct parser *parser, struct ast_node *type,
 	while (!toklist_is_empty(stack)) {
 		top = toklist_last(stack);
 
-		if (token_is_keyword(top, C_KEYWORD_CONST))
+		if (token_is_keyword(top, KWD_TYPE_CONST))
 			type->flags |= TYPE_FLAG_CONST;
-		else if (token_is_keyword(top, C_KEYWORD_VOLATILE))
+		else if (token_is_keyword(top, KWD_TYPE_VOLATILE))
 			type->flags |= TYPE_FLAG_VOLATILE;
-		else if (token_is_keyword(top, C_KEYWORD_RESTRICT)) 
+		else if (token_is_keyword(top, KWD_TYPE_RESTRICT)) 
 			type->flags |= TYPE_FLAG_RESTRICT;
 		else
 			break;
@@ -140,7 +88,7 @@ static void parser_parse_type_qual(struct parser *parser, struct ast_node *type,
 }
 
 
-static struct ast_node *parser_parse_declaration_part(struct parser *parser, struct toklist *stack)
+static struct ast_node *parse_decl_part(struct parser *parser, struct toklist *stack)
 {
 	struct ast_node *node;
 	struct token *top;
@@ -155,13 +103,13 @@ again:
 		top = toklist_remove_last(stack);
 
 		if (top->type == TOKEN_ASTERISK) {
-			node->ctype = CTYPE_POINTER;
+			node->ctype = CTYPE_PTR;
 		}
 		else if (top->type == TOKEN_LPAREN) {
 			parser_next(parser);
 			goto again;
 		}
-		else if (token_is_keyword(top, C_KEYWORD_INT)) {
+		else if (token_is_keyword(top, KWD_TYPE_INT)) {
 			node->ctype = CTYPE_INT;
 			parser_parse_type_qual(parser, node, stack);
 		}
@@ -198,7 +146,7 @@ again:
  *     int *(*f(int a))
  *
  */
-static void parser_parse_declaration_do(struct parser *parser, struct ast_node *parent, struct toklist *stack)
+static void parse_decl_do(struct parser *parser, struct ast_node *parent, struct toklist *stack)
 {
 	struct ast_node *prev = parent;
 	struct ast_node *child;
@@ -210,22 +158,25 @@ static void parser_parse_declaration_do(struct parser *parser, struct ast_node *
 		if (token_is(parser->token, TOKEN_SEMICOLON) && toklist_is_empty(stack))
 			break;
 
-		child = parser_parse_declaration_part(parser, stack);
+		child = parse_decl_part(parser, stack);
 		prev->type = child;
 		prev = child;
 	}
 }
 
 
-struct ast_node *parser_parse_declaration(struct parser *parser)
+struct ast_node *parser_parse_decl(struct parser *parser)
 {
 	struct toklist stack;
 	struct ast_node *decl;
 	
 	toklist_init(&stack);
 
+	/*
+	 * Put tokens onto stack until you run into the name which is being declared.
+	 */
 	while ((!token_is_name(parser->token) || token_is_any_keyword(parser->token))
-		&& !token_is_eof(parser->token)) {
+		&& !token_is_eof(parser->token) && !token_is(parser->token, TOKEN_SEMICOLON)) {
 		toklist_insert_last(&stack, parser->token);
 		parser_next(parser);
 	}
@@ -234,7 +185,7 @@ struct ast_node *parser_parse_declaration(struct parser *parser)
 
 	decl = ast_node_new(&parser->ctx);
 	decl->node_type = AST_NODE_DECL;
-	parser_parse_declaration_do(parser, decl, &stack);
+	parse_decl_do(parser, decl, &stack);
 
 	toklist_free(&stack);
 
@@ -256,7 +207,7 @@ void dump_decl(struct ast_node *decl)
 		fprintf(stderr, "volatile ");
 
 	switch (decl->ctype) {
-	case CTYPE_POINTER:
+	case CTYPE_PTR:
 		fprintf(stderr, "pointer to ");
 		break;
 
@@ -283,7 +234,7 @@ void parser_build_ast(struct parser *parser, struct ast *tree, char *cfile)
 
 	cpp_open_file(parser->cpp, cfile);
 	parser_next(parser);
-	decl = parser_parse_declaration(parser);
+	decl = parser_parse_decl(parser);
 	cpp_close_file(parser->cpp);
 
 	dump_decl(decl->type);

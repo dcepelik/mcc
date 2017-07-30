@@ -16,13 +16,6 @@ enum type_flag
 	TYPE_FLAG_RESTRICT = 4,
 };
 
-enum ctype
-{
-	CTYPE_INT = 1,
-	CTYPE_POINTER,
-	CTYPE_ARRAY,
-};
-
 struct ast_node
 {
 	enum ast_node_type node_type;

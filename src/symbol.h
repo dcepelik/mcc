@@ -71,10 +71,10 @@ struct symdef
 	struct symbol *symbol;
 	enum symbol_type type;
 	union {
-		enum cpp_directive directive;
-		enum c_keyword keyword;
-		struct macro macro;
-		struct macro_arg macro_arg;
+		enum cpp_directive directive;	/* C preprocessor directive */
+		const struct kwd *keyword;	/* C keyword */
+		struct macro macro;		/* C preprocessor macro */
+		struct macro_arg macro_arg;	/* argument of a C preprocessor macro */
 	};
 };
 

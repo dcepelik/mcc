@@ -87,7 +87,7 @@ bool token_is_macro_arg(struct token *token);
 bool token_is_eof(struct token *token);
 bool token_is_eol(struct token *token);
 bool token_is_eol_or_eof(struct token *token);
-bool token_is_keyword(struct token *token, enum c_keyword keyword);
+bool token_is_keyword(struct token *token, enum kwd_type type);
 bool token_is_any_keyword(struct token *token);
 
 char *token_to_string(struct token *token);
