@@ -37,7 +37,7 @@ suite=$1
 
 num_ok=0
 num_errs=0
-prog=../../../src/$suite
+prog=$(pwd)/../build/$suite
 
 if [ -z "$suite" ]; then
 	echo "$0: usage: $0 SUITE"

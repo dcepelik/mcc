@@ -4,6 +4,7 @@ BUILD_DIR = build
 SRC_DIR = src
 OBJS_DIR = $(BUILD_DIR)/objs
 DEPS_DIR = $(BUILD_DIR)/deps
+INC_DIRS = $(SRC_DIR)/include
 
 BINS = $(BUILD_DIR)/mcc $(BUILD_DIR)/mcpp
 SRCS = array.c \
@@ -38,6 +39,7 @@ OBJS = $(filter-out $(MAINS), $(addprefix $(OBJS_DIR)/, $(patsubst %.c, %.o, $(S
 DEPS = $(addprefix $(DEPS_DIR)/, $(patsubst %.c, %.d, $(SRCS)))
 
 CFLAGS += -c -std=gnu11 \
+	-I $(INC_DIRS) \
 	-Wall -Wextra -Werror --pedantic -Wno-unused-parameter -Wno-unused-function \
 	-Wimplicit-fallthrough=1 \
 	-ggdb3 -DDEBUG
