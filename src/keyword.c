@@ -1,7 +1,10 @@
 #include "keyword.h"
 
 
-static const struct kwd keywords[] = {
+/*
+ * Definition of C keywords.
+ */
+const struct kwd keywords[44] = {
 	{
 		.name = "_Alignas",
 		.type = KWD_TYPE_ALIGNAS,
@@ -41,13 +44,13 @@ static const struct kwd keywords[] = {
 	{
 		.name = "_Thread_local",
 		.type = KWD_TYPE_THREAD_LOCAL,
-		.class = KWD_CLASS_STORAGE;
+		.class = KWD_CLASS_STORCLS,
 		.storcls = STORCLS_THREAD_LOCAL,
 	},
 	{
 		.name = "auto",
 		.type = KWD_TYPE_AUTO,
-		.class = KWD_CLASS_STORAGE;
+		.class = KWD_CLASS_STORCLS,
 		.storcls = STORCLS_AUTO,
 	},
 	{
@@ -95,7 +98,7 @@ static const struct kwd keywords[] = {
 	{
 		.name = "extern",
 		.type = KWD_TYPE_EXTERN,
-		.class = KWD_CLASS_STORAGE,
+		.class = KWD_CLASS_STORCLS,
 		.storcls = STORCLS_EXTERN,
 	},
 	{
@@ -117,7 +120,7 @@ static const struct kwd keywords[] = {
 	{
 		.name = "inline",
 		.type = KWD_TYPE_INLINE,
-		.class = KWD_CLASS_STORAGE,
+		.class = KWD_CLASS_STORCLS,
 		.storcls = STORCLS_INLINE,
 	},
 	{
@@ -131,7 +134,7 @@ static const struct kwd keywords[] = {
 	{
 		.name = "register",
 		.type = KWD_TYPE_REGISTER,
-		.class = KWD_CLASS_STORAGE,
+		.class = KWD_CLASS_STORCLS,
 		.storcls = STORCLS_REGISTER,
 	},
 	{
@@ -197,3 +200,4 @@ static const struct kwd keywords[] = {
 		.type = KWD_TYPE_WHILE,
 	},
 };
+

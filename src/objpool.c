@@ -82,9 +82,8 @@ void objpool_dealloc(struct objpool *pool, void *mem)
 	unused->next = pool->first_unused;
 	pool->first_unused = unused;
 
+	assert(pool->num_objs > 0);
 	pool->num_objs--;
-
-	assert(pool->num_objs >= 0);
 }
 
 

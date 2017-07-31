@@ -119,8 +119,8 @@ bool hashtab_remove(struct hashtab *hashtab, struct hashnode *node)
 
 	cur->next = node->next;
 
+	assert(hashtab->count > 0);
 	hashtab->count--;
-	assert(hashtab->count >= 0);
 
 	return true;
 }

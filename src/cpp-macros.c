@@ -137,7 +137,7 @@ static struct token *macro_parse_args(struct cpp *cpp, struct macro *macro, stru
 	struct token *next;
 	struct symdef *def;
 	struct toklist args;
-	unsigned parens_balance = 0;
+	int parens_balance = 0;
 	bool args_ended = false;
 
 	assert(token_is_expandable_macro(token));

@@ -110,7 +110,7 @@ void strbuf_free(struct strbuf *buf)
 size_t strbuf_vprintf_at(struct strbuf *buf, size_t offset, char *fmt, va_list args)
 {
 	va_list args2;
-	size_t num_written;
+	int num_written;
 	size_t size_needed;
 
 	va_copy(args2, args);

@@ -83,8 +83,6 @@ void *list_remove_first(struct list *lst)
 			lst->last = &lst->head;
 	}
 
-	assert(list_length(lst) >= 0);
-	
 	return first;
 }
 

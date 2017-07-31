@@ -74,8 +74,8 @@ static inline void *mempool_alloc_chain(struct mempool_chain *chain, size_t size
 	free_size = chain->last_free;
 	assert(free_size >= size);
 
+	assert(chain->last_free >= size);
 	chain->last_free -= size;
-	assert(chain->last_free >= 0);
 
 	return (unsigned char *)chain->last - free_size;
 }

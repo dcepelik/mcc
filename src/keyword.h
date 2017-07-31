@@ -80,9 +80,6 @@ struct kwd
 	};
 };
 
-/*
- * Definition of C keywords.
- */
-extern const struct kwd *keywords;
+extern const struct kwd keywords[44];
 
 #endif

@@ -236,7 +236,7 @@ static inline int hex_val(int c)
 static uint32_t read_hex_number(struct lexer *lexer, size_t min_len, size_t max_len)
 {	
 	uint32_t val = 0;
-	int i;
+	size_t i;
 
 	for (i = 0; i < max_len; i++) {
 		if (!is_hex_digit(*lexer->c))
@@ -391,7 +391,7 @@ static struct token *lexer_lex_char(struct lexer *lexer, struct token *token)
 
 static inline bool lexer_is_eol(struct lexer *lexer)
 {
-	return (lexer->c - strbuf_get_string(&lexer->linebuf))
+	return (size_t)(lexer->c - strbuf_get_string(&lexer->linebuf))
 		>= strbuf_strlen(&lexer->linebuf);
 }
 
@@ -737,7 +737,10 @@ next_nonwhite_char:
 			return lexer_lex_string_literal(lexer, token);
 		}
 
+		/* fall-through: it's not a string prefix */
+
 	case 'U':
+		/* fall-through */
 	case 'L':
 		/* L'char' or U'char' or u'char' */
 		if (*lexer->c == '\'') {

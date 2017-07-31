@@ -15,7 +15,7 @@ void errlist_init(struct errlist *errlist)
 	mempool_init(&errlist->string_pool, STRING_POOL_BLOCK_SIZE);
 	objpool_init(&errlist->error_pool, sizeof(struct error), ERROR_POOL_BLOCK_SIZE);
 
-	for (i = 0; i < ARRAY_SIZE(&errlist->num_errors_by_level); i++)
+	for (i = 0; i < ARRAY_SIZE(errlist->num_errors_by_level); i++)
 		errlist->num_errors_by_level[i] = 0;
 }
 
