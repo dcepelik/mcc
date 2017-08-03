@@ -173,6 +173,7 @@ void *list_next(struct list_node *node)
 
 void list_free(struct list *lst)
 {
+	(void) lst;
 }
 
 

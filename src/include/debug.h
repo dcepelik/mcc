@@ -20,5 +20,6 @@ bool shall_debug_file(const char *filename);
 #define DEBUG_MSG(msg)			DEBUG_PRINTF("%s", msg)
 #define DEBUG_EXPR(formatter, expr)	DEBUG_PRINTF(#expr " = " formatter, (expr))
 #define DEBUG_TRACE			DEBUG_PRINTF("Control reached %s", __func__)
+#define TMP_ASSERT(expr)		assert(expr)
 
 #endif

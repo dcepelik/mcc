@@ -63,12 +63,12 @@ static void hashtab_resize(struct hashtab *hashtab, size_t new_size)
 
 void hashtab_init(struct hashtab *hashtab, struct objpool *pool, size_t init_size)
 {
+	(void) pool; /* TODO why unused? */
+
 	hashtab->table = NULL;
 	hashtab->size = 0;
 	hashtab->count = 0;
-
 	mempool_init(&hashtab->keys, 1024);
-
 	hashtab_resize(hashtab, init_size);
 }
 
@@ -153,6 +153,8 @@ void *hashtab_search(struct hashtab *hashtab, char *key)
 
 void *hashtab_next(struct hashtab *hashtab, struct hashnode *node)
 {
+	(void) hashtab;
+
 	struct hashnode *cur = node->next;
 
 	while (cur != NULL) {

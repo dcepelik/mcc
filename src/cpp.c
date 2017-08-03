@@ -98,14 +98,17 @@ static void cpp_setup_builtin(struct cpp *cpp, char *name, char *fmt, ...)
 }
 
 
+/* TODO */
 static void cpp_builtin_file(struct cpp *cpp, struct macro *macro, struct toklist *out)
 {
+	(void) macro;
 	toklist_load_from_string(out, cpp->ctx, "\"%s\"", "some-file.c");
 }
 
-
+/* TODO */
 static void cpp_builtin_line(struct cpp *cpp, struct macro *macro, struct toklist *out)
 {
+	(void) macro;
 	toklist_load_from_string(out, cpp->ctx, "%lu", 128);
 }
 

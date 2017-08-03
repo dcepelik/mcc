@@ -23,8 +23,8 @@ SRCS = array.c \
 	keyword.c \
 	lexer.c \
 	list.c \
-	mcc-main.c \
-	mcpp-main.c \
+	mcc.c \
+	mcpp.c \
 	mempool.c \
 	objpool.c \
 	parser.c \
@@ -34,13 +34,13 @@ SRCS = array.c \
 	token.c \
 	toklist.c \
 	utf8.c
-MAINS = $(OBJS_DIR)/mcc-main.o $(OBJS_DIR)/mcpp-main.o
+MAINS = $(OBJS_DIR)/mcc.o $(OBJS_DIR)/mcpp.o
 OBJS = $(filter-out $(MAINS), $(addprefix $(OBJS_DIR)/, $(patsubst %.c, %.o, $(SRCS))))
 DEPS = $(addprefix $(DEPS_DIR)/, $(patsubst %.c, %.d, $(SRCS)))
 
 CFLAGS += -c -std=gnu11 \
 	-I $(INC_DIRS) \
-	-Wall -Wextra -Werror --pedantic -Wno-unused-parameter -Wno-unused-function \
+	-Wall -Wextra -Werror --pedantic -Wno-unused-function \
 	-Wimplicit-fallthrough=1 \
 	-ggdb3 -DDEBUG
 LDFLAGS += -Wall
@@ -54,12 +54,12 @@ $(DEPS_DIR)/%.d: $(SRC_DIR)/%.c Makefile
 all: $(BINS)
 
 clean:
-	rm -f -- $(OBJS) $(MAINS) $(BINS)
+	rm -f -- $(OBJS_DIR)/*.o $(DEPS_DIR)/*.d $(BINS)
 
-$(BUILD_DIR)/mcc: $(OBJS) $(OBJS_DIR)/mcc-main.o
+$(BUILD_DIR)/mcc: $(OBJS) $(OBJS_DIR)/mcc.o
 	$(CC) $(LDFLAGS) -o $@ $^
 
-$(BUILD_DIR)/mcpp: $(OBJS) $(OBJS_DIR)/mcpp-main.o
+$(BUILD_DIR)/mcpp: $(OBJS) $(OBJS_DIR)/mcpp.o
 	$(CC) $(LDFLAGS) -o $@ $^
 
 include $(DEPS)

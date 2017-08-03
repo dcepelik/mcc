@@ -34,4 +34,7 @@ char *strbuf_copy_to_mempool(struct strbuf *buf, struct mempool *pool);
 size_t strbuf_printf(struct strbuf *buf, char *fmt, ...);
 size_t strbuf_vprintf_at(struct strbuf *buf, size_t offset, char *fmt, va_list args);
 
+/* TODO This is slow. Don't use it or make it faster. */
+size_t strbuf_prepend(struct strbuf *buf, char *fmt, ...);
+
 #endif

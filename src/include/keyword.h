@@ -27,13 +27,23 @@ enum storcls
 /*
  * Built-in C Type.
  */
-enum ctype
+enum tspec
 {
-	CTYPE_ARRAY,
-	CTYPE_ENUM,
-	CTYPE_INT,
-	CTYPE_PTR,
-	CTYPE_STRUCT,
+	TSPEC_ARRAY,
+	TSPEC_BOOL,
+	TSPEC_CHAR,
+	TSPEC_COMPLEX,
+	TSPEC_DOUBLE,
+	TSPEC_ENUM,
+	TSPEC_FLOAT,
+	TSPEC_INT,
+	TSPEC_LONG,
+	TSPEC_PTR,
+	TSPEC_SHORT,
+	TSPEC_SIGNED,
+	TSPEC_STRUCT,
+	TSPEC_UNSIGNED,
+	TSPEC_VOID,
 };
 
 enum kwd_type
@@ -56,11 +66,13 @@ enum kwd_type
  */
 enum kwd_class
 {
-	KWD_CLASS_CTYPE,	/* built-in C type */
+	KWD_CLASS_ALIGNMENT,	/* alignment specifier */
 	KWD_CLASS_FLOWCTL,	/* flow control keyword */
+	KWD_CLASS_FUNCSPEC,	/* function specifier */
 	KWD_CLASS_OPER,		/* operator */
 	KWD_CLASS_STORCLS,	/* storage class */
 	KWD_CLASS_TQUAL,	/* type qualifier */
+	KWD_CLASS_TSPEC,	/* type specifier */
 	KWD_CLASS_OTHER,
 };
 
@@ -75,7 +87,7 @@ struct kwd
 	union
 	{
 		enum tqual tqual;	/* type qualifier */
-		enum ctype ctype;	/* built-in C type */
+		enum tspec tspec;	/* built-in C type */
 		enum storcls storcls;	/* storage class */
 	};
 };

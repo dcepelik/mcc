@@ -43,6 +43,8 @@ void cpp_file_include(struct cpp *cpp, struct cpp_file *file)
 
 static mcc_error_t cpp_file_include_searchpath_do(struct cpp *cpp, const char **search_dirs, char *filename, struct cpp_file *file)
 {
+	(void) search_dirs; /* TODO Use this */
+
 	bool file_found;
 	struct strbuf pathbuf;
 	char *path;
@@ -97,6 +99,7 @@ mcc_error_t cpp_file_include_hheader(struct cpp *cpp, char *filename, struct cpp
 
 void cpp_file_free(struct cpp *cpp, struct cpp_file *file)
 {
+	(void) cpp;
 	inbuf_close(&file->inbuf);
 	lexer_free(&file->lexer);
 }

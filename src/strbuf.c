@@ -144,3 +144,23 @@ size_t strbuf_printf(struct strbuf *buf, char *fmt, ...)
 
 	return num_written;
 }
+
+
+size_t strbuf_prepend(struct strbuf *buf, char *fmt, ...)
+{
+	size_t num_written;
+	char *cpy;
+	
+	cpy = strbuf_strcpy(buf);
+	strbuf_reset(buf);
+
+	va_list args;
+	va_start(args, fmt);
+	num_written = strbuf_vprintf_at(buf, buf->len, fmt, args);
+	va_end(args);
+
+	strbuf_printf(buf, "%s", cpy);
+	free(cpy);
+
+	return num_written;
+}
