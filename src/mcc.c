@@ -2,7 +2,7 @@
 #include "cpp.h"
 #include "error.h"
 #include "symbol.h"
-#include "parser.h"
+#include "parse.h"
 #include "ast.h"
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,68 +1,6 @@
-#include "parser.h"
 #include "keyword.h"
 #include "array.h"
-
-static void parser_next(struct parser *parser)
-{
-	parser->token = cpp_next(parser->cpp);
-}
-
-
-static void parser_skip(struct parser *parser)
-{
-	/* TODO free */
-	(void) parser_next(parser);
-}
-
-
-static void parser_next_push(struct parser *parser, struct toklist *toklist)
-{
-	toklist_insert_last(toklist, parser->token);
-	parser_next(parser);
-}
-
-
-void parser_setup_symtab(struct symtab *table)
-{
-	struct symbol *symbol;
-	struct symdef *def;
-	size_t i;
-
-	for (i = 0; i < ARRAY_SIZE(keywords); i++) {
-		symbol = symtab_insert(table, keywords[i].name);
-
-		def = symbol_define(table, symbol);
-		def->type = SYMBOL_TYPE_C_KEYWORD;
-		def->keyword = &keywords[i];
-	}
-}
-
-
-void parser_init(struct parser *parser)
-{
-	context_init(&parser->ctx);
-	parser_setup_symtab(&parser->ctx.symtab);
-	parser->cpp = cpp_new(&parser->ctx);
-}
-
-
-void parser_free(struct parser *parser)
-{
-	context_free(&parser->ctx);
-	cpp_delete(parser->cpp);
-}
-
-
-static bool parser_is_eof(struct parser *parser)
-{
-	return token_is(parser->token, TOKEN_EOF);
-}
-
-
-static void parser_skip_rest(struct parser *parser)
-{
-	(void) parser;
-}
+#include "parse-internal.h"
 
 
 static struct ast_node *parse_declarators(struct parser *parser, struct toklist *stack);
@@ -127,18 +65,10 @@ static struct ast_node *parse_declarators(struct parser *parser, struct toklist 
 		decl->decl = parse_declarators(parser, stack);
 		return decl;
 	}
-	else if (token_is_name(parser->token) && !token_is_any_keyword(parser->token)) {
-		//decl = ast_node_new(&parser->ctx);
-		//decl->type = AST_NAME;
-		//decl->ident = "ahoj";
-		parser_next(parser);
-		return parse_declarators(parser, stack);
-	}
 	else if (token_is(parser->token, TOKEN_SEMICOLON) || token_is(parser->token, TOKEN_COMMA)) {
-		if (toklist_is_empty(stack))
-			return NULL;
-
-		return parse_pointer(parser, stack);
+		if (!toklist_is_empty(stack))
+			return parse_pointer(parser, stack);
+		return NULL;
 	}
 	else {
 		token_dump(parser->token, stderr);
@@ -219,7 +149,7 @@ static struct ast_node *parse_decl_part(struct parser *parser)
 }
 
 
-static struct ast_node *parser_parse_decl(struct parser *parser)
+struct ast_node *parser_parse_decl(struct parser *parser)
 {
 	struct ast_node *decl;
 	bool comma = false;
@@ -327,20 +257,4 @@ void dump_decln(struct ast_node *decln)
 
 	fprintf(stderr, strbuf_get_string(&buf));
 	strbuf_free(&buf);
-}
-
-
-void parser_build_ast(struct parser *parser, struct ast *tree, char *cfile)
-{
-	(void) tree;
-
-	struct ast_node *decln;
-
-	cpp_open_file(parser->cpp, cfile);
-	parser_next(parser);
-	decln = parser_parse_decl(parser);
-	cpp_close_file(parser->cpp);
-
-	dump_decln(decln);
-	fprintf(stderr, "\n");
 }
