@@ -7,9 +7,11 @@
 enum ast_node_type
 {
 	AST_ARRAY,
-	AST_POINTER,
 	AST_DECL,
 	AST_DECL_PART,
+	AST_POINTER,
+	AST_STRUCT_SPEC,
+	AST_UNION_SPEC,
 };
 
 struct ast_node
@@ -23,8 +25,10 @@ struct ast_node
 	};
 	char *ident;
 	size_t size;
-	struct ast_node *decl; /* declarator */
+	struct ast_node *spec;	/* struct or union specifiaction */
+	struct ast_node *decl;	/* declarator */
 	struct ast_node **parts;
+	struct ast_node **decls;
 };
 
 void ast_node_init(struct ast_node *node);

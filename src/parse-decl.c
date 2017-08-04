@@ -105,11 +105,58 @@ static struct ast_node *parse_init_declarator(struct parser *parser)
 
 
 /*
+ * Parses: 6.7.2.1 struct-or-union-specifier.
+ */
+static struct ast_node *parse_struct_or_union_specifier(struct parser *parser)
+{
+	struct ast_node *spec;
+
+	if (token_is_keyword(parser->token, KWD_TYPE_STRUCT))
+		spec = ast_node_new(&parser->ctx, AST_STRUCT_SPEC);
+	else if (token_is_keyword(parser->token, KWD_TYPE_UNION))
+		spec = ast_node_new(&parser->ctx, AST_UNION_SPEC);
+	else
+		assert(0);
+
+	parser_next(parser);
+	spec->ident = NULL;
+	spec->decls = NULL;
+
+	if (token_is_name(parser->token) && !token_is_any_keyword(parser->token)) {
+		spec->ident = symbol_get_name(parser->token->symbol);
+		parser_next(parser);
+	}
+
+	if (!parser_expect(parser, TOKEN_LBRACE)) {
+		TMP_ASSERT(spec->ident); /* if there's no decl list, there must be a name */
+		return spec;
+	}
+
+	spec->decls = array_new(2, sizeof(*spec->decls));
+	while (!token_is_eof(parser->token)) {
+		if (token_is(parser->token, TOKEN_RBRACE))
+			break;
+
+		spec->decls = array_claim(spec->decls, 1);
+		spec->decls[array_size(spec->decls) - 1] = parser_parse_decl(parser);
+	}
+
+	if (!parser_expect(parser, TOKEN_RBRACE))
+		TMP_ASSERT(0);
+
+	return spec;
+
+}
+
+
+/*
  * Parses: 6.7 declaration-specifiers.
  */
 static void parse_declspec(struct parser *parser, struct ast_node *decln)
 {
 	const struct kwd *kwd;
+
+	decln->tspec = decln->tquals = decln->storcls = 0;
 
 	while (token_is_any_keyword(parser->token)) {
 		kwd = parser->token->symbol->def->keyword;
@@ -132,7 +179,10 @@ static void parse_declspec(struct parser *parser, struct ast_node *decln)
 				return;
 		}
 
-		parser_next(parser);
+		if (kwd->type == KWD_TYPE_STRUCT || kwd->type == KWD_TYPE_UNION)
+			decln->spec = parse_struct_or_union_specifier(parser);
+		else
+			parser_next(parser);
 	}
 }
 
@@ -172,16 +222,44 @@ struct ast_node *parser_parse_decl(struct parser *parser)
 }
 
 
+void print_decln(struct ast_node *decln, struct strbuf *buf);
+
+
 static void print_declspec(struct ast_node *node, struct strbuf *buf)
 {
-	if (node->tquals & TQUAL_CONST)
+	size_t i;
+
+	if (node->tquals & TQUAL_CONST) {
 		strbuf_printf(buf, "const ");
-	if (node->tquals & TQUAL_RESTRICT)
+	}
+	if (node->tquals & TQUAL_RESTRICT) {
 		strbuf_printf(buf, "restrict ");
-	if (node->tquals & TQUAL_VOLATILE)
+	}
+	if (node->tquals & TQUAL_VOLATILE) {
 		strbuf_printf(buf, "volatile ");
-	if (node->tspec & TSPEC_INT)
+	}
+	if (node->tspec & TSPEC_INT) {
 		strbuf_printf(buf, "int ");
+	}
+	if (node->tspec & TSPEC_STRUCT) {
+		if (node->spec->ident)
+			strbuf_printf(buf, "struct %s ", node->spec->ident);
+		else
+			strbuf_printf(buf, "struct ");
+
+		if (node->spec->decls) {
+			strbuf_printf(buf, "{\n");
+			for (i = 0; i < array_size(node->spec->decls); i++) {
+				strbuf_printf(buf, "\t");
+				print_decln(node->spec->decls[i], buf);
+				strbuf_printf(buf, "\n");
+			}
+			strbuf_printf(buf, "} ");
+		}
+	}
+	if (node->tspec & TSPEC_UNION) {
+		strbuf_printf(buf, "union ");
+	}
 }
 
 
@@ -228,23 +306,28 @@ static void print_init_declarator(struct ast_node *part, struct ast_node *decl, 
 }
 
 
-void dump_decln(struct ast_node *decln)
+void print_decln(struct ast_node *decln, struct strbuf *buf)
 {
 	size_t i;
 
+	print_declspec(decln, buf);
+
+	for (i = 0; i < array_size(decln->parts); i++) {
+		print_init_declarator(decln->parts[i], decln->parts[i]->decl, buf);
+		if (i < array_size(decln->parts) - 1)
+			strbuf_printf(buf, ", ");
+	}
+	strbuf_printf(buf, ";");
+}
+
+
+void dump_decln(struct ast_node *decln)
+{
 	struct strbuf buf;
 	strbuf_init(&buf, 64);
 
 	TMP_ASSERT(decln->type == AST_DECL);
-
-	print_declspec(decln, &buf);
-
-	for (i = 0; i < array_size(decln->parts); i++) {
-		print_init_declarator(decln->parts[i], decln->parts[i]->decl, &buf);
-		if (i < array_size(decln->parts) - 1)
-			strbuf_printf(&buf, ", ");
-	}
-	strbuf_printf(&buf, ";");
+	print_decln(decln, &buf);
 
 	fprintf(stderr, strbuf_get_string(&buf));
 	strbuf_free(&buf);

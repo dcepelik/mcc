@@ -66,6 +66,17 @@ void parser_skip_rest(struct parser *parser)
 }
 
 
+bool parser_expect(struct parser *parser, enum token_type type)
+{
+	if (token_is(parser->token, type)) {
+		parser_next(parser);
+		return true;
+	}
+
+	return false;
+}
+
+
 void parser_build_ast(struct parser *parser, struct ast *tree, char *cfile)
 {
 	(void) tree;

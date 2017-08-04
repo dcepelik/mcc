@@ -205,7 +205,8 @@ const struct kwd keywords[44] = {
 	{
 		.name = "struct",
 		.type = KWD_TYPE_STRUCT,
-		.class = KWD_CLASS_OTHER
+		.class = KWD_CLASS_TSPEC,
+		.tspec = TSPEC_STRUCT,
 	},
 	{
 		.name = "switch",
@@ -220,7 +221,8 @@ const struct kwd keywords[44] = {
 	{
 		.name = "union",
 		.type = KWD_TYPE_UNION,
-		.class = KWD_CLASS_OTHER
+		.class = KWD_CLASS_TSPEC,
+		.tspec = TSPEC_UNION,
 	},
 	{
 		.name = "unsigned",
