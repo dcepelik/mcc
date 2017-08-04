@@ -6,6 +6,12 @@
 static struct ast_node *parse_declarators(struct parser *parser, struct toklist *stack);
 
 
+/*
+ * Parses: 6.7.6 pointer
+ *
+ * Only parses a single pointer (without the right recursion, which is contained in
+ * parse_declarators).
+ */
 static struct ast_node *parse_pointer(struct parser *parser, struct toklist *stack)
 {
 	enum tqual tquals;
@@ -31,15 +37,7 @@ static struct ast_node *parse_pointer(struct parser *parser, struct toklist *sta
 
 
 /*
- * Parse a Declarator.
- *
- * This functions parses a Declarator in the same way most C programmers are
- * used to: it begins with the name being declared and proceeds to the right
- * until it hits a right parenthesis, comma or a semicolon; then it reads to the left of
- * the name, etc.
- *
- * It does not parse the Declarator as descibed in the Standard; it also parses
- * Direct Declarators, Pointer Declarators, etc.
+ * Parses: 6.7.6 declarator, 6.7.6 direct-declarator
  */
 static struct ast_node *parse_declarators(struct parser *parser, struct toklist *stack)
 {
@@ -78,7 +76,36 @@ static struct ast_node *parse_declarators(struct parser *parser, struct toklist 
 
 
 /*
- * Parse Declaration Specifiers.
+ * Parses: 6.7 init-declarator.
+ */
+static struct ast_node *parse_init_declarator(struct parser *parser)
+{
+	struct ast_node *part;
+	struct toklist stack;
+
+	part = ast_node_new(&parser->ctx, AST_DECL_PART);
+	
+	/* now push all leading *, ( and type qualifiers onto the stack */
+	toklist_init(&stack);
+	while (token_is(parser->token, TOKEN_ASTERISK)
+		|| token_is(parser->token, TOKEN_LPAREN)
+		|| token_is_tqual(parser->token)) {
+		toklist_insert_last(&stack, parser->token);
+		parser_next(parser);
+	}
+
+	TMP_ASSERT(token_is_name(parser->token) && !token_is_any_keyword(parser->token));
+	part->ident = symbol_get_name(parser->token->symbol);
+	parser_next(parser);
+	part->decl = parse_declarators(parser, &stack);
+	toklist_free(&stack);
+
+	return part;
+}
+
+
+/*
+ * Parses: 6.7 declaration-specifiers.
  */
 static void parse_declspec(struct parser *parser, struct ast_node *decln)
 {
@@ -111,44 +138,8 @@ static void parse_declspec(struct parser *parser, struct ast_node *decln)
 
 
 /*
- * Parse Declaration.
- * See 6.7. Declarations
- *
- * Examples of various declarations:
- *
- *     int a
- *     int * const *b[]
- *     const int * const c
- *     volatile int *d[][]
- *     int *(*f(int a))
- *
+ * Parses: 6.7 declaration, 6.7 init-declarator-list.
  */
-static struct ast_node *parse_decl_part(struct parser *parser)
-{
-	struct ast_node *part;
-	struct toklist stack;
-
-	part = ast_node_new(&parser->ctx, AST_DECL_PART);
-	
-	/* now push all leading *, ( and type qualifiers onto the stack */
-	toklist_init(&stack);
-	while (token_is(parser->token, TOKEN_ASTERISK)
-		|| token_is(parser->token, TOKEN_LPAREN)
-		|| token_is_tqual(parser->token)) {
-		toklist_insert_last(&stack, parser->token);
-		parser_next(parser);
-	}
-
-	TMP_ASSERT(token_is_name(parser->token) && !token_is_any_keyword(parser->token));
-	part->ident = symbol_get_name(parser->token->symbol);
-	parser_next(parser);
-	part->decl = parse_declarators(parser, &stack);
-	toklist_free(&stack);
-
-	return part;
-}
-
-
 struct ast_node *parser_parse_decl(struct parser *parser)
 {
 	struct ast_node *decl;
@@ -172,7 +163,7 @@ struct ast_node *parser_parse_decl(struct parser *parser)
 		}
 
 		decl->parts = array_claim(decl->parts, 1);
-		decl->parts[array_size(decl->parts) - 1] = parse_decl_part(parser);
+		decl->parts[array_size(decl->parts) - 1] = parse_init_declarator(parser);
 
 		comma = false;
 	}
@@ -194,7 +185,7 @@ static void print_declspec(struct ast_node *node, struct strbuf *buf)
 }
 
 
-static void print_decl_part(struct ast_node *part, struct ast_node *decl, struct strbuf *buf)
+static void print_init_declarator(struct ast_node *part, struct ast_node *decl, struct strbuf *buf)
 {
 	bool need_parens = false;
 	struct strbuf decl_buf;
@@ -249,7 +240,7 @@ void dump_decln(struct ast_node *decln)
 	print_declspec(decln, &buf);
 
 	for (i = 0; i < array_size(decln->parts); i++) {
-		print_decl_part(decln->parts[i], decln->parts[i]->decl, &buf);
+		print_init_declarator(decln->parts[i], decln->parts[i]->decl, &buf);
 		if (i < array_size(decln->parts) - 1)
 			strbuf_printf(&buf, ", ");
 	}
