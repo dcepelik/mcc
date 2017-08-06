@@ -9,12 +9,12 @@
 * I want to know what goes into writing a compiler from scratch. Reading books about it
   just won't do anymore.
 * I hate Bison and Flex and I actually *enjoy* writing fast lexers and parsers by hand.
-  Don't judge me, everone's got a perversion.
-* I want to learn how to write complex software and compilers have always attracted me.
-* I want a framework to test out new code optimization algorithms without fighting with
-  existing code.
-* Writing a C compiler in C looks like an opportunity to learn about all the dark corners
-  of the language.
+  Don't judge me, everyone's got a perversion.
+* I want to learn to write complex software and compilers have always attracted me.
+* I need a framework to test out new code optimization algorithms without having to fight
+  over existing code.
+* Writing a C compiler in C looks like an opportunity to get to know all the dark corners
+  of C.
 * I'm interested in code optimization.
 * I'd love to write something I can be proud of (at least a bit).
 
