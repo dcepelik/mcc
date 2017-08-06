@@ -1,8 +1,44 @@
 #ifndef KEYWORD_H
 #define KEYWORD_H
 
+#define INT_TFLAGS	(TFLAG_UNSIGNED | TFLAG_SIGNED | TFLAG_SHORT | TFLAG_LONG | TFLAG_LONG_LONG)
+#define CHAR_TFLAGS	(TFLAG_UNSIGNED | TFLAG_SIGNED)
+
 /*
- * C Type Qualifier.
+ * C Type Specifiers which are considered ``basic types''. They are accompanied by
+ * ``flags'' which modify them, see enum tflag.
+ *
+ * This distinction is for the programmer's convenience only.
+ */
+enum tspec
+{
+	TSPEC_BOOL	= 1 << 0, 
+	TSPEC_CHAR	= 1 << 1,
+	TSPEC_DOUBLE	= 1 << 2,
+	TSPEC_ENUM	= 1 << 3,
+	TSPEC_FLOAT	= 1 << 4,
+	TSPEC_INT	= 1 << 5,
+	TSPEC_STRUCT	= 1 << 6,
+	TSPEC_UNION	= 1 << 7,
+	TSPEC_VOID	= 1 << 8,
+};
+
+/*
+ * C Type Specifiers which are considered merely ``flags'' which accompany the
+ * ``basic types'' which they modify, see enum tspec.
+ */
+enum tflag
+{
+	TFLAG_UNSIGNED	= 1 << 0,
+	TFLAG_SIGNED	= 1 << 1,
+	TFLAG_SHORT	= 1 << 2,
+	TFLAG_LONG	= 1 << 3,
+	TFLAG_LONG_LONG	= 1 << 4,
+	TFLAG_COMPLEX	= 1 << 5,
+};
+
+/*
+ * C Type Qualifiers.
  */
 enum tqual
 {
@@ -12,7 +48,7 @@ enum tqual
 };
 
 /*
- * C Storage Class.
+ * C Storage Class Specifiers.
  */
 enum storcls
 {
@@ -22,29 +58,6 @@ enum storcls
 	STORCLS_REGISTER	= 1 << 3,
 	STORCLS_STATIC		= 1 << 4,
 	STORCLS_THREAD_LOCAL	= 1 << 5,
-};
-
-/*
- * Built-in C Type.
- */
-enum tspec
-{
-	TSPEC_ARRAY	= 1 << 0,
-	TSPEC_BOOL	= 1 << 1,
-	TSPEC_CHAR	= 1 << 2,
-	TSPEC_COMPLEX	= 1 << 3,
-	TSPEC_DOUBLE	= 1 << 4,
-	TSPEC_ENUM	= 1 << 5,
-	TSPEC_FLOAT	= 1 << 6,
-	TSPEC_INT	= 1 << 7,
-	TSPEC_LONG	= 1 << 8,
-	TSPEC_PTR	= 1 << 9,
-	TSPEC_SHORT	= 1 << 10,
-	TSPEC_SIGNED	= 1 << 11,
-	TSPEC_STRUCT	= 1 << 12,
-	TSPEC_UNION	= 1 << 13,
-	TSPEC_UNSIGNED	= 1 << 14,
-	TSPEC_VOID	= 1 << 15,
 };
 
 enum kwd_type
@@ -73,7 +86,8 @@ enum kwd_class
 	KWD_CLASS_OPER,		/* operator */
 	KWD_CLASS_STORCLS,	/* storage class */
 	KWD_CLASS_TQUAL,	/* type qualifier */
-	KWD_CLASS_TSPEC,	/* type specifier */
+	KWD_CLASS_TSPEC,	/* type specifier, see enum tspec */
+	KWD_CLASS_TFLAG,	/* type specifier, see enum tflag */
 	KWD_CLASS_OTHER,
 };
 
@@ -88,7 +102,8 @@ struct kwd
 	union
 	{
 		enum tqual tqual;	/* type qualifier */
-		enum tspec tspec;	/* built-in C type */
+		enum tspec tspec;	/* type specifier, see enum tspec */
+		enum tflag tflags;	/* type specifier, see enum tflag */ /* TODO rename to tflag */
 		enum storcls storcls;	/* storage class */
 	};
 };

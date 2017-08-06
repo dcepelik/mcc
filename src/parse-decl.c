@@ -59,7 +59,7 @@ static struct ast_node *parse_declarators(struct parser *parser, struct toklist 
 		if (parser->token->type == TOKEN_NUMBER)
 			parser_next(parser); /* TODO */
 		TMP_ASSERT(token_is(parser->token, TOKEN_RBRACKET));
-		parser_next(parser);
+		parser_require(parser, TOKEN_RBRACKET);
 		decl->decl = parse_declarators(parser, stack);
 		return decl;
 	}
@@ -69,8 +69,9 @@ static struct ast_node *parse_declarators(struct parser *parser, struct toklist 
 		return NULL;
 	}
 	else {
-		token_dump(parser->token, stderr);
-		assert(false);
+		parse_error(parser, "unexpected %s, one of [;,) was expected",
+			token_get_name(parser->token->type));
+		return NULL;
 	}
 }
 
@@ -104,6 +105,16 @@ static struct ast_node *parse_init_declarator(struct parser *parser)
 }
 
 
+static void sanitize_declspec_member(struct parser *parser, struct ast_node *decln)
+{
+	if (decln->storcls) {
+		parse_error(parser, "Storage class specifier not valid for struct "
+			"and union members.");
+		decln->storcls = 0;
+	}
+}
+
+
 /*
  * Parses: 6.7.2.1 struct-or-union-specifier.
  */
@@ -128,7 +139,8 @@ static struct ast_node *parse_struct_or_union_specifier(struct parser *parser)
 	}
 
 	if (!parser_expect(parser, TOKEN_LBRACE)) {
-		TMP_ASSERT(spec->ident); /* if there's no decl list, there must be a name */
+		if (!spec->ident)
+			parse_error(parser, "struct name expected");
 		return spec;
 	}
 
@@ -139,13 +151,100 @@ static struct ast_node *parse_struct_or_union_specifier(struct parser *parser)
 
 		spec->decls = array_claim(spec->decls, 1);
 		spec->decls[array_size(spec->decls) - 1] = parser_parse_decl(parser);
+		sanitize_declspec_member(parser, spec->decls[array_size(spec->decls) - 1]);
 	}
 
-	if (!parser_expect(parser, TOKEN_RBRACE))
-		TMP_ASSERT(0);
-
+	parser_require(parser, TOKEN_RBRACE);
 	return spec;
+}
 
+
+static void apply_tflag(struct parser *parser, struct ast_node *decln, const struct kwd *kwd)
+{
+	uint8_t new_tflags = decln->tflags;
+
+	switch (kwd->tflags) {
+	case TFLAG_LONG:
+		if (decln->tflags & TFLAG_LONG) { /* promote long to long long */
+			new_tflags ^= TFLAG_LONG;
+			new_tflags |= TFLAG_LONG_LONG;
+			break;
+		}
+
+		/* fall-through */
+
+	default:
+		new_tflags |= kwd->tflags;
+	}
+
+	if (new_tflags & TFLAG_SIGNED && new_tflags & TFLAG_UNSIGNED)
+		parse_error(parser, "Both signed and unsigned? What do the doctors say?");
+	else if (new_tflags & (TFLAG_LONG | TFLAG_LONG_LONG) && new_tflags & TFLAG_SHORT)
+		parse_error(parser, "Both long and short? What would that be?");
+	else if (new_tflags & TFLAG_LONG && new_tflags & TFLAG_LONG_LONG)
+		parse_error(parser, "Longer than long long? Have a break.");
+	else if (new_tflags & TFLAG_COMPLEX && new_tflags & ~(TFLAG_LONG | TFLAG_COMPLEX))
+		parse_error(parser, "Invalid type specifier for _Complex.");
+	else if (new_tflags == decln->tflags)
+		parse_error(parser, "Type specifier is redundant.");
+	else
+		decln->tflags = new_tflags;
+}
+
+
+static void apply_tspec(struct parser *parser, struct ast_node *decln, const struct kwd *kwd)
+{
+	if (decln->tspec)
+		parse_error(parser, "Too many types specified.");
+	else
+		decln->tspec |= kwd->tspec;
+}
+
+
+static void apply_storcls(struct parser *parser, struct ast_node *decln, const struct kwd *kwd)
+{
+	if (decln->storcls)
+		parse_error(parser, "Too many storage classes specified.");
+	else
+		decln->storcls |= kwd->storcls;
+}
+
+
+static void sanitize_declspec(struct parser *parser, struct ast_node *decln)
+{
+	if (!decln->tspec) {
+		if (!(decln->tflags & INT_TFLAGS))
+			parse_error(parser, "Type not specified, assume it's an int.");
+		decln->tspec = TSPEC_INT;
+	}
+
+	switch (decln->tspec) {
+	case TSPEC_INT:
+		if (decln->tflags & ~INT_TFLAGS) {
+			parse_error(parser, "Invalid type specifiers for int, ignore.");
+			decln->tflags &= INT_TFLAGS;
+		};
+		break;
+
+	case TSPEC_CHAR:
+		if (decln->tflags & ~CHAR_TFLAGS) {
+			parse_error(parser, "Invalid type specifiers for char, ingore.");
+			decln->tflags &= CHAR_TFLAGS;
+		}
+		break;
+
+	case TSPEC_BOOL:
+		if (decln->tflags) {
+			parse_error(parser, "Invalid type specifiers for _Bool, ignore.");
+			decln->tflags = 0;
+		}
+		break;
+	}
+
+	if (decln->tflags & TFLAG_COMPLEX
+		&& decln->tspec != TSPEC_FLOAT && decln->tspec != TSPEC_DOUBLE) {
+		parse_error(parser, "Only float and double can be _Complex.");
+	}
 }
 
 
@@ -156,7 +255,10 @@ static void parse_declspec(struct parser *parser, struct ast_node *decln)
 {
 	const struct kwd *kwd;
 
-	decln->tspec = decln->tquals = decln->storcls = 0;
+	decln->tspec = 0;
+	decln->tflags = 0;
+	decln->tquals = 0;
+	decln->storcls = 0;
 
 	while (token_is_any_keyword(parser->token)) {
 		kwd = parser->token->symbol->def->keyword;
@@ -164,19 +266,28 @@ static void parse_declspec(struct parser *parser, struct ast_node *decln)
 		switch (kwd->class) {
 			case KWD_CLASS_ALIGNMENT:
 				break;
+
 			case KWD_CLASS_TSPEC:
-				decln->tspec |= kwd->tspec;
+				apply_tspec(parser, decln, kwd);
 				break;
+
+			case KWD_CLASS_TFLAG:
+				apply_tflag(parser, decln, kwd);
+				break;
+
 			case KWD_CLASS_FUNCSPEC:
 				break;
+
 			case KWD_CLASS_STORCLS:
-				decln->storcls |= kwd->storcls;
+				apply_storcls(parser, decln, kwd);
 				break;
+
 			case KWD_CLASS_TQUAL:
 				decln->tquals |= kwd->tqual;
 				break;
+
 			default:
-				return;
+				goto out;
 		}
 
 		if (kwd->type == KWD_TYPE_STRUCT || kwd->type == KWD_TYPE_UNION)
@@ -184,6 +295,8 @@ static void parse_declspec(struct parser *parser, struct ast_node *decln)
 		else
 			parser_next(parser);
 	}
+out:
+	sanitize_declspec(parser, decln);
 }
 
 
@@ -207,9 +320,8 @@ struct ast_node *parser_parse_decl(struct parser *parser)
 		}
 
 		if (array_size(decl->parts) > 0) {
-			TMP_ASSERT(token_is(parser->token, TOKEN_COMMA));
+			parser_require(parser, TOKEN_COMMA);
 			comma = true;
-			parser_next(parser);
 		}
 
 		decl->parts = array_claim(decl->parts, 1);
@@ -225,22 +337,61 @@ struct ast_node *parser_parse_decl(struct parser *parser)
 void print_decln(struct ast_node *decln, struct strbuf *buf);
 
 
+static const char *tspec_to_string(enum tspec tspec)
+{
+	switch (tspec) {
+	case TSPEC_BOOL:
+		return "_Bool";
+	case TSPEC_CHAR:
+		return "char";
+	case TSPEC_DOUBLE:
+		return "double";
+	case TSPEC_ENUM:
+		return "enum";
+	case TSPEC_FLOAT:
+		return "float";
+	case TSPEC_INT:
+		return "int";
+	case TSPEC_STRUCT:
+		return "struct";
+	case TSPEC_UNION:
+		return "union";
+	case TSPEC_VOID:
+		return "void";
+	default:
+		assert(0);
+	}
+}
+
+
 static void print_declspec(struct ast_node *node, struct strbuf *buf)
 {
 	size_t i;
 
-	if (node->tquals & TQUAL_CONST) {
+	if (node->tquals & TQUAL_CONST)
 		strbuf_printf(buf, "const ");
-	}
-	if (node->tquals & TQUAL_RESTRICT) {
+	if (node->tquals & TQUAL_RESTRICT)
 		strbuf_printf(buf, "restrict ");
-	}
-	if (node->tquals & TQUAL_VOLATILE) {
+	if (node->tquals & TQUAL_VOLATILE)
 		strbuf_printf(buf, "volatile ");
-	}
-	if (node->tspec & TSPEC_INT) {
-		strbuf_printf(buf, "int ");
-	}
+
+	if (node->tflags & TFLAG_UNSIGNED)
+		strbuf_printf(buf, "unsigned ");
+	else if (node->tflags & TFLAG_SIGNED)
+		strbuf_printf(buf, "signed ");
+	
+	if (node->tflags & TFLAG_SHORT)
+		strbuf_printf(buf, "short ");
+	else if (node->tflags & TFLAG_LONG)
+		strbuf_printf(buf, "long ");
+	else if (node->tflags & TFLAG_LONG_LONG)
+		strbuf_printf(buf, "long long ");
+	
+	if (node->tflags & TFLAG_COMPLEX)
+		strbuf_printf(buf, "_Complex ");
+
+	strbuf_printf(buf, "%s ", tspec_to_string(node->tspec));
+
 	if (node->tspec & TSPEC_STRUCT) {
 		if (node->spec->ident)
 			strbuf_printf(buf, "struct %s ", node->spec->ident);

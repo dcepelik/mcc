@@ -29,8 +29,8 @@ const struct kwd keywords[44] = {
 	{
 		.name = "_Complex",
 		.type = KWD_TYPE_COMPLEX,
-		.class = KWD_CLASS_TSPEC,
-		.tspec = TSPEC_COMPLEX,
+		.class = KWD_CLASS_TFLAG,
+		.tflags = TFLAG_COMPLEX,
 	},
 	{
 		.name = "_Generic",
@@ -159,8 +159,8 @@ const struct kwd keywords[44] = {
 	{
 		.name = "long",
 		.type = KWD_TYPE_LONG,
-		.class = KWD_CLASS_TSPEC,
-		.tspec = TSPEC_LONG,
+		.class = KWD_CLASS_TFLAG,
+		.tflags = TFLAG_LONG,
 	},
 	{
 		.name = "register",
@@ -182,14 +182,14 @@ const struct kwd keywords[44] = {
 	{
 		.name = "short",
 		.type = KWD_TYPE_SHORT,
-		.class = KWD_CLASS_TSPEC,
-		.tspec = TSPEC_SHORT,
+		.class = KWD_CLASS_TFLAG,
+		.tflags = TFLAG_SHORT,
 	},
 	{
 		.name = "signed",
 		.type = KWD_TYPE_SIGNED,
-		.class = KWD_CLASS_TSPEC,
-		.tspec = TSPEC_SIGNED,
+		.class = KWD_CLASS_TFLAG,
+		.tflags = TFLAG_SIGNED,
 	},
 	{
 		.name = "sizeof",
@@ -227,8 +227,8 @@ const struct kwd keywords[44] = {
 	{
 		.name = "unsigned",
 		.type = KWD_TYPE_UNSIGNED,
-		.class = KWD_CLASS_TSPEC,
-		.tspec = TSPEC_UNSIGNED,
+		.class = KWD_CLASS_TFLAG,
+		.tflags = TFLAG_UNSIGNED,
 	},
 	{
 		.name = "void",

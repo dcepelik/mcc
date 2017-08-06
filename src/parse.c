@@ -1,7 +1,7 @@
-#include "parse.h"
 #include "array.h"
-
 #include "parse-internal.h"
+#include "parse.h"
+#include <stdarg.h>
 
 
 void parser_setup_symtab(struct symtab *table)
@@ -63,6 +63,29 @@ bool parser_is_eof(struct parser *parser)
 void parser_skip_rest(struct parser *parser)
 {
 	(void) parser;
+}
+
+
+void parse_error(struct parser *parser, char *msg, ...)
+{
+	(void) parser;
+
+	va_list args;
+	va_start(args, msg);
+	fprintf(stderr, "parse error: ");
+	vfprintf(stderr, msg, args);
+	fprintf(stderr, "\n");
+	va_end(args);
+}
+
+
+bool parser_require(struct parser *parser, enum token_type token)
+{
+	if (!parser_expect(parser, token)) {
+		parse_error(parser, "%s was expected", token_get_name(token));
+		return false;
+	}
+	return true;
 }
 
 

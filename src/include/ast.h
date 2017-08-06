@@ -19,9 +19,10 @@ struct ast_node
 	enum ast_node_type type;
 
 	struct {
-		enum tspec tspec;
-		enum storcls storcls;
-		enum tqual tquals;
+		uint16_t tspec;		/* see enum tspec */
+		uint8_t tflags;		/* see enum tflags */
+		uint8_t tquals;		/* see enum tquals */
+		uint8_t storcls;	/* see enum storcls */
 	};
 	char *ident;
 	size_t size;
