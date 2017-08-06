@@ -10,12 +10,12 @@ void parser_setup_symtab(struct symtab *table)
 	struct symdef *def;
 	size_t i;
 
-	for (i = 0; i < ARRAY_SIZE(keywords); i++) {
-		symbol = symtab_insert(table, keywords[i].name);
+	for (i = 0; i < ARRAY_SIZE(kwdinfo); i++) {
+		symbol = symtab_insert(table, kwdinfo[i].name);
 
 		def = symbol_define(table, symbol);
 		def->type = SYMBOL_TYPE_C_KEYWORD;
-		def->keyword = &keywords[i];
+		def->kwdinfo = &kwdinfo[i];
 	}
 }
 

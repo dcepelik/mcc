@@ -142,17 +142,17 @@ bool token_is_any_keyword(struct token *token)
 }
 
 
-bool token_is_keyword(struct token *token, enum kwd_type type)
+bool token_is_keyword(struct token *token, enum kwd kwd)
 {
-	return token_is_any_keyword(token) && token->symbol->def->keyword->type == type;
+	return token_is_any_keyword(token) && token->symbol->def->kwdinfo->kwd == kwd;
 }
 
 
 bool token_is_tqual(struct token *token)
 {
 	return token_is_any_keyword(token)
-		&& (token->symbol->def->keyword->class == KWD_CLASS_TQUAL
-		|| token->symbol->def->keyword->class == KWD_CLASS_TFLAG);
+		&& (token->symbol->def->kwdinfo->class == KWD_CLASS_TQUAL
+		|| token->symbol->def->kwdinfo->class == KWD_CLASS_TFLAG);
 }
 
 

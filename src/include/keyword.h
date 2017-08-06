@@ -60,19 +60,15 @@ enum storcls
 	STORCLS_THREAD_LOCAL	= 1 << 5,
 };
 
-enum kwd_type
+enum kwd
 {
-	KWD_TYPE_AUTO, KWD_TYPE_BREAK, KWD_TYPE_CASE, KWD_TYPE_CHAR, KWD_TYPE_CONST,
-	KWD_TYPE_CONTINUE, KWD_TYPE_DEFAULT, KWD_TYPE_DO, KWD_TYPE_DOUBLE, KWD_TYPE_ELSE,
-	KWD_TYPE_ENUM, KWD_TYPE_EXTERN, KWD_TYPE_FLOAT, KWD_TYPE_FOR, KWD_TYPE_GOTO,
-	KWD_TYPE_IF, KWD_TYPE_INLINE, KWD_TYPE_INT, KWD_TYPE_LONG, KWD_TYPE_REGISTER,
-	KWD_TYPE_RESTRICT, KWD_TYPE_RETURN, KWD_TYPE_SHORT, KWD_TYPE_SIGNED,
-	KWD_TYPE_SIZEOF, KWD_TYPE_STATIC, KWD_TYPE_STRUCT, KWD_TYPE_SWITCH,
-	KWD_TYPE_TYPEDEF, KWD_TYPE_UNION, KWD_TYPE_UNSIGNED, KWD_TYPE_VOID,
-	KWD_TYPE_VOLATILE, KWD_TYPE_WHILE, KWD_TYPE_ALIGNAS, KWD_TYPE_ALIGNOF,
-	KWD_TYPE_ATOMIC, KWD_TYPE_BOOL, KWD_TYPE_COMPLEX, KWD_TYPE_GENERIC,
-	KWD_TYPE_IMAGINARY, KWD_TYPE_NORETURN, KWD_TYPE_STATIC_ASSERT,
-	KWD_TYPE_THREAD_LOCAL,
+	KWD_AUTO, KWD_BREAK, KWD_CASE, KWD_CHAR, KWD_CONST, KWD_CONTINUE, KWD_DEFAULT,
+	KWD_DO, KWD_DOUBLE, KWD_ELSE, KWD_ENUM, KWD_EXTERN, KWD_FLOAT, KWD_FOR, KWD_GOTO,
+	KWD_IF, KWD_INLINE, KWD_INT, KWD_LONG, KWD_REGISTER, KWD_RESTRICT, KWD_RETURN,
+	KWD_SHORT, KWD_SIGNED, KWD_SIZEOF, KWD_STATIC, KWD_STRUCT, KWD_SWITCH,
+	KWD_TYPEDEF, KWD_UNION, KWD_UNSIGNED, KWD_VOID, KWD_VOLATILE, KWD_WHILE,
+	KWD_ALIGNAS, KWD_ALIGNOF, KWD_ATOMIC, KWD_BOOL, KWD_COMPLEX, KWD_GENERIC,
+	KWD_IMAGINARY, KWD_NORETURN, KWD_STATIC_ASSERT, KWD_THREAD_LOCAL
 };
 
 /*
@@ -92,13 +88,16 @@ enum kwd_class
 };
 
 /*
- * C keyword.
+ * C keyword information.
+ *
+ * Defined at compile time, the kwdinfo structures are used to configure the symbol
+ * table and to simplify the parsing of declaration specifiers, among other things.
  */
-struct kwd
+struct kwdinfo
 {
 	char *name;		/* name of the keyword */
 	enum kwd_class class;	/* keyword class */
-	enum kwd_type type;	/* keyword type */
+	enum kwd kwd;		/* keyword type */
 	union
 	{
 		enum tqual tqual;	/* type qualifier */
@@ -108,6 +107,6 @@ struct kwd
 	};
 };
 
-extern const struct kwd keywords[44];
+extern const struct kwdinfo kwdinfo[44];
 
 #endif

@@ -4,247 +4,247 @@
 /*
  * Definition of C keywords.
  */
-const struct kwd keywords[44] = {
+const struct kwdinfo kwdinfo[44] = {
 	{
 		.name = "_Alignas",
-		.type = KWD_TYPE_ALIGNAS,
+		.kwd = KWD_ALIGNAS,
 		.class = KWD_CLASS_OTHER
 	},
 	{
 		.name = "_Alignof",
-		.type = KWD_TYPE_ALIGNOF,
+		.kwd = KWD_ALIGNOF,
 		.class = KWD_CLASS_OTHER
 	},
 	{
 		.name = "_Atomic",
-		.type = KWD_TYPE_ATOMIC,
+		.kwd = KWD_ATOMIC,
 		.class = KWD_CLASS_OTHER
 	},
 	{
 		.name = "_Bool",
-		.type = KWD_TYPE_BOOL,
+		.kwd = KWD_BOOL,
 		.class = KWD_CLASS_TSPEC,
 		.tspec = TSPEC_BOOL,
 	},
 	{
 		.name = "_Complex",
-		.type = KWD_TYPE_COMPLEX,
+		.kwd = KWD_COMPLEX,
 		.class = KWD_CLASS_TFLAG,
 		.tflags = TFLAG_COMPLEX,
 	},
 	{
 		.name = "_Generic",
-		.type = KWD_TYPE_GENERIC,
+		.kwd = KWD_GENERIC,
 		.class = KWD_CLASS_OTHER
 	},
 	{
 		.name = "_Imaginary",
-		.type = KWD_TYPE_IMAGINARY,
+		.kwd = KWD_IMAGINARY,
 		.class = KWD_CLASS_OTHER
 	},
 	{
 		.name = "_Noreturn",
-		.type = KWD_TYPE_NORETURN,
+		.kwd = KWD_NORETURN,
 		.class = KWD_CLASS_OTHER
 	},
 	{
 		.name = "_Static_assert",
-		.type = KWD_TYPE_STATIC_ASSERT,
+		.kwd = KWD_STATIC_ASSERT,
 		.class = KWD_CLASS_OTHER
 	},
 	{
 		.name = "_Thread_local",
-		.type = KWD_TYPE_THREAD_LOCAL,
+		.kwd = KWD_THREAD_LOCAL,
 		.class = KWD_CLASS_STORCLS,
 		.storcls = STORCLS_THREAD_LOCAL,
 	},
 	{
 		.name = "auto",
-		.type = KWD_TYPE_AUTO,
+		.kwd = KWD_AUTO,
 		.class = KWD_CLASS_STORCLS,
 		.storcls = STORCLS_AUTO,
 	},
 	{
 		.name = "break",
-		.type = KWD_TYPE_BREAK,
+		.kwd = KWD_BREAK,
 		.class = KWD_CLASS_OTHER
 	},
 	{
 		.name = "case",
-		.type = KWD_TYPE_CASE,
+		.kwd = KWD_CASE,
 		.class = KWD_CLASS_OTHER
 	},
 	{
 		.name = "char",
-		.type = KWD_TYPE_CHAR,
+		.kwd = KWD_CHAR,
 		.class = KWD_CLASS_TSPEC,
 		.tspec = TSPEC_CHAR,
 	},
 	{
 		.name = "const",
-		.type = KWD_TYPE_CONST,
+		.kwd = KWD_CONST,
 		.class = KWD_CLASS_TQUAL,
 		.tqual = TQUAL_CONST,
 	},
 	{
 		.name = "continue",
-		.type = KWD_TYPE_CONTINUE,
+		.kwd = KWD_CONTINUE,
 		.class = KWD_CLASS_OTHER
 	},
 	{
 		.name = "default",
-		.type = KWD_TYPE_DEFAULT,
+		.kwd = KWD_DEFAULT,
 		.class = KWD_CLASS_OTHER
 	},
 	{
 		.name = "do",
-		.type = KWD_TYPE_DO,
+		.kwd = KWD_DO,
 		.class = KWD_CLASS_OTHER
 	},
 	{
 		.name = "double",
-		.type = KWD_TYPE_DOUBLE,
+		.kwd = KWD_DOUBLE,
 		.class = KWD_CLASS_TSPEC,
 		.tspec = TSPEC_DOUBLE,
 	},
 	{
 		.name = "else",
-		.type = KWD_TYPE_ELSE,
+		.kwd = KWD_ELSE,
 		.class = KWD_CLASS_OTHER
 	},
 	{
 		.name = "enum",
-		.type = KWD_TYPE_ENUM,
+		.kwd = KWD_ENUM,
 		.class = KWD_CLASS_OTHER
 	},
 	{
 		.name = "extern",
-		.type = KWD_TYPE_EXTERN,
+		.kwd = KWD_EXTERN,
 		.class = KWD_CLASS_STORCLS,
 		.storcls = STORCLS_EXTERN,
 	},
 	{
 		.name = "float",
-		.type = KWD_TYPE_FLOAT,
+		.kwd = KWD_FLOAT,
 		.class = KWD_CLASS_TSPEC,
 		.tspec = TSPEC_FLOAT,
 	},
 	{
 		.name = "for",
-		.type = KWD_TYPE_FOR,
+		.kwd = KWD_FOR,
 		.class = KWD_CLASS_OTHER
 	},
 	{
 		.name = "goto",
-		.type = KWD_TYPE_GOTO,
+		.kwd = KWD_GOTO,
 		.class = KWD_CLASS_OTHER
 	},
 	{
 		.name = "if",
-		.type = KWD_TYPE_IF,
+		.kwd = KWD_IF,
 		.class = KWD_CLASS_OTHER,
 	},
 	{
 		.name = "inline",
-		.type = KWD_TYPE_INLINE,
+		.kwd = KWD_INLINE,
 		.class = KWD_CLASS_STORCLS,
 		.storcls = STORCLS_INLINE,
 	},
 	{
 		.name = "int",
-		.type = KWD_TYPE_INT,
+		.kwd = KWD_INT,
 		.class = KWD_CLASS_TSPEC,
 		.tspec = TSPEC_INT,
 	},
 	{
 		.name = "long",
-		.type = KWD_TYPE_LONG,
+		.kwd = KWD_LONG,
 		.class = KWD_CLASS_TFLAG,
 		.tflags = TFLAG_LONG,
 	},
 	{
 		.name = "register",
-		.type = KWD_TYPE_REGISTER,
+		.kwd = KWD_REGISTER,
 		.class = KWD_CLASS_STORCLS,
 		.storcls = STORCLS_REGISTER,
 	},
 	{
 		.name = "restrict",
-		.type = KWD_TYPE_RESTRICT,
+		.kwd = KWD_RESTRICT,
 		.class = KWD_CLASS_TQUAL,
 		.storcls = TQUAL_RESTRICT,
 	},
 	{
 		.name = "return",
-		.type = KWD_TYPE_RETURN,
+		.kwd = KWD_RETURN,
 		.class = KWD_CLASS_OTHER
 	},
 	{
 		.name = "short",
-		.type = KWD_TYPE_SHORT,
+		.kwd = KWD_SHORT,
 		.class = KWD_CLASS_TFLAG,
 		.tflags = TFLAG_SHORT,
 	},
 	{
 		.name = "signed",
-		.type = KWD_TYPE_SIGNED,
+		.kwd = KWD_SIGNED,
 		.class = KWD_CLASS_TFLAG,
 		.tflags = TFLAG_SIGNED,
 	},
 	{
 		.name = "sizeof",
-		.type = KWD_TYPE_SIZEOF,
+		.kwd = KWD_SIZEOF,
 		.class = KWD_CLASS_OTHER
 	},
 	{
 		.name = "static",
-		.type = KWD_TYPE_STATIC,
+		.kwd = KWD_STATIC,
 		.class = KWD_CLASS_STORCLS,
 		.storcls = STORCLS_STATIC,
 	},
 	{
 		.name = "struct",
-		.type = KWD_TYPE_STRUCT,
+		.kwd = KWD_STRUCT,
 		.class = KWD_CLASS_TSPEC,
 		.tspec = TSPEC_STRUCT,
 	},
 	{
 		.name = "switch",
-		.type = KWD_TYPE_SWITCH,
+		.kwd = KWD_SWITCH,
 		.class = KWD_CLASS_OTHER
 	},
 	{
 		.name = "typedef",
-		.type = KWD_TYPE_TYPEDEF,
+		.kwd = KWD_TYPEDEF,
 		.class = KWD_CLASS_OTHER
 	},
 	{
 		.name = "union",
-		.type = KWD_TYPE_UNION,
+		.kwd = KWD_UNION,
 		.class = KWD_CLASS_TSPEC,
 		.tspec = TSPEC_UNION,
 	},
 	{
 		.name = "unsigned",
-		.type = KWD_TYPE_UNSIGNED,
+		.kwd = KWD_UNSIGNED,
 		.class = KWD_CLASS_TFLAG,
 		.tflags = TFLAG_UNSIGNED,
 	},
 	{
 		.name = "void",
-		.type = KWD_TYPE_VOID,
+		.kwd = KWD_VOID,
 		.class = KWD_CLASS_TSPEC,
 		.tspec = TSPEC_VOID,
 	},
 	{
 		.name = "volatile",
-		.type = KWD_TYPE_VOLATILE,
+		.kwd = KWD_VOLATILE,
 		.class = KWD_CLASS_TQUAL,
 		.tqual = TQUAL_VOLATILE,
 	},
 	{
 		.name = "while",
-		.type = KWD_TYPE_WHILE,
+		.kwd = KWD_WHILE,
 		.class = KWD_CLASS_OTHER
 	},
 };

@@ -23,7 +23,7 @@ static struct ast_node *parse_pointer(struct parser *parser, struct toklist *sta
 
 	tquals = 0;
 	while (token_is_tqual(top)) {
-		tquals |= top->symbol->def->keyword->tqual;
+		tquals |= top->symbol->def->kwdinfo->tqual;
 		TMP_ASSERT(!toklist_is_empty(stack));
 		top = toklist_remove_last(stack);
 	}
@@ -122,9 +122,9 @@ static struct ast_node *parse_struct_or_union_specifier(struct parser *parser)
 {
 	struct ast_node *spec;
 
-	if (token_is_keyword(parser->token, KWD_TYPE_STRUCT))
+	if (token_is_keyword(parser->token, KWD_STRUCT))
 		spec = ast_node_new(&parser->ctx, AST_STRUCT_SPEC);
-	else if (token_is_keyword(parser->token, KWD_TYPE_UNION))
+	else if (token_is_keyword(parser->token, KWD_UNION))
 		spec = ast_node_new(&parser->ctx, AST_UNION_SPEC);
 	else
 		assert(0);
@@ -159,7 +159,7 @@ static struct ast_node *parse_struct_or_union_specifier(struct parser *parser)
 }
 
 
-static void apply_tflag(struct parser *parser, struct ast_node *decln, const struct kwd *kwd)
+static void apply_tflag(struct parser *parser, struct ast_node *decln, const struct kwdinfo *kwd)
 {
 	uint8_t new_tflags = decln->tflags;
 
@@ -192,7 +192,7 @@ static void apply_tflag(struct parser *parser, struct ast_node *decln, const str
 }
 
 
-static void apply_tspec(struct parser *parser, struct ast_node *decln, const struct kwd *kwd)
+static void apply_tspec(struct parser *parser, struct ast_node *decln, const struct kwdinfo *kwd)
 {
 	if (decln->tspec)
 		parse_error(parser, "Too many types specified.");
@@ -201,7 +201,7 @@ static void apply_tspec(struct parser *parser, struct ast_node *decln, const str
 }
 
 
-static void apply_storcls(struct parser *parser, struct ast_node *decln, const struct kwd *kwd)
+static void apply_storcls(struct parser *parser, struct ast_node *decln, const struct kwdinfo *kwd)
 {
 	if (decln->storcls)
 		parse_error(parser, "Too many storage classes specified.");
@@ -253,7 +253,7 @@ static void sanitize_declspec(struct parser *parser, struct ast_node *decln)
  */
 static void parse_declspec(struct parser *parser, struct ast_node *decln)
 {
-	const struct kwd *kwd;
+	const struct kwdinfo *kwdinfo;
 
 	decln->tspec = 0;
 	decln->tflags = 0;
@@ -261,36 +261,36 @@ static void parse_declspec(struct parser *parser, struct ast_node *decln)
 	decln->storcls = 0;
 
 	while (token_is_any_keyword(parser->token)) {
-		kwd = parser->token->symbol->def->keyword;
+		kwdinfo = parser->token->symbol->def->kwdinfo;
 
-		switch (kwd->class) {
+		switch (kwdinfo->class) {
 			case KWD_CLASS_ALIGNMENT:
 				break;
 
 			case KWD_CLASS_TSPEC:
-				apply_tspec(parser, decln, kwd);
+				apply_tspec(parser, decln, kwdinfo);
 				break;
 
 			case KWD_CLASS_TFLAG:
-				apply_tflag(parser, decln, kwd);
+				apply_tflag(parser, decln, kwdinfo);
 				break;
 
 			case KWD_CLASS_FUNCSPEC:
 				break;
 
 			case KWD_CLASS_STORCLS:
-				apply_storcls(parser, decln, kwd);
+				apply_storcls(parser, decln, kwdinfo);
 				break;
 
 			case KWD_CLASS_TQUAL:
-				decln->tquals |= kwd->tqual;
+				decln->tquals |= kwdinfo->tqual;
 				break;
 
 			default:
 				goto out;
 		}
 
-		if (kwd->type == KWD_TYPE_STRUCT || kwd->type == KWD_TYPE_UNION)
+		if (kwdinfo->kwd == KWD_STRUCT || kwdinfo->kwd == KWD_UNION)
 			decln->spec = parse_struct_or_union_specifier(parser);
 		else
 			parser_next(parser);
