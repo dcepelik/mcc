@@ -239,6 +239,19 @@ static void sanitize_declspec(struct parser *parser, struct ast_node *decln)
 			decln->tflags = 0;
 		}
 		break;
+
+	case TSPEC_FLOAT:
+		if (decln->tflags) {
+			parse_error(parser, "Invalid type specifiers for float, ignore.");
+			decln->tflags = 0;
+		}
+		break;
+
+	case TSPEC_DOUBLE:
+		if (decln->tflags & ~DOUBLE_TFLAGS) {
+			parse_error(parser, "Invalid type specifiers for double, ignore.");
+			decln->tflags &= DOUBLE_TFLAGS;
+		}
 	}
 
 	if (decln->tflags & TFLAG_COMPLEX
@@ -358,6 +371,44 @@ static const char *tspec_to_string(enum tspec tspec)
 		return "union";
 	case TSPEC_VOID:
 		return "void";
+	default:
+		assert(0);
+	}
+}
+
+
+static const char *tqual_to_string(enum tqual tqual)
+{
+	switch (tqual) {
+	case TQUAL_CONST:
+		return "const";
+	case TQUAL_RESTRICT:
+		return "restrict";
+	case TQUAL_VOLATILE:
+		return "volatile";
+	case TQUAL_ATOMIC:
+		return "_Atomic";
+	default:
+		assert(0);
+	}
+}
+
+
+static const char *tflag_to_string(enum tflag tflag)
+{
+	switch (tflag) {
+	case TFLAG_UNSIGNED:
+		return "unsigned";
+	case TFLAG_SIGNED:
+		return "signed";
+	case TFLAG_SHORT:
+		return "short";
+	case TFLAG_LONG:
+		return "long";
+	case TFLAG_LONG_LONG:
+		return "long long";
+	case TFLAG_COMPLEX:
+		return "_Complex";
 	default:
 		assert(0);
 	}

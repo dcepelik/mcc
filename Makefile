@@ -29,6 +29,7 @@ SRCS = array.c \
 	objpool.c \
 	parse.c \
 	parse-decl.c \
+	parse-expr.c \
 	print.c \
 	strbuf.c \
 	symbol.c \

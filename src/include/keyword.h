@@ -3,6 +3,7 @@
 
 #define INT_TFLAGS	(TFLAG_UNSIGNED | TFLAG_SIGNED | TFLAG_SHORT | TFLAG_LONG | TFLAG_LONG_LONG)
 #define CHAR_TFLAGS	(TFLAG_UNSIGNED | TFLAG_SIGNED)
+#define DOUBLE_TFLAGS	(TFLAG_LONG | TFLAG_COMPLEX)
 
 /*
  * C Type Specifiers which are considered ``basic types''. They are accompanied by
@@ -45,6 +46,7 @@ enum tqual
 	TQUAL_CONST	= 1 << 0,
 	TQUAL_RESTRICT	= 1 << 1,
 	TQUAL_VOLATILE	= 1 << 2,
+	TQUAL_ATOMIC	= 1 << 3,
 };
 
 /*
@@ -60,6 +62,9 @@ enum storcls
 	STORCLS_THREAD_LOCAL	= 1 << 5,
 };
 
+/*
+ * C keyword.
+ */
 enum kwd
 {
 	KWD_AUTO, KWD_BREAK, KWD_CASE, KWD_CHAR, KWD_CONST, KWD_CONTINUE, KWD_DEFAULT,
@@ -72,18 +77,20 @@ enum kwd
 };
 
 /*
- * Keyword class.
+ * Keyword ``class''.
+ *
+ * Used internally to simplify parsing of declaration specifiers, among other things.
  */
 enum kwd_class
 {
-	KWD_CLASS_ALIGNMENT,	/* alignment specifier */
-	KWD_CLASS_FLOWCTL,	/* flow control keyword */
-	KWD_CLASS_FUNCSPEC,	/* function specifier */
-	KWD_CLASS_OPER,		/* operator */
-	KWD_CLASS_STORCLS,	/* storage class */
-	KWD_CLASS_TQUAL,	/* type qualifier */
-	KWD_CLASS_TSPEC,	/* type specifier, see enum tspec */
-	KWD_CLASS_TFLAG,	/* type specifier, see enum tflag */
+	KWD_CLASS_ALIGNMENT,	/* the _Alignas alignment specifier (for convenience) */
+	KWD_CLASS_FLOWCTL,	/* flow control keywords */
+	KWD_CLASS_FUNCSPEC,	/* function specifiers */
+	KWD_CLASS_OPER,		/* operators */
+	KWD_CLASS_STORCLS,	/* storage classes */
+	KWD_CLASS_TQUAL,	/* type qualifiers */
+	KWD_CLASS_TSPEC,	/* ``basic type'' type specifiers, see enum tspec */
+	KWD_CLASS_TFLAG,	/* ``flag'' type specifiers, see enum tflag */
 	KWD_CLASS_OTHER,
 };
 

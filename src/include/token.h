@@ -41,7 +41,7 @@ struct location
 void location_dump(struct location *loc);
 
 /*
- * See 6.4.5 String literals syntax (encoding-prefix)
+ * See 6.4.5 String literals syntax (encoding-prefix).
  */
 enum enc_prefix
 {
