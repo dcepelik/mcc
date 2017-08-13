@@ -27,6 +27,7 @@ SRCS = array.c \
 	mcpp.c \
 	mempool.c \
 	objpool.c \
+	operator.c \
 	parse.c \
 	parse-decl.c \
 	parse-expr.c \

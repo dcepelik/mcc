@@ -248,4 +248,3 @@ const struct kwdinfo kwdinfo[44] = {
 		.class = KWD_CLASS_OTHER
 	},
 };
-

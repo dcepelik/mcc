@@ -9,25 +9,79 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+/*
+ * C Token.
+ * See 6.4 Lexical categories, 6.4.6 Punctuators.
+ */
 enum token_type
 {
-	/* 6.4 Lexical categories */
+	/*
+	 * The TOKEN_OP_* constants always translate to the
+	 * OPER_* operator in `enum oper', regardless of context.
+	 * For example, the `++' token always represents the
+	 * unary incrementation operator.
+	 *
+	 * Values less than TOKEN_OP_CAST_MAX are safe to cast
+	 * to `enum oper'.
+	 *
+	 * NOTE: Do not modify the order of items within this
+	 *       block without modifying `enum oper' correspondingly.
+	 */
+	TOKEN_OP_ADDEQ,		/* OPER_ADDEQ */
+	TOKEN_OP_AND,           /* OPER_AND, */
+	TOKEN_OP_ARROW,         /* OPER_ARROW */
+	TOKEN_OP_ASSIGN,        /* OPER_ASSIG */
+	TOKEN_OP_BITANDEQ,      /* OPER_BITAN */
+	TOKEN_OP_BITOR,         /* OPER_BITOR */
+	TOKEN_OP_BITOREQ,       /* OPER_BITOR */
+	TOKEN_OP_DEC,           /* OPER_DEC */
+	TOKEN_OP_DIV,           /* OPER_DIV */
+	TOKEN_OP_DIVEQ,         /* OPER_DIVEQ */
+	TOKEN_OP_EQ,            /* OPER_EQ */
+	TOKEN_OP_GE,            /* OPER_GE */
+	TOKEN_OP_GT,            /* OPER_GT */
+	TOKEN_OP_INC,           /* OPER_INC */
+	TOKEN_OP_LE,            /* OPER_LE */
+	TOKEN_OP_LT,            /* OPER_LT */
+	TOKEN_OP_MOD,           /* OPER_MOD */
+	TOKEN_OP_MODEQ,         /* OPER_MODEQ */
+	TOKEN_OP_MULEQ,         /* OPER_MULEQ */
+	TOKEN_OP_NEG,           /* OPER_NEG */
+	TOKEN_OP_NEQ,           /* OPER_NEQ */
+	TOKEN_OP_NOT,           /* OPER_NOT */
+	TOKEN_OP_OR,            /* OPER_OR */
+	TOKEN_OP_SHL,           /* OPER_SHL */
+	TOKEN_OP_SHLEQ,         /* OPER_SHLEQ */
+	TOKEN_OP_SHR,           /* OPER_SHR */
+	TOKEN_OP_SHREQ,         /* OPER_SHREQ */
+	TOKEN_OP_SUBEQ,         /* OPER_SUBEQ */
+	TOKEN_OP_XOR,           /* OPER_XOR */
+	TOKEN_OP_XOREQ,         /* OPER_XOREQ */
+	TOKEN_OP_CAST_MAX,	/* special value */
+
+	/*
+	 * Remaining punctuators. Some of these tokens will also
+	 * translate to operators, but the translation is context-
+	 * sensitive.
+	 *
+	 * For example, the TOKEN_AMP token may either translate
+	 * to OPER_ADDROF or OPER_BITAND operators, depending on
+	 * context in which it is used.
+	 */
+	TOKEN_AMP, TOKEN_ASTERISK, TOKEN_COLON, TOKEN_COMMA, TOKEN_DOT, TOKEN_ELLIPSIS,
+	TOKEN_HASH, TOKEN_HASH_HASH, TOKEN_LBRACE, TOKEN_LBRACKET, TOKEN_LPAREN,
+	TOKEN_MINUS, TOKEN_PLUS, TOKEN_QMARK, TOKEN_RBRACE, TOKEN_RBRACKET, TOKEN_RPAREN,
+	TOKEN_SEMICOLON,
+
+	/*
+	 * 6.4 Lexical categories
+	 */
 	TOKEN_CHAR_CONST, TOKEN_HEADER_HNAME, TOKEN_HEADER_QNAME, TOKEN_NAME,
 	TOKEN_NUMBER, TOKEN_STRING_LITERAL, TOKEN_OTHER,
 
-	/* 6.4.6 Punctuators */
-	TOKEN_AMPERSAND, TOKEN_AND_EQ, TOKEN_ARROW, TOKEN_ASTERISK, TOKEN_COLON,
-	TOKEN_COMMA, TOKEN_DEC, TOKEN_DIV, TOKEN_DIV_EQ, TOKEN_DOT,
-	TOKEN_ELLIPSIS, TOKEN_EQ, TOKEN_EQ_EQ, TOKEN_GE, TOKEN_GT, TOKEN_HASH,
-	TOKEN_HASH_HASH, TOKEN_INC, TOKEN_LBRACE, TOKEN_LBRACKET, TOKEN_LE,
-	TOKEN_LOGICAL_AND, TOKEN_LOGICAL_OR, TOKEN_LPAREN, TOKEN_LT,
-	TOKEN_MINUS, TOKEN_MINUS_EQ, TOKEN_MOD, TOKEN_MOD_EQ, TOKEN_MUL_EQ,
-	TOKEN_NEG, TOKEN_NEQ, TOKEN_NOT, TOKEN_OR, TOKEN_OR_EQ, TOKEN_PLUS,
-	TOKEN_PLUS_EQ, TOKEN_QUESTION_MARK, TOKEN_RBRACE, TOKEN_RBRACKET,
-	TOKEN_RPAREN, TOKEN_SEMICOLON, TOKEN_SHL, TOKEN_SHL_EQ, TOKEN_SHR,
-	TOKEN_SHR_EQ, TOKEN_XOR, TOKEN_XOR_EQ,
-
-	/* internal markers */
+	/*
+	 * Markers for internal use.
+	 */
 	TOKEN_EOF, TOKEN_EOL, TOKEN_PLACEMARKER
 };
 
@@ -57,6 +111,8 @@ struct token
 	struct list_node list_node;	/* node for token lists */
 	char *spelling;			/* token as given in input */
 
+	enum token_type type;		/* token type */
+
 	union
 	{
 		struct symbol *symbol;	/* for name tokens */
@@ -67,8 +123,6 @@ struct token
 
 	struct location startloc;	/* location where the token begins */
 	struct location endloc;		/* location where the token ends */
-
-	enum token_type type;		/* token type */
 
 	/* flags */
 	bool after_white:1;		/* preceded by whitespace? */

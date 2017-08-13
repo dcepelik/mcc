@@ -824,15 +824,15 @@ next_nonwhite_char:
 
 	case '-':
 		if (*lexer->c == '>') {
-			token->type = TOKEN_ARROW;
+			token->type = TOKEN_OP_ARROW;
 			lexer->c++;
 		}
 		else if (*lexer->c == '-') {
-			token->type = TOKEN_DEC;
+			token->type = TOKEN_OP_DEC;
 			lexer->c++;
 		}
 		else if (*lexer->c == '=') {
-			token->type = TOKEN_MINUS_EQ;
+			token->type = TOKEN_OP_SUBEQ;
 			lexer->c++;
 		}
 		else {
@@ -843,11 +843,11 @@ next_nonwhite_char:
 
 	case '+':
 		if (*lexer->c == '+') {
-			token->type = TOKEN_INC;
+			token->type = TOKEN_OP_INC;
 			lexer->c++;
 		}
 		else if (*lexer->c == '=') {
-			token->type = TOKEN_PLUS_EQ;
+			token->type = TOKEN_OP_ADDEQ;
 			lexer->c++;
 		}
 		else {
@@ -858,22 +858,22 @@ next_nonwhite_char:
 
 	case '&':
 		if (*lexer->c == '=') {
-			token->type = TOKEN_AND_EQ;
+			token->type = TOKEN_OP_BITANDEQ;
 			lexer->c++;
 		}
 		else if (*lexer->c == '&') {
-			token->type = TOKEN_LOGICAL_AND;
+			token->type = TOKEN_OP_AND;
 			lexer->c++;
 		}
 		else {
-			token->type = TOKEN_AMPERSAND;
+			token->type = TOKEN_AMP;
 		}
 
 		break;
 
 	case '*':
 		if (*lexer->c == '=') {
-			token->type = TOKEN_MUL_EQ;
+			token->type = TOKEN_OP_MULEQ;
 			lexer->c++;
 		}
 		else {
@@ -883,16 +883,16 @@ next_nonwhite_char:
 		break;
 
 	case '~':
-		token->type = TOKEN_NEG;
+		token->type = TOKEN_OP_NEG;
 		break;
 
 	case '!':
 		if (*lexer->c == '=') {
-			token->type = TOKEN_NEQ;
+			token->type = TOKEN_OP_NEQ;
 			lexer->c++;
 		}
 		else {
-			token->type = TOKEN_NOT;
+			token->type = TOKEN_OP_NOT;
 		}
 
 		break;
@@ -911,18 +911,18 @@ next_nonwhite_char:
 		}
 
 		if (*lexer->c == '=') {
-			token->type = TOKEN_DIV_EQ;
+			token->type = TOKEN_OP_DIVEQ;
 			lexer->c++;
 		}
 		else {
-			token->type = TOKEN_DIV;
+			token->type = TOKEN_OP_DIV;
 		}
 
 		break;
 
 	case '%':
 		if (*lexer->c == '=') {
-			token->type = TOKEN_MOD_EQ;
+			token->type = TOKEN_OP_MODEQ;
 			lexer->c++;
 		}
 		else if (*lexer->c == ':') {
@@ -940,7 +940,7 @@ next_nonwhite_char:
 			lexer->c++;
 		}
 		else {
-			token->type = TOKEN_MOD;
+			token->type = TOKEN_OP_MOD;
 		}
 		break;
 
@@ -948,15 +948,15 @@ next_nonwhite_char:
 		if (!lexer->inside_include) {
 			if (*lexer->c == '=') {
 				lexer->c++;
-				token->type = TOKEN_LE;
+				token->type = TOKEN_OP_LE;
 			}
 			else if (*lexer->c == '<') {
 				if (lexer->c[1] == '=') {
-					token->type = TOKEN_SHL_EQ;
+					token->type = TOKEN_OP_SHLEQ;
 					lexer->c += 2;
 				}
 				else {
-					token->type = TOKEN_SHL;
+					token->type = TOKEN_OP_SHL;
 					lexer->c++;
 				}
 			}
@@ -969,7 +969,7 @@ next_nonwhite_char:
 				lexer->c++;
 			}
 			else {
-				token->type = TOKEN_LT;
+				token->type = TOKEN_OP_LT;
 			}
 		}
 		else {
@@ -979,53 +979,53 @@ next_nonwhite_char:
 
 	case '>':
 		if (*lexer->c == '=') {
-			token->type = TOKEN_GE;
+			token->type = TOKEN_OP_GE;
 			lexer->c++;
 		}
 		else if (*lexer->c == '>') {
 			if (lexer->c[1] == '=') {
-				token->type = TOKEN_SHR_EQ;
+				token->type = TOKEN_OP_SHREQ;
 				lexer->c += 2;
 			}
 			else {
-				token->type = TOKEN_SHR;
+				token->type = TOKEN_OP_SHR;
 				lexer->c++;
 			}
 		}
 		else {
-			token->type = TOKEN_GT;
+			token->type = TOKEN_OP_GT;
 		}
 
 		break;
 
 	case '^':
 		if (*lexer->c == '=') {
-			token->type = TOKEN_XOR_EQ;
+			token->type = TOKEN_OP_XOREQ;
 			lexer->c++;
 		}
 		else {
-			token->type = TOKEN_XOR;
+			token->type = TOKEN_OP_XOR;
 		}
 
 		break;
 
 	case '|':
 		if (*lexer->c == '|') {
-			token->type = TOKEN_LOGICAL_OR;
+			token->type = TOKEN_OP_OR;
 			lexer->c++;
 		}
 		else if (*lexer->c == '=') {
-			token->type = TOKEN_OR_EQ;
+			token->type = TOKEN_OP_BITOREQ;
 			lexer->c++;
 		}
 		else {
-			token->type = TOKEN_OR;
+			token->type = TOKEN_OP_BITOR;
 		}
 
 		break;
 	
 	case '?':
-		token->type = TOKEN_QUESTION_MARK;
+		token->type = TOKEN_QMARK;
 		break;
 
 	case ':':
@@ -1045,11 +1045,11 @@ next_nonwhite_char:
 
 	case '=':
 		if (*lexer->c == '=') {
-			token->type = TOKEN_EQ_EQ;
+			token->type = TOKEN_OP_EQ;
 			lexer->c++;
 		}
 		else {
-			token->type = TOKEN_EQ;
+			token->type = TOKEN_OP_ASSIGN;
 		}
 
 		break;
