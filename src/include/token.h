@@ -1,5 +1,5 @@
-#ifndef TOKINFO_H
-#define TOKINFO_H
+#ifndef TOKEN_H
+#define TOKEN_H
 
 #include "list.h"
 #include "lstr.h"
@@ -10,8 +10,10 @@
 #include <stdlib.h>
 
 /*
- * C Token.
- * See 6.4 Lexical categories, 6.4.6 Punctuators.
+ * C token.
+ *
+ * See 6.4 Lexical categories
+ * See 6.4.6 Punctuators
  */
 enum token_type
 {

@@ -5,7 +5,7 @@
 
 /*
  * C operators.
- * See 6.5.2--6.5.16.
+ * See: 6.5.2--6.5.16.
  */
 enum oper
 {
@@ -14,7 +14,7 @@ enum oper
 	 * TOKEN_OP_* tokens.
 	 *
 	 * NOTE: Please do not modify the order of items within
-	 *       this block withou modifying `enum token_type'
+	 *       this block without modifying `enum token_type'
 	 *       correspondingly. See `enum token_type'.
 	 */
 	OPER_ADDEQ,	/* x += y */
@@ -49,7 +49,13 @@ enum oper
 	OPER_XOREQ,	/* x ^= y */
 
 	/*
-	 * The remaining (context-sensitive) operators
+	 * The remaining (context-sensitive) operators, or operators
+	 * which do not correspond to a single simple token.
+	 *
+	 * For example, OPER_ALIGNOF translates from a TOKEN_NAME
+	 * token whose symbolic name is `_Alignof', and OPER_OFFSET
+	 * consists of multiple tokens (`[' and `]' with an expression
+	 * in between).
 	 */
 
 	OPER_ADD,	/* x + y */
@@ -71,11 +77,13 @@ enum oper
  */
 struct opinfo
 {
-	byte_t oper;	/* operator, see `enum oper' */
-	byte_t arity;	/* operator arity */
-	byte_t prio;	/* operator priority */
+	byte_t oper;	/* the operator, see `enum oper' */
+	byte_t arity;	/* arity */
+	byte_t prio;	/* priority */
 };
 
 extern const struct opinfo opinfo[42];
+
+const char *oper_to_string(enum oper oper);
 
 #endif
