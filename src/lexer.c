@@ -785,7 +785,7 @@ next_nonwhite_char:
 				lexer->c += 2;
 			}
 			else {
-				token->type = TOKEN_DOT;
+				token->type = TOKEN_OP_DOT;
 			}
 
 			break;
@@ -828,7 +828,7 @@ next_nonwhite_char:
 			lexer->c++;
 		}
 		else if (*lexer->c == '-') {
-			token->type = TOKEN_OP_DEC;
+			token->type = TOKEN_MINUSMINUS;
 			lexer->c++;
 		}
 		else if (*lexer->c == '=') {
@@ -843,7 +843,7 @@ next_nonwhite_char:
 
 	case '+':
 		if (*lexer->c == '+') {
-			token->type = TOKEN_OP_INC;
+			token->type = TOKEN_PLUSPLUS;
 			lexer->c++;
 		}
 		else if (*lexer->c == '=') {

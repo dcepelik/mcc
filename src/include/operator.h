@@ -24,14 +24,12 @@ enum oper
 	OPER_BITANDEQ,	/* x &= y */
 	OPER_BITOR,	/* x | y */
 	OPER_BITOREQ,	/* x |= y */
-	OPER_DEC,	/* x-- or --x */
 	OPER_DIV,	/* x / y */
 	OPER_DIVEQ,	/* x /= y */
 	OPER_DOT,	/* x.y */
 	OPER_EQ, 	/* x == y */
 	OPER_GE, 	/* x >= y */
 	OPER_GT, 	/* x > y */
-	OPER_INC,	/* x++ or ++x */
 	OPER_LE, 	/* x <= y */
 	OPER_LT, 	/* x < y */
 	OPER_MOD,	/* x % y */
@@ -66,10 +64,16 @@ enum oper
 	OPER_DEREF,	/* *x */
 	OPER_MUL,	/* x * y */
 	OPER_OFFSET,	/* x[y] */
+	OPER_POSTDEC,	/* x-- */
+	OPER_POSTINC,	/* x++ */
+	OPER_PREDEC,	/* --x */
+	OPER_PREINC,	/* ++x */
 	OPER_SIZEOF,	/* sizeof(x) */
 	OPER_SUB,	/* x - y */
 	OPER_UMINUS,	/* -x */
 	OPER_UPLUS,	/* +x */
+
+	NOPERS,		/* number of operators */
 };
 
 enum opassoc
@@ -89,7 +93,7 @@ struct opinfo
 	enum opassoc assoc;	/* associativity */
 };
 
-extern const struct opinfo opinfo[42];
+extern const struct opinfo opinfo[NOPERS];
 
 const char *oper_to_string(enum oper oper);
 

@@ -19,7 +19,7 @@ static struct ast_expr *build_expr_node(struct parser *parser,
 
 	expr = objpool_alloc(&parser->ctx.exprs);
 	switch (opinfo->arity) {
-	case 1:	/* unary */
+	case 1:	/* prefix */
 		expr->type = EXPR_TYPE_UOP;
 		expr->uop.oper = opinfo->oper;
 		expr->uop.expr = array_last(args);
@@ -52,7 +52,7 @@ struct ast_expr *parse_expr(struct parser *parser)
 	struct ast_expr *expr;			/* current expression */
 	enum oper cur_op;			/* current operator */
 	const struct opinfo *cur_opinfo;	/* current operator's information */
-	bool unary = true;			/* next operator is unary */
+	bool prefix = true;			/* next operator is prefix */
 
 	ops = array_new(4, sizeof(*ops));
 	args = array_new(4, sizeof(*args));
@@ -61,20 +61,18 @@ struct ast_expr *parse_expr(struct parser *parser)
 		/* translate token(s) to operator */
 		switch (parser->token->type) {
 		case TOKEN_OP_ADDEQ:
-		case TOKEN_DOT:
+		case TOKEN_OP_DOT:
 		case TOKEN_OP_AND:
 		case TOKEN_OP_ARROW:
 		case TOKEN_OP_ASSIGN:
 		case TOKEN_OP_BITANDEQ:
 		case TOKEN_OP_BITOR:
 		case TOKEN_OP_BITOREQ:
-		case TOKEN_OP_DEC:
 		case TOKEN_OP_DIV:
 		case TOKEN_OP_DIVEQ:
 		case TOKEN_OP_EQ:
 		case TOKEN_OP_GE:
 		case TOKEN_OP_GT:
-		case TOKEN_OP_INC:
 		case TOKEN_OP_LE:
 		case TOKEN_OP_LT:
 		case TOKEN_OP_MOD:
@@ -94,16 +92,19 @@ struct ast_expr *parse_expr(struct parser *parser)
 			cur_op = (enum oper)parser->token->type;
 			break;
 		case TOKEN_PLUS:
-			cur_op = unary ? OPER_UPLUS : OPER_ADD;
+			cur_op = prefix ? OPER_UPLUS : OPER_ADD;
 			break;
 		case TOKEN_MINUS:
-			cur_op = unary ? OPER_UMINUS : OPER_SUB;
+			cur_op = prefix ? OPER_UMINUS : OPER_SUB;
+			break;
+		case TOKEN_PLUSPLUS:
+			cur_op = prefix ? OPER_PREINC : OPER_POSTINC;
 			break;
 		case TOKEN_AMP:
-			cur_op = unary ? OPER_ADDROF : OPER_BITAND;
+			cur_op = prefix ? OPER_ADDROF : OPER_BITAND;
 			break;
 		case TOKEN_ASTERISK:
-			cur_op = unary ? OPER_DEREF : OPER_MUL;
+			cur_op = prefix ? OPER_DEREF : OPER_MUL;
 			break;
 		case TOKEN_LBRACKET:
 			cur_op = OPER_OFFSET;
@@ -113,7 +114,7 @@ struct ast_expr *parse_expr(struct parser *parser)
 			array_push(args, parse_expr(parser));
 			if (!parser_expect(parser, TOKEN_RPAREN))
 				parse_error(parser, "expected )");
-			unary = false;
+			prefix = false;
 			continue;
 		case TOKEN_RBRACKET:
 		case TOKEN_RPAREN:
@@ -125,17 +126,18 @@ struct ast_expr *parse_expr(struct parser *parser)
 				expr->number = parser->token->str;
 				array_push(args, expr);
 			}
-			unary = false;
+			prefix = false;
 			parser_next(parser);
 			continue;
 		}
 
 		cur_opinfo = &opinfo[cur_op];
-		unary = true;
+		if (prefix || cur_opinfo->assoc == OPASSOC_RIGHT)
+			prefix = true;
 
 		while (array_size(ops)
 			&& array_last(ops)->prio >= cur_opinfo->prio
-			&& array_last(ops)->assoc == OPASSOC_LEFT) {
+			&& cur_opinfo->assoc == OPASSOC_LEFT) {
 			expr = build_expr_node(parser, ops, args);
 			array_push(args, expr);
 		}

@@ -30,36 +30,34 @@ enum token_type
 	 *       block without modifying `enum oper' correspondingly.
 	 */
 	TOKEN_OP_ADDEQ,		/* OPER_ADDEQ */
-	TOKEN_DOT, 		/* OPER_DOT TODO rename to TOKEN_OP_DOT */
-	TOKEN_OP_AND,           /* OPER_AND, */
-	TOKEN_OP_ARROW,         /* OPER_ARROW */
-	TOKEN_OP_ASSIGN,        /* OPER_ASSIG */
-	TOKEN_OP_BITANDEQ,      /* OPER_BITAN */
-	TOKEN_OP_BITOR,         /* OPER_BITOR */
-	TOKEN_OP_BITOREQ,       /* OPER_BITOR */
-	TOKEN_OP_DEC,           /* OPER_DEC */
-	TOKEN_OP_DIV,           /* OPER_DIV */
-	TOKEN_OP_DIVEQ,         /* OPER_DIVEQ */
-	TOKEN_OP_EQ,            /* OPER_EQ */
-	TOKEN_OP_GE,            /* OPER_GE */
-	TOKEN_OP_GT,            /* OPER_GT */
-	TOKEN_OP_INC,           /* OPER_INC */
-	TOKEN_OP_LE,            /* OPER_LE */
-	TOKEN_OP_LT,            /* OPER_LT */
-	TOKEN_OP_MOD,           /* OPER_MOD */
-	TOKEN_OP_MODEQ,         /* OPER_MODEQ */
-	TOKEN_OP_MULEQ,         /* OPER_MULEQ */
-	TOKEN_OP_NEG,           /* OPER_NEG */
-	TOKEN_OP_NEQ,           /* OPER_NEQ */
-	TOKEN_OP_NOT,           /* OPER_NOT */
-	TOKEN_OP_OR,            /* OPER_OR */
-	TOKEN_OP_SHL,           /* OPER_SHL */
-	TOKEN_OP_SHLEQ,         /* OPER_SHLEQ */
-	TOKEN_OP_SHR,           /* OPER_SHR */
-	TOKEN_OP_SHREQ,         /* OPER_SHREQ */
-	TOKEN_OP_SUBEQ,         /* OPER_SUBEQ */
-	TOKEN_OP_XOR,           /* OPER_XOR */
-	TOKEN_OP_XOREQ,         /* OPER_XOREQ */
+	TOKEN_OP_DOT,		/* OPER_DOT */
+	TOKEN_OP_AND,		/* OPER_AND,	*/
+	TOKEN_OP_ARROW,		/* OPER_ARROW */
+	TOKEN_OP_ASSIGN,	/* OPER_ASSIG */
+	TOKEN_OP_BITANDEQ,	/* OPER_BITAN */
+	TOKEN_OP_BITOR,		/* OPER_BITOR */
+	TOKEN_OP_BITOREQ,	/* OPER_BITOR */
+	TOKEN_OP_DIV,		/* OPER_DIV */
+	TOKEN_OP_DIVEQ,		/* OPER_DIVEQ */
+	TOKEN_OP_EQ,		/* OPER_EQ */
+	TOKEN_OP_GE,		/* OPER_GE */
+	TOKEN_OP_GT,		/* OPER_GT */
+	TOKEN_OP_LE,		/* OPER_LE */
+	TOKEN_OP_LT,		/* OPER_LT */
+	TOKEN_OP_MOD,		/* OPER_MOD */
+	TOKEN_OP_MODEQ,		/* OPER_MODEQ */
+	TOKEN_OP_MULEQ,		/* OPER_MULEQ */
+	TOKEN_OP_NEG,		/* OPER_NEG */
+	TOKEN_OP_NEQ,		/* OPER_NEQ */
+	TOKEN_OP_NOT,		/* OPER_NOT */
+	TOKEN_OP_OR,		/* OPER_OR */
+	TOKEN_OP_SHL,		/* OPER_SHL */
+	TOKEN_OP_SHLEQ,		/* OPER_SHLEQ */
+	TOKEN_OP_SHR,		/* OPER_SHR */
+	TOKEN_OP_SHREQ,		/* OPER_SHREQ */
+	TOKEN_OP_SUBEQ,		/* OPER_SUBEQ */
+	TOKEN_OP_XOR,		/* OPER_XOR */
+	TOKEN_OP_XOREQ,		/* OPER_XOREQ */
 	TOKEN_OP_CAST_MAX,	/* special value */
 
 	/*
@@ -74,7 +72,7 @@ enum token_type
 	TOKEN_AMP, TOKEN_ASTERISK, TOKEN_COLON, TOKEN_COMMA, TOKEN_ELLIPSIS,
 	TOKEN_HASH, TOKEN_HASH_HASH, TOKEN_LBRACE, TOKEN_LBRACKET, TOKEN_LPAREN,
 	TOKEN_MINUS, TOKEN_PLUS, TOKEN_QMARK, TOKEN_RBRACE, TOKEN_RBRACKET, TOKEN_RPAREN,
-	TOKEN_SEMICOLON,
+	TOKEN_SEMICOLON, TOKEN_MINUSMINUS, TOKEN_PLUSPLUS,	
 
 	/*
 	 * 6.4 Lexical categories
