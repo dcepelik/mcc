@@ -27,6 +27,7 @@ enum oper
 	OPER_DEC,	/* x-- or --x */
 	OPER_DIV,	/* x / y */
 	OPER_DIVEQ,	/* x /= y */
+	OPER_DOT,	/* x.y */
 	OPER_EQ, 	/* x == y */
 	OPER_GE, 	/* x >= y */
 	OPER_GT, 	/* x > y */
@@ -63,7 +64,6 @@ enum oper
 	OPER_ALIGNOF,	/* _Alignof(x) */
 	OPER_BITAND,	/* x & y */
 	OPER_DEREF,	/* *x */
-	OPER_DOT,	/* x.y */
 	OPER_MUL,	/* x * y */
 	OPER_OFFSET,	/* x[y] */
 	OPER_SIZEOF,	/* sizeof(x) */
@@ -72,14 +72,21 @@ enum oper
 	OPER_UPLUS,	/* +x */
 };
 
+enum opassoc
+{
+	OPASSOC_LEFT,
+	OPASSOC_RIGHT,
+};
+
 /*
  * C operator information.
  */
 struct opinfo
 {
-	byte_t oper;	/* the operator, see `enum oper' */
-	byte_t arity;	/* arity */
-	byte_t prio;	/* priority */
+	byte_t oper;		/* the operator, see `enum oper' */
+	byte_t arity;		/* arity */
+	byte_t prio;		/* priority */
+	enum opassoc assoc;	/* associativity */
 };
 
 extern const struct opinfo opinfo[42];

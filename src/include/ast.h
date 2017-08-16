@@ -37,6 +37,7 @@ enum expr_type
 {
 	/* primary expressions, see ``struct ast_primary'' */
 	EXPR_TYPE_PRI_IDENT,
+	EXPR_TYPE_PRI_NUMBER,	/* TODO */
 	/* ... */
 	EXPR_TYPE_PRI_GENERIC,
 
@@ -44,8 +45,8 @@ enum expr_type
 
 	/* ... */
 
-	EXPR_TYPE_BEXPR,
-	EXPR_TYPE_UEXPR,
+	EXPR_TYPE_UOP,		/* unary operation */
+	EXPR_TYPE_BOP,		/* binary operation */
 };
 
 /*
@@ -118,6 +119,7 @@ struct ast_expr
 		struct ast_cast cast;	/* cast expression */
 		struct ast_uop uop;	/* unary operation */
 		struct ast_bop bop;	/* binary operation */
+		char *number;		/* TODO */
 	};
 };
 

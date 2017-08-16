@@ -1,6 +1,7 @@
 #include "common.h"
 #include "array.h"
 #include "debug.h"
+#include <assert.h>
 
 
 struct array_header
@@ -78,4 +79,12 @@ void array_reset(void *arr)
 void array_delete(void *arr)
 {
 	free(array_get_header(arr));
+}
+
+
+void array_pop(void *arr)
+{
+	struct array_header *hdr = array_get_header(arr);
+	assert(hdr->num_items > 0);
+	hdr->num_items--;
 }

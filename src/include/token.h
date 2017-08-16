@@ -30,6 +30,7 @@ enum token_type
 	 *       block without modifying `enum oper' correspondingly.
 	 */
 	TOKEN_OP_ADDEQ,		/* OPER_ADDEQ */
+	TOKEN_DOT, 		/* OPER_DOT TODO rename to TOKEN_OP_DOT */
 	TOKEN_OP_AND,           /* OPER_AND, */
 	TOKEN_OP_ARROW,         /* OPER_ARROW */
 	TOKEN_OP_ASSIGN,        /* OPER_ASSIG */
@@ -70,7 +71,7 @@ enum token_type
 	 * to OPER_ADDROF or OPER_BITAND operators, depending on
 	 * context in which it is used.
 	 */
-	TOKEN_AMP, TOKEN_ASTERISK, TOKEN_COLON, TOKEN_COMMA, TOKEN_DOT, TOKEN_ELLIPSIS,
+	TOKEN_AMP, TOKEN_ASTERISK, TOKEN_COLON, TOKEN_COMMA, TOKEN_ELLIPSIS,
 	TOKEN_HASH, TOKEN_HASH_HASH, TOKEN_LBRACE, TOKEN_LBRACKET, TOKEN_LPAREN,
 	TOKEN_MINUS, TOKEN_PLUS, TOKEN_QMARK, TOKEN_RBRACE, TOKEN_RBRACKET, TOKEN_RPAREN,
 	TOKEN_SEMICOLON,
