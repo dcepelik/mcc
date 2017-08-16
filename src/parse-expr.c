@@ -19,7 +19,7 @@ static struct ast_expr *build_expr_node(struct parser *parser,
 
 	expr = objpool_alloc(&parser->ctx.exprs);
 	switch (opinfo->arity) {
-	case 1:	/* prefix */
+	case 1:	/* unary */
 		expr->type = EXPR_TYPE_UOP;
 		expr->uop.oper = opinfo->oper;
 		expr->uop.expr = array_last(args);
@@ -44,15 +44,13 @@ static struct ast_expr *build_expr_node(struct parser *parser,
 
 struct ast_expr *parse_expr(struct parser *parser)
 {
-	struct strbuf buf;
-	strbuf_init(&buf, 1024);
-
 	const struct opinfo **ops;		/* operator stack */
 	struct ast_expr **args;			/* operands stack */
 	struct ast_expr *expr;			/* current expression */
+	struct ast_expr *offset_expr;		/* offset expression */
 	enum oper cur_op;			/* current operator */
 	const struct opinfo *cur_opinfo;	/* current operator's information */
-	bool prefix = true;			/* next operator is prefix */
+	bool prefix = true;			/* if an operator follows, it is a prefix operator */
 
 	ops = array_new(4, sizeof(*ops));
 	args = array_new(4, sizeof(*args));
@@ -107,13 +105,19 @@ struct ast_expr *parse_expr(struct parser *parser)
 			cur_op = prefix ? OPER_DEREF : OPER_MUL;
 			break;
 		case TOKEN_LBRACKET:
+			DEBUG_MSG("Got a [.");
+			parser_next(parser);
+			offset_expr = parse_expr(parser);
+			if (!token_is(parser->token, TOKEN_RBRACKET))
+				parse_error(parser, "] was expected");
+			prefix = false;
 			cur_op = OPER_OFFSET;
 			break;
 		case TOKEN_LPAREN:
 			parser_next(parser);
-			array_push(args, parse_expr(parser));
-			if (!parser_expect(parser, TOKEN_RPAREN))
-				parse_error(parser, "expected )");
+			expr = parse_expr(parser);
+			array_push(args, expr);
+			parser_require(parser, TOKEN_RPAREN);
 			prefix = false;
 			continue;
 		case TOKEN_RBRACKET:
@@ -132,7 +136,7 @@ struct ast_expr *parse_expr(struct parser *parser)
 		}
 
 		cur_opinfo = &opinfo[cur_op];
-		if (prefix || cur_opinfo->assoc == OPASSOC_RIGHT)
+		if (cur_opinfo->assoc == OPASSOC_RIGHT)
 			prefix = true;
 
 		while (array_size(ops)
@@ -142,16 +146,15 @@ struct ast_expr *parse_expr(struct parser *parser)
 			array_push(args, expr);
 		}
 
+		if (cur_op == OPER_OFFSET)
+			array_push(args, offset_expr);
+
 		array_push(ops, cur_opinfo);
 		parser_next(parser);
-
-		if (cur_op == OPER_OFFSET) {
-			TMP_ASSERT(0);
-			parse_expr(parser);
-		}
 	}
 
 break_while:
+	DEBUG_MSG("Popping rest of operators.");
 	while (array_size(ops) > 0) {
 		expr = build_expr_node(parser, ops, args);
 		array_push(args, expr);
