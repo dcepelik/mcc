@@ -35,8 +35,8 @@ struct ast_node
 	};
 	char *ident;
 	size_t size;
-	struct ast_node_2 *size_expr;
-	struct ast_node_2 *init;	/* initializer */
+	struct ast_expr *size_expr;
+	struct ast_expr *init;	/* initializer */
 	struct ast_node *spec;	/* struct or union specifiaction */
 	struct ast_node *decl;	/* declarator */
 	struct ast_node **parts;
@@ -48,10 +48,6 @@ struct ast_node
 	};
 };
 
-/*
- * C declaration specifiers.
- * See 6.7.
- */
 struct ast_declspec
 {
 	decl_tspec_t tspec;	/* type specifiers, see `enum tspec' */
@@ -60,7 +56,7 @@ struct ast_declspec
 	decl_storcls_t storcls;	/* storage class, see `enum storcls' */
 	union
 	{
-		struct ast_node_2 *su_spec;
+		struct ast_su_spec *su_spec;
 	};
 };
 
@@ -74,7 +70,7 @@ struct ast_declspec
 struct ast_su_spec
 {
 	char *name;
-	struct ast_node_2 **members;
+	struct ast_decl **members;
 };
 
 /*
@@ -96,9 +92,10 @@ enum declr_type
  */
 struct ast_declr
 {
+	struct list_node node;
 	union
 	{
-		struct ast_node_2 *size;	/* DECLR_TYPE_ARRAY */
+		struct ast_expr *size;	/* DECLR_TYPE_ARRAY */
 		char *ident;		/* DECLR_TYPE_IDENT */
 		decl_tquals_t tquals;	/* DECLR_TYPE_PTR */
 	};
@@ -111,8 +108,8 @@ struct ast_declr
  */
 struct ast_init_declr
 {
-	struct ast_declr **declrs;	/* declarators */
-	struct ast_node_2 *init;	/* initializer */
+	struct list declrs;	/* declarators, see `struct ast_declr' */
+	struct ast_expr *init;	/* initializer */
 };
 
 /*
@@ -121,8 +118,8 @@ struct ast_init_declr
  */
 struct ast_decl
 {
-	struct ast_declspec declspec;		/* declaration specifiers */
-	struct ast_init_declr *init_declrs;	/* init-declarators */
+	struct ast_declspec declspec;	/* declaration specifiers */
+	struct list init_decl_list;	/* declarators list */
 };
 
 /*
@@ -164,9 +161,9 @@ struct ast_primary
  */
 struct ast_cexpr
 {
-	struct ast_node_2 *cond;	/* the condition */
-	struct ast_node_2 *yes;	/* expression when the condition holds */
-	struct ast_node_2 *no;	/* expression when the condition does not hold */
+	struct ast_expr *cond;	/* the condition */
+	struct ast_expr *yes;	/* expression when the condition holds */
+	struct ast_expr *no;	/* expression when the condition does not hold */
 };
 
 /*
@@ -178,7 +175,7 @@ struct ast_cexpr
 struct ast_cast
 {
 	char *type_name;	/* target type name */
-	struct ast_node_2 *expr;	/* expression to be cast */
+	struct ast_expr *expr;	/* expression to be cast */
 };
 
 /*
@@ -188,7 +185,7 @@ struct ast_cast
 struct ast_uop
 {
 	enum oper oper;		/* the operator, see `enum oper', unary operators */
-	struct ast_node_2 *expr;	/* the (only) operand */
+	struct ast_expr *expr;	/* the (only) operand */
 };
 
 /*
@@ -198,67 +195,33 @@ struct ast_uop
 struct ast_bop
 {
 	enum oper oper;		/* the operator, see `enum oper', binary operators */
-	struct ast_node_2 *fst;	/* the first operand */
-	struct ast_node_2 *snd;	/* the second operand */
+	struct ast_expr *fst;	/* the first operand */
+	struct ast_expr *snd;	/* the second operand */
 };
 
 /*
- * Type of AST node. Used to dispatch the union in `struct ast_node_2'.
- *
- * NOTE: For brevity, names of enumeration constants defined by this enum
- *       do not start with the enum's name.
+ * C expression.
+ * See 6.5.1--6.6.
  */
-enum ast_node_2_type
+struct ast_expr
 {
-	AST_SU_SPEC,		/* structure or union specifier */
-
-	/* primary expressions, see `struct ast_primary' */
-	AST_EXPR_PRI_IDENT,
-	AST_EXPR_PRI_NUMBER,	/* TODO */
-	/* ... */
-	AST_EXPR_PRI_GENERIC,
-
-	AST_EXPR_COND,
-
-	/* ... */
-
-	AST_EXPR_UOP,		/* unary operation */
-	AST_EXPR_BOP,		/* binary operation */
-
-	AST_UNIT,		/* translation unit */
-};
-
-/*
- * AST node.
- */
-struct ast_node_2
-{
-	enum ast_node_2_type type;
-	union
-	{
-		struct ast_decl decl;		/* declaration */
-		struct ast_su_spec su_spec;	/* structure or union specifier */
-
-		struct ast_uop uop;		/* unary operation */
-		struct ast_bop bop;		/* binary operation */
-		struct ast_cexpr cexpr;		/* conditional expression */
-		struct ast_cast cast;		/* cast expression */
-
-		char *number;			/* TODO */
+	enum expr_type type;
+	union {
+		struct ast_cexpr cexpr;	/* conditional expression */
+		struct ast_cast cast;	/* cast expression */
+		struct ast_uop uop;	/* unary operation */
+		struct ast_bop bop;	/* binary operation */
+		char *number;		/* TODO */
 	};
 };
 
-/*
- * The Abstract Syntax Tree (AST).
- */
+void ast_node_init(struct ast_node *node);
+struct ast_node *ast_node_new(struct context *ctx, enum ast_node_type type);
+struct ast_expr *ast_expr_new(struct context *ctx, enum expr_type type);
+
 struct ast
 {
 	struct ast_node root;
 };
-
-
-void ast_node_init(struct ast_node *node);
-struct ast_node *ast_node_new(struct context *ctx, enum ast_node_type type);
-struct ast_node_2 *ast_node_2_new(struct context *ctx, enum ast_node_2_type type);
 
 #endif
