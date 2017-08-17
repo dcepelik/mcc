@@ -82,9 +82,9 @@ static struct ast_node *parse_declarators(struct parser *parser, struct toklist 
 /*
  * Parses: 6.7 init-declarator.
  */
-static struct ast_node *parse_init_declarator(struct parser *parser)
+static struct ast_init_declr *parse_init_declr(struct parser *parser)
 {
-	struct ast_node *part;
+	struct ast_declr *declr;
 	struct toklist stack;
 
 	part = ast_node_new(&parser->ctx, AST_DECL_PART);
@@ -120,12 +120,14 @@ static struct ast_node *parse_init_declarator(struct parser *parser)
 }
 
 
-static void sanitize_declspec_member(struct parser *parser, struct ast_node *decln)
+static void sanitize_dspec_su_member(struct parser *parser, struct ast_node_2 *member)
 {
-	if (decln->storcls) {
+	assert(member->type == AST_SU_SPEC);
+
+	if (member->decl.declspec.storcls) {
 		parse_error(parser, "Storage class specifier not valid for struct "
 			"and union members.");
-		decln->storcls = 0;
+		member->decl.declspec.storcls = 0;
 	}
 }
 
@@ -133,54 +135,53 @@ static void sanitize_declspec_member(struct parser *parser, struct ast_node *dec
 /*
  * Parses: 6.7.2.1 struct-or-union-specifier.
  */
-static struct ast_node *parse_struct_or_union_specifier(struct parser *parser)
+static struct ast_node_2 *parse_su_spec(struct parser *parser)
 {
-	struct ast_node *spec;
-
-	if (token_is_keyword(parser->token, KWD_STRUCT))
-		spec = ast_node_new(&parser->ctx, AST_STRUCT_SPEC);
-	else if (token_is_keyword(parser->token, KWD_UNION))
-		spec = ast_node_new(&parser->ctx, AST_UNION_SPEC);
-	else
-		assert(0);
-
+	assert(token_is_keyword(parser->token, KWD_STRUCT) || token_is_keyword(parser->token, KWD_UNION));
 	parser_next(parser);
-	spec->ident = NULL;
-	spec->decls = NULL;
+
+	struct ast_node_2 *node;
+	struct ast_su_spec *spec;
+	struct ast_node_2 *member;
+	
+	node = ast_node_2_new(&parser->ctx, AST_SU_SPEC);
+	spec = &node->su_spec;
+	spec->members = array_new(2, sizeof(*spec->members));
 
 	if (token_is_name(parser->token) && !token_is_any_keyword(parser->token)) {
-		spec->ident = symbol_get_name(parser->token->symbol);
+		spec->name = symbol_get_name(parser->token->symbol);
 		parser_next(parser);
+	}
+	else {
+		spec->name = NULL; /* anonymous struct */
 	}
 
 	if (!parser_expect(parser, TOKEN_LBRACE)) {
-		if (!spec->ident)
+		if (!spec->name)
 			parse_error(parser, "struct name expected");
-		return spec;
+		return node;
 	}
 
-	spec->decls = array_new(2, sizeof(*spec->decls));
-	while (!token_is_eof(parser->token)) {
-		if (token_is(parser->token, TOKEN_RBRACE))
-			break;
-
-		spec->decls = array_claim(spec->decls, 1);
-		spec->decls[array_size(spec->decls) - 1] = parser_parse_decl(parser);
-		sanitize_declspec_member(parser, spec->decls[array_size(spec->decls) - 1]);
+	while (!token_is_eof(parser->token) && !token_is(parser->token, TOKEN_RBRACE)) {
+		member = parser_parse_decl(parser);
+		sanitize_dspec_su_member(parser, member);
+		array_push(spec->members, member);
 	}
 
 	parser_require(parser, TOKEN_RBRACE);
-	return spec;
+	return node;
 }
 
 
-static void apply_tflag(struct parser *parser, struct ast_node *decln, const struct kwdinfo *kwd)
+static void apply_tflag(struct parser *parser,
+                        struct ast_declspec *dspec,
+			const struct kwdinfo *kwd)
 {
-	uint8_t new_tflags = decln->tflags;
+	uint8_t new_tflags = dspec->tflags;
 
 	switch (kwd->tflags) {
 	case TFLAG_LONG:
-		if (decln->tflags & TFLAG_LONG) { /* promote long to long long */
+		if (dspec->tflags & TFLAG_LONG) { /* promote long to long long */
 			new_tflags ^= TFLAG_LONG;
 			new_tflags |= TFLAG_LONG_LONG;
 			break;
@@ -200,77 +201,81 @@ static void apply_tflag(struct parser *parser, struct ast_node *decln, const str
 		parse_error(parser, "Longer than long long? Have a break.");
 	else if (new_tflags & TFLAG_COMPLEX && new_tflags & ~(TFLAG_LONG | TFLAG_COMPLEX))
 		parse_error(parser, "Invalid type specifier for _Complex.");
-	else if (new_tflags == decln->tflags)
+	else if (new_tflags == dspec->tflags)
 		parse_error(parser, "Type specifier is redundant.");
 	else
-		decln->tflags = new_tflags;
+		dspec->tflags = new_tflags;
 }
 
 
-static void apply_tspec(struct parser *parser, struct ast_node *decln, const struct kwdinfo *kwd)
+static void apply_tspec(struct parser *parser,
+                        struct ast_declspec *dspec,
+			const struct kwdinfo *kwd)
 {
-	if (decln->tspec)
+	if (dspec->tspec)
 		parse_error(parser, "Too many types specified.");
 	else
-		decln->tspec |= kwd->tspec;
+		dspec->tspec |= kwd->tspec;
 }
 
 
-static void apply_storcls(struct parser *parser, struct ast_node *decln, const struct kwdinfo *kwd)
+static void apply_storcls(struct parser *parser,
+                          struct ast_declspec *dspec,
+			  const struct kwdinfo *kwd)
 {
-	if (decln->storcls)
+	if (dspec->storcls)
 		parse_error(parser, "Too many storage classes specified.");
 	else
-		decln->storcls |= kwd->storcls;
+		dspec->storcls |= kwd->storcls;
 }
 
 
-static void sanitize_declspec(struct parser *parser, struct ast_node *decln)
+static void sanitize_declspec(struct parser *parser, struct ast_declspec *dspec)
 {
-	if (!decln->tspec) {
-		if (!(decln->tflags & INT_TFLAGS))
+	if (!dspec->tspec) {
+		if (!(dspec->tflags & INT_TFLAGS))
 			parse_error(parser, "Type not specified, assume it's an int.");
-		decln->tspec = TSPEC_INT;
+		dspec->tspec = TSPEC_INT;
 	}
 
-	switch (decln->tspec) {
+	switch (dspec->tspec) {
 	case TSPEC_INT:
-		if (decln->tflags & ~INT_TFLAGS) {
+		if (dspec->tflags & ~INT_TFLAGS) {
 			parse_error(parser, "Invalid type specifiers for int, ignore.");
-			decln->tflags &= INT_TFLAGS;
+			dspec->tflags &= INT_TFLAGS;
 		};
 		break;
 
 	case TSPEC_CHAR:
-		if (decln->tflags & ~CHAR_TFLAGS) {
+		if (dspec->tflags & ~CHAR_TFLAGS) {
 			parse_error(parser, "Invalid type specifiers for char, ingore.");
-			decln->tflags &= CHAR_TFLAGS;
+			dspec->tflags &= CHAR_TFLAGS;
 		}
 		break;
 
 	case TSPEC_BOOL:
-		if (decln->tflags) {
+		if (dspec->tflags) {
 			parse_error(parser, "Invalid type specifiers for _Bool, ignore.");
-			decln->tflags = 0;
+			dspec->tflags = 0;
 		}
 		break;
 
 	case TSPEC_FLOAT:
-		if (decln->tflags) {
+		if (dspec->tflags) {
 			parse_error(parser, "Invalid type specifiers for float, ignore.");
-			decln->tflags = 0;
+			dspec->tflags = 0;
 		}
 		break;
 
 	case TSPEC_DOUBLE:
-		if (decln->tflags & ~DOUBLE_TFLAGS) {
+		if (dspec->tflags & ~DOUBLE_TFLAGS) {
 			parse_error(parser, "Invalid type specifiers for double, ignore.");
-			decln->tflags &= DOUBLE_TFLAGS;
+			dspec->tflags &= DOUBLE_TFLAGS;
 		}
 	}
 
-	if (decln->tflags & TFLAG_COMPLEX
-		&& decln->tspec != TSPEC_FLOAT && decln->tspec != TSPEC_DOUBLE) {
+	if (dspec->tflags & TFLAG_COMPLEX
+		&& dspec->tspec != TSPEC_FLOAT && dspec->tspec != TSPEC_DOUBLE) {
 		parse_error(parser, "Only float and double can be _Complex.");
 	}
 }
@@ -279,14 +284,14 @@ static void sanitize_declspec(struct parser *parser, struct ast_node *decln)
 /*
  * Parses: 6.7 declaration-specifiers.
  */
-static void parse_declspec(struct parser *parser, struct ast_node *decln)
+static void parse_declspec(struct parser *parser, struct ast_declspec *dspec)
 {
 	const struct kwdinfo *kwdinfo;
 
-	decln->tspec = 0;
-	decln->tflags = 0;
-	decln->tquals = 0;
-	decln->storcls = 0;
+	dspec->tspec = 0;
+	dspec->tflags = 0;
+	dspec->tquals = 0;
+	dspec->storcls = 0;
 
 	while (token_is_any_keyword(parser->token)) {
 		kwdinfo = parser->token->symbol->def->kwdinfo;
@@ -295,46 +300,48 @@ static void parse_declspec(struct parser *parser, struct ast_node *decln)
 			case KWD_CLASS_ALIGNMENT:
 				break;
 			case KWD_CLASS_TSPEC:
-				apply_tspec(parser, decln, kwdinfo);
+				apply_tspec(parser, dspec, kwdinfo);
 				break;
 			case KWD_CLASS_TFLAG:
-				apply_tflag(parser, decln, kwdinfo);
+				apply_tflag(parser, dspec, kwdinfo);
 				break;
 			case KWD_CLASS_FUNCSPEC:
 				break;
 			case KWD_CLASS_STORCLS:
-				apply_storcls(parser, decln, kwdinfo);
+				apply_storcls(parser, dspec, kwdinfo);
 				break;
 			case KWD_CLASS_TQUAL:
-				decln->tquals |= kwdinfo->tqual;
+				dspec->tquals |= kwdinfo->tqual;
 				break;
 			default:
 				goto break_while;
 		}
 
 		if (kwdinfo->kwd == KWD_STRUCT || kwdinfo->kwd == KWD_UNION)
-			decln->spec = parse_struct_or_union_specifier(parser);
+			dspec->su_spec = parse_su_spec(parser);
 		else
 			parser_next(parser);
 	}
 
 break_while:
-	sanitize_declspec(parser, decln);
+	sanitize_declspec(parser, dspec);
 }
 
 
 /*
  * Parses: 6.7 declaration, 6.7 init-declarator-list.
  */
-struct ast_node *parser_parse_decl(struct parser *parser)
+struct ast_node_2 *parser_parse_decl(struct parser *parser)
 {
-	struct ast_node *decl;
-	struct ast_node *declarator;
+	struct ast_node_2 *node;
+	struct ast_decl *decl;
+	struct ast_init_declr *declr;
 	bool comma = false;
 
-	decl = ast_node_new(&parser->ctx, AST_DECL);
-	parse_declspec(parser, decl);
-	decl->parts = array_new(1, sizeof(*decl->parts));
+	node = ast_node_2_new(&parser->ctx, AST_DECL);
+	decl = &node->decl;
+	list_init(&decl->init_decl_list);
+	parse_declspec(parser, &decl->declspec);
 
 	while (!token_is_eof(parser->token)) {
 		if (token_is(parser->token, TOKEN_SEMICOLON)) {
@@ -344,11 +351,11 @@ struct ast_node *parser_parse_decl(struct parser *parser)
 			break;
 		}
 
-		if (!comma && array_size(decl->parts) > 0)
-			parse_error(parser, "comma was expected");
+		if (!comma && list_length(&decl->init_decl_list) > 0)
+			parse_error(parser, "`,' was expected");
 
-		declarator = parse_init_declarator(parser);
-		array_push(decl->parts, declarator);
+		declr = parse_init_declr(parser);
+		list_insert_last(&decl->init_decl_list, &declr->node);
 
 		comma = false;
 		if (token_is(parser->token, TOKEN_COMMA)) {
@@ -357,7 +364,7 @@ struct ast_node *parser_parse_decl(struct parser *parser)
 		}
 	}
 
-	return decl;
+	return node;
 }
 
 
@@ -548,12 +555,12 @@ void print_decln(struct ast_node *decln, struct strbuf *buf)
 
 void dump_decln(struct ast_node *decln)
 {
-	struct strbuf buf;
+	/*struct strbuf buf;
 	strbuf_init(&buf, 64);
 
 	TMP_ASSERT(decln->type == AST_DECL);
 	print_decln(decln, &buf);
 
 	fprintf(stderr, strbuf_get_string(&buf));
-	strbuf_free(&buf);
+	strbuf_free(&buf);*/
 }

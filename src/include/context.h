@@ -18,7 +18,8 @@ struct context
 	struct objpool token_pool;	/* objpool for struct token */
 	struct mempool token_data;	/* mempool for misc token data */
 	struct objpool ast_node_pool;	/* mempool for AST nodes */
-	struct objpool exprs;		/* TODO temporary node for AST expressions */
+	struct objpool ast_node_2_pool;	/* mempool for AST nodes (new) */
+	struct mempool ast_data;	/* mempool for mist AST data */
 };
 
 void context_init(struct context *ctx);

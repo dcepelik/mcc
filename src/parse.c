@@ -104,7 +104,7 @@ void parser_build_ast(struct parser *parser, struct ast *tree, char *cfile)
 {
 	(void) tree;
 
-	struct ast_node *decln;
+	struct ast_node_2 *decln;
 	//struct ast_expr *expr;
 	//struct strbuf buf;
 

@@ -14,23 +14,22 @@
 
 static void push_operation(struct parser *parser,
                            const struct opinfo **ops,
-                           struct ast_expr **args)
+                           struct ast_node_2 **args)
 {
 	const struct opinfo *opinfo = array_last(ops);
-	struct ast_expr *expr;
+	struct ast_node_2 *expr;
 
 	assert(array_size(args) >= opinfo->arity);
 
-	expr = objpool_alloc(&parser->ctx.exprs);
 	switch (opinfo->arity) {
 	case 1:	/* unary */
-		expr->type = EXPR_TYPE_UOP;
+		expr = ast_node_2_new(&parser->ctx, AST_EXPR_UOP);
 		expr->uop.oper = opinfo->oper;
 		expr->uop.expr = array_last(args);
 		array_pop(args);
 		break;
 	case 2: /* binary */
-		expr->type = EXPR_TYPE_BOP;
+		expr = ast_node_2_new(&parser->ctx, AST_EXPR_BOP);
 		expr->bop.oper = opinfo->oper;
 		expr->bop.snd = array_last(args);
 		array_pop(args);
@@ -46,12 +45,12 @@ static void push_operation(struct parser *parser,
 }
 
 
-struct ast_expr *parse_expr(struct parser *parser)
+struct ast_node_2 *parse_expr(struct parser *parser)
 {
 	const struct opinfo **ops;		/* operator stack */
-	struct ast_expr **args;			/* operands stack */
-	struct ast_expr *expr;			/* current expression */
-	struct ast_expr *offset_expr;		/* offset expression */
+	struct ast_node_2 **args;			/* operands stack */
+	struct ast_node_2 *expr;			/* current expression */
+	struct ast_node_2 *offset_expr;		/* offset expression */
 	enum oper cur_op;			/* current operator */
 	const struct opinfo *cur_opinfo;	/* current operator's information */
 	bool prefix = true;			/* if an operator follows, it is a prefix operator */
@@ -129,8 +128,7 @@ struct ast_expr *parse_expr(struct parser *parser)
 			goto break_while;
 		default:
 			if (parser->token->type == TOKEN_NUMBER) {
-				expr = objpool_alloc(&parser->ctx.exprs);
-				expr->type = EXPR_TYPE_PRI_NUMBER;
+				expr = ast_node_2_new(&parser->ctx, AST_EXPR_PRI_NUMBER);
 				expr->number = parser->token->str;
 				array_push(args, expr);
 			}
@@ -170,18 +168,18 @@ break_while:
 }
 
 
-void dump_expr(struct ast_expr *expr, struct strbuf *buf)
+void dump_expr(struct ast_node_2 *expr, struct strbuf *buf)
 {
 	switch (expr->type) {
-	case EXPR_TYPE_PRI_NUMBER:
+	case AST_EXPR_PRI_NUMBER:
 		strbuf_printf(buf, "%s", expr->number);
 		break;
-	case EXPR_TYPE_UOP:
+	case AST_EXPR_UOP:
 		strbuf_printf(buf, "%s(", oper_to_string(expr->uop.oper));
 		dump_expr(expr->uop.expr, buf);
 		strbuf_printf(buf, ")");
 		break;
-	case EXPR_TYPE_BOP:
+	case AST_EXPR_BOP:
 		strbuf_printf(buf, "%s(", oper_to_string(expr->bop.oper));
 		dump_expr(expr->bop.fst, buf);
 		strbuf_printf(buf, ", ");
