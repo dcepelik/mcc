@@ -1,5 +1,5 @@
-#include "keyword.h"
 #include "array.h"
+#include "keyword.h"
 #include "parse-internal.h"
 
 
@@ -56,20 +56,23 @@ static struct ast_node *parse_declarators(struct parser *parser, struct toklist 
 	else if (token_is(parser->token, TOKEN_LBRACKET)) {
 		decl = ast_node_new(&parser->ctx, AST_ARRAY);
 		parser_next(parser);
-		if (parser->token->type == TOKEN_NUMBER)
-			parser_next(parser); /* TODO */
-		TMP_ASSERT(token_is(parser->token, TOKEN_RBRACKET));
+		if (parser->token->type == TOKEN_RBRACKET)
+			decl->size_expr = NULL;
+		else
+			decl->size_expr = parse_expr(parser);
 		parser_require(parser, TOKEN_RBRACKET);
 		decl->decl = parse_declarators(parser, stack);
 		return decl;
 	}
-	else if (token_is(parser->token, TOKEN_SEMICOLON) || token_is(parser->token, TOKEN_COMMA)) {
+	else if (token_is(parser->token, TOKEN_SEMICOLON)
+		|| token_is(parser->token, TOKEN_COMMA)
+		|| token_is(parser->token, TOKEN_OP_ASSIGN)) {
 		if (!toklist_is_empty(stack))
 			return parse_pointer(parser, stack);
 		return NULL;
 	}
 	else {
-		parse_error(parser, "unexpected %s, one of [;,) was expected",
+		parse_error(parser, "unexpected %s, one of [;,)= was expected",
 			token_get_name(parser->token->type));
 		return NULL;
 	}
@@ -86,7 +89,7 @@ static struct ast_node *parse_init_declarator(struct parser *parser)
 
 	part = ast_node_new(&parser->ctx, AST_DECL_PART);
 	
-	/* now push all leading *, ( and type qualifiers onto the stack */
+	/* push all leading *, ( and type qualifiers onto the stack */
 	toklist_init(&stack);
 	while (token_is(parser->token, TOKEN_ASTERISK)
 		|| token_is(parser->token, TOKEN_LPAREN)
@@ -95,11 +98,23 @@ static struct ast_node *parse_init_declarator(struct parser *parser)
 		parser_next(parser);
 	}
 
-	TMP_ASSERT(token_is_name(parser->token) && !token_is_any_keyword(parser->token));
+	if (!token_is_name(parser->token) || token_is_any_keyword(parser->token)) {
+		parse_error(parser, "identifier was expected");
+		assert(0);
+	}
 	part->ident = symbol_get_name(parser->token->symbol);
 	parser_next(parser);
 	part->decl = parse_declarators(parser, &stack);
 	toklist_free(&stack);
+
+	part->init = NULL;
+	if (token_is(parser->token, TOKEN_OP_ASSIGN)) {
+		parser_next(parser);
+		if (token_is(parser->token, TOKEN_LBRACE))
+			assert(0);
+		else
+			part->init = parse_expr(parser);
+	}
 
 	return part;
 }
@@ -279,28 +294,22 @@ static void parse_declspec(struct parser *parser, struct ast_node *decln)
 		switch (kwdinfo->class) {
 			case KWD_CLASS_ALIGNMENT:
 				break;
-
 			case KWD_CLASS_TSPEC:
 				apply_tspec(parser, decln, kwdinfo);
 				break;
-
 			case KWD_CLASS_TFLAG:
 				apply_tflag(parser, decln, kwdinfo);
 				break;
-
 			case KWD_CLASS_FUNCSPEC:
 				break;
-
 			case KWD_CLASS_STORCLS:
 				apply_storcls(parser, decln, kwdinfo);
 				break;
-
 			case KWD_CLASS_TQUAL:
 				decln->tquals |= kwdinfo->tqual;
 				break;
-
 			default:
-				goto out;
+				goto break_while;
 		}
 
 		if (kwdinfo->kwd == KWD_STRUCT || kwdinfo->kwd == KWD_UNION)
@@ -308,7 +317,8 @@ static void parse_declspec(struct parser *parser, struct ast_node *decln)
 		else
 			parser_next(parser);
 	}
-out:
+
+break_while:
 	sanitize_declspec(parser, decln);
 }
 
@@ -319,6 +329,7 @@ out:
 struct ast_node *parser_parse_decl(struct parser *parser)
 {
 	struct ast_node *decl;
+	struct ast_node *declarator;
 	bool comma = false;
 
 	decl = ast_node_new(&parser->ctx, AST_DECL);
@@ -327,20 +338,23 @@ struct ast_node *parser_parse_decl(struct parser *parser)
 
 	while (!token_is_eof(parser->token)) {
 		if (token_is(parser->token, TOKEN_SEMICOLON)) {
-			TMP_ASSERT(!comma);
+			if (comma)
+				parse_error(parser, "trailing `,' not allowed here, ignored");
 			parser_next(parser);
 			break;
 		}
 
-		if (array_size(decl->parts) > 0) {
-			parser_require(parser, TOKEN_COMMA);
-			comma = true;
-		}
+		if (!comma && array_size(decl->parts) > 0)
+			parse_error(parser, "comma was expected");
 
-		decl->parts = array_claim(decl->parts, 1);
-		decl->parts[array_size(decl->parts) - 1] = parse_init_declarator(parser);
+		declarator = parse_init_declarator(parser);
+		array_push(decl->parts, declarator);
 
 		comma = false;
+		if (token_is(parser->token, TOKEN_COMMA)) {
+			comma = true;
+			parser_next(parser);
+		}
 	}
 
 	return decl;
@@ -465,7 +479,9 @@ static void print_declspec(struct ast_node *node, struct strbuf *buf)
 }
 
 
-static void print_init_declarator(struct ast_node *part, struct ast_node *decl, struct strbuf *buf)
+static void print_init_declarator(struct ast_node *part,
+                                  struct ast_node *decl,
+				  struct strbuf *buf)
 {
 	bool need_parens = false;
 	struct strbuf decl_buf;
@@ -480,11 +496,13 @@ static void print_init_declarator(struct ast_node *part, struct ast_node *decl, 
 			case AST_ARRAY:
 				if (need_parens) {
 					strbuf_prepend(&decl_buf, "(");
-					strbuf_printf(&decl_buf, ")[]");
+					strbuf_printf(&decl_buf, ")");
 				}
-				else {
-					strbuf_printf(&decl_buf, "[]");
-				}
+
+				strbuf_printf(&decl_buf, "[");
+				if (decl->size_expr)
+					dump_expr(decl->size_expr, &decl_buf);
+				strbuf_printf(&decl_buf, "]");
 				need_parens = false;
 				break;
 			case AST_POINTER:
@@ -501,6 +519,11 @@ static void print_init_declarator(struct ast_node *part, struct ast_node *decl, 
 		}
 
 		decl = decl->decl;
+	}
+
+	if (part->init) {
+		strbuf_printf(&decl_buf, " = ");
+		dump_expr(part->init, &decl_buf);
 	}
 
 	strbuf_printf(buf, strbuf_get_string(&decl_buf));

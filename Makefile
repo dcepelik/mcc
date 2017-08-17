@@ -45,7 +45,7 @@ CFLAGS += -c -std=gnu11 \
 	-I $(INC_DIRS) \
 	-Wall -Wextra -Werror --pedantic -Wno-unused-function \
 	-Wimplicit-fallthrough=1 \
-	-ggdb3 -DDEBUG
+	-g -DDEBUG
 LDFLAGS += -Wall
 
 $(OBJS_DIR)/%.o: $(SRC_DIR)/%.c $(DEPS_DIR)/%.d Makefile

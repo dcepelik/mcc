@@ -1,10 +1,10 @@
 #ifndef TOKEN_H
 #define TOKEN_H
 
+#include "keyword.h"
 #include "list.h"
 #include "lstr.h"
 #include "strbuf.h"
-#include "keyword.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,8 +33,8 @@ enum token_type
 	TOKEN_OP_DOT,		/* OPER_DOT */
 	TOKEN_OP_AND,		/* OPER_AND,	*/
 	TOKEN_OP_ARROW,		/* OPER_ARROW */
-	TOKEN_OP_ASSIGN,	/* OPER_ASSIG */
-	TOKEN_OP_BITANDEQ,	/* OPER_BITAN */
+	TOKEN_OP_ASSIGN,	/* OPER_ASSIGN */
+	TOKEN_OP_BITANDEQ,	/* OPER_BITAND */
 	TOKEN_OP_BITOR,		/* OPER_BITOR */
 	TOKEN_OP_BITOREQ,	/* OPER_BITOR */
 	TOKEN_OP_DIV,		/* OPER_DIV */

@@ -1,16 +1,20 @@
+/*
+ * parse-expr.c:
+ * A rather simple, shunting-yard based parser of C expressions.
+ */
+
 #include "array.h"
 #include "debug.h"
 #include "operator.h"
 #include "parse-internal.h"
 #include "parse.h"
 #include "strbuf.h"
+#include <assert.h>
 
-#define OPSTACK_SIZE	16
 
-
-static struct ast_expr *build_expr_node(struct parser *parser,
-                                        const struct opinfo **ops,
-                                        struct ast_expr **args)
+static void push_operation(struct parser *parser,
+                           const struct opinfo **ops,
+                           struct ast_expr **args)
 {
 	const struct opinfo *opinfo = array_last(ops);
 	struct ast_expr *expr;
@@ -38,7 +42,7 @@ static struct ast_expr *build_expr_node(struct parser *parser,
 	}
 
 	array_pop(ops);
-	return expr;
+	array_push(args, expr);
 }
 
 
@@ -105,7 +109,6 @@ struct ast_expr *parse_expr(struct parser *parser)
 			cur_op = prefix ? OPER_DEREF : OPER_MUL;
 			break;
 		case TOKEN_LBRACKET:
-			DEBUG_MSG("Got a [.");
 			parser_next(parser);
 			offset_expr = parse_expr(parser);
 			if (!token_is(parser->token, TOKEN_RBRACKET))
@@ -122,6 +125,7 @@ struct ast_expr *parse_expr(struct parser *parser)
 			continue;
 		case TOKEN_RBRACKET:
 		case TOKEN_RPAREN:
+		case TOKEN_COMMA: /* TODO */
 			goto break_while;
 		default:
 			if (parser->token->type == TOKEN_NUMBER) {
@@ -141,10 +145,8 @@ struct ast_expr *parse_expr(struct parser *parser)
 
 		while (array_size(ops)
 			&& array_last(ops)->prio >= cur_opinfo->prio
-			&& cur_opinfo->assoc == OPASSOC_LEFT) {
-			expr = build_expr_node(parser, ops, args);
-			array_push(args, expr);
-		}
+			&& cur_opinfo->assoc == OPASSOC_LEFT)
+			push_operation(parser, ops, args);
 
 		if (cur_op == OPER_OFFSET)
 			array_push(args, offset_expr);
@@ -154,11 +156,8 @@ struct ast_expr *parse_expr(struct parser *parser)
 	}
 
 break_while:
-	DEBUG_MSG("Popping rest of operators.");
-	while (array_size(ops) > 0) {
-		expr = build_expr_node(parser, ops, args);
-		array_push(args, expr);
-	}
+	while (array_size(ops) > 0)
+		push_operation(parser, ops, args);
 
 	assert(array_size(ops) == 0);
 	assert(array_size(args) == 1);

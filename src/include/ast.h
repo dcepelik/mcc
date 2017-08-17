@@ -1,9 +1,16 @@
 #ifndef AST_H
 #define AST_H
 
+/*
+ * Unify ast_nodes with expressions.
+ */
+
 #include "context.h"
 #include "keyword.h"
+#include "list.h"
 #include "operator.h"
+
+#include "decl.h"
 
 enum ast_node_type
 {
@@ -13,6 +20,7 @@ enum ast_node_type
 	AST_POINTER,
 	AST_STRUCT_SPEC,
 	AST_UNION_SPEC,
+	AST_EXPR,
 };
 
 struct ast_node
@@ -27,15 +35,99 @@ struct ast_node
 	};
 	char *ident;
 	size_t size;
+	struct ast_expr *size_expr;
+	struct ast_expr *init;	/* initializer */
 	struct ast_node *spec;	/* struct or union specifiaction */
 	struct ast_node *decl;	/* declarator */
 	struct ast_node **parts;
 	struct ast_node **decls;
+
+	union
+	{
+		struct ast_expr *expr;
+	};
 };
 
+struct ast_declspec
+{
+	decl_tspec_t tspec;	/* type specifiers, see `enum tspec' */
+	decl_tflags_t tflags;	/* type flags, see `enum tflag' */
+	decl_tquals_t tquals;	/* type qualifiers, see `enum tquals' */
+	decl_storcls_t storcls;	/* storage class, see `enum storcls' */
+	union
+	{
+		struct ast_su_spec *su_spec;
+	};
+};
+
+/*
+ * C struct or union specifier.
+ * See 6.7.2.1.
+ *
+ * NOTE: The owner of the structure is supposed to know whether the
+ *       specifier specifies a struct or a union.
+ */
+struct ast_su_spec
+{
+	char *name;
+	struct ast_decl **members;
+};
+
+/*
+ * Type of a C declarator. Used to dispatch the union in `struct ast_declr'.
+ */
+enum declr_type
+{
+	DECLR_TYPE_ARRAY,
+	DECLR_TYPE_IDENT,
+	DECLR_TYPE_PTR,
+};
+
+/*
+ * C declarator.
+ * See 6.7.6.
+ *
+ * NOTE: `ast_declr' is used as an abbreviation of `declarator', while `decl'
+ *       stands for `declaration'.
+ */
+struct ast_declr
+{
+	struct list_node node;
+	union
+	{
+		struct ast_expr *size;	/* DECLR_TYPE_ARRAY */
+		char *ident;		/* DECLR_TYPE_IDENT */
+		decl_tquals_t tquals;	/* DECLR_TYPE_PTR */
+	};
+	byte_t type;		/* type of the declarator, see `enum declr_type' */
+};
+
+/*
+ * C init-declarator (a declarator and possibly an initializer).
+ * See 6.7.
+ */
+struct ast_init_declr
+{
+	struct list declrs;	/* declarators, see `struct ast_declr' */
+	struct ast_expr *init;	/* initializer */
+};
+
+/*
+ * C declaration.
+ * See 6.7.
+ */
+struct ast_decl
+{
+	struct ast_declspec declspec;	/* declaration specifiers */
+	struct list init_decl_list;	/* declarators list */
+};
+
+/*
+ * Type of a C expression. Used to dispatch the union in `struct ast_expr'.
+ */
 enum expr_type
 {
-	/* primary expressions, see ``struct ast_primary'' */
+	/* primary expressions, see `struct ast_primary' */
 	EXPR_TYPE_PRI_IDENT,
 	EXPR_TYPE_PRI_NUMBER,	/* TODO */
 	/* ... */
