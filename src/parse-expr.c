@@ -125,6 +125,7 @@ struct ast_expr *parse_expr(struct parser *parser)
 			continue;
 		case TOKEN_RBRACKET:
 		case TOKEN_RPAREN:
+		case TOKEN_SEMICOLON:
 		case TOKEN_COMMA: /* TODO */
 			goto break_while;
 		default:

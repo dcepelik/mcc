@@ -2,21 +2,21 @@
 #include "keyword.h"
 #include "parse-internal.h"
 
-
-static struct ast_node *parse_declarators(struct parser *parser, struct toklist *stack);
+#define ANON_STRUCT_NAME	"<anonymous>"
 
 
 /*
  * Parses: 6.7.6 pointer
  *
- * Only parses a single pointer (without the right recursion, which is contained in
- * parse_declarators).
+ * NOTE: Only parses a single pointer declarator (without the right recursion,
+ *       which is contained in parse_declrs).
  */
-static struct ast_node *parse_pointer(struct parser *parser, struct toklist *stack)
+static void parse_ptr_declr(struct parser *parser, struct toklist *stack, struct ast_declr *declr)
 {
+	(void) parser;
+
 	enum tqual tquals;
 	struct token *top;
-	struct ast_node *decl = NULL;
 
 	TMP_ASSERT(!toklist_is_empty(stack));
 	top = toklist_remove_last(stack);
@@ -29,52 +29,50 @@ static struct ast_node *parse_pointer(struct parser *parser, struct toklist *sta
 	}
 
 	TMP_ASSERT(token_is(top, TOKEN_ASTERISK));
-	decl = ast_node_new(&parser->ctx, AST_POINTER);
-	decl->tquals = tquals;
-	decl->decl = parse_declarators(parser, stack);
-	return decl;
+	declr->type = DECLR_TYPE_PTR;
+	declr->tquals = tquals;
 }
 
 
 /*
  * Parses: 6.7.6 declarator, 6.7.6 direct-declarator
  */
-static struct ast_node *parse_declarators(struct parser *parser, struct toklist *stack)
+static void parse_declrs(struct parser *parser, struct toklist *stack, struct ast_init_declr *init_declr)
 {
-	struct ast_node *decl = NULL;
+	struct ast_declr *declr;
 
-	if (token_is(parser->token, TOKEN_RPAREN)) {
-		TMP_ASSERT(!toklist_is_empty(stack));
-		if (token_is(toklist_last(stack), TOKEN_LPAREN)) {
-			toklist_remove_last(stack); /* skip `(' on the left */
-			parser_next(parser); /* skip `)' on the right */
-			return parse_declarators(parser, stack);
+	while (true) {
+		if (token_is(parser->token, TOKEN_RPAREN)) {
+			TMP_ASSERT(!toklist_is_empty(stack));
+			if (token_is(toklist_last(stack), TOKEN_LPAREN)) {
+				toklist_remove_last(stack); /* skip `(' on the left */
+				parser_next(parser); /* skip `)' on the right */
+				continue;
+			}
+
+			parse_ptr_declr(parser, stack, array_push_new(init_declr->declrs));
 		}
-
-		return parse_pointer(parser, stack);
-	}
-	else if (token_is(parser->token, TOKEN_LBRACKET)) {
-		decl = ast_node_new(&parser->ctx, AST_ARRAY);
-		parser_next(parser);
-		if (parser->token->type == TOKEN_RBRACKET)
-			decl->size_expr = NULL;
-		else
-			decl->size_expr = parse_expr(parser);
-		parser_require(parser, TOKEN_RBRACKET);
-		decl->decl = parse_declarators(parser, stack);
-		return decl;
-	}
-	else if (token_is(parser->token, TOKEN_SEMICOLON)
-		|| token_is(parser->token, TOKEN_COMMA)
-		|| token_is(parser->token, TOKEN_OP_ASSIGN)) {
-		if (!toklist_is_empty(stack))
-			return parse_pointer(parser, stack);
-		return NULL;
-	}
-	else {
-		parse_error(parser, "unexpected %s, one of [;,)= was expected",
-			token_get_name(parser->token->type));
-		return NULL;
+		else if (token_is(parser->token, TOKEN_LBRACKET)) {
+			parser_next(parser);
+			declr = array_push_new(init_declr->declrs);
+			declr->type = DECLR_TYPE_ARRAY;
+			declr->size = parser->token->type == TOKEN_RBRACKET
+				? NULL
+				: parse_expr(parser);
+			parser_require(parser, TOKEN_RBRACKET);
+		}
+		else if (token_is(parser->token, TOKEN_SEMICOLON)
+			|| token_is(parser->token, TOKEN_COMMA)
+			|| token_is(parser->token, TOKEN_OP_ASSIGN)) {
+			if (toklist_is_empty(stack))
+				break;
+			parse_ptr_declr(parser, stack, array_push_new(init_declr->declrs));
+		}
+		else {
+			parse_error(parser, "unexpected %s, one of [;,)= was expected",
+				token_get_name(parser->token->type));
+			break;
+		}
 	}
 }
 
@@ -82,12 +80,11 @@ static struct ast_node *parse_declarators(struct parser *parser, struct toklist 
 /*
  * Parses: 6.7 init-declarator.
  */
-static struct ast_node *parse_init_declarator(struct parser *parser)
+static void parse_init_declr(struct parser *parser, struct ast_init_declr *init_declr)
 {
-	struct ast_node *part;
 	struct toklist stack;
 
-	part = ast_node_new(&parser->ctx, AST_DECL_PART);
+	init_declr->declrs = array_new(4, sizeof(*init_declr->declrs));
 	
 	/* push all leading *, ( and type qualifiers onto the stack */
 	toklist_init(&stack);
@@ -100,73 +97,70 @@ static struct ast_node *parse_init_declarator(struct parser *parser)
 
 	if (!token_is_name(parser->token) || token_is_any_keyword(parser->token)) {
 		parse_error(parser, "identifier was expected");
-		assert(0);
+		init_declr->ident = NULL;
 	}
-	part->ident = symbol_get_name(parser->token->symbol);
+	else {
+		init_declr->ident = symbol_get_name(parser->token->symbol);
+	}
 	parser_next(parser);
-	part->decl = parse_declarators(parser, &stack);
+	parse_declrs(parser, &stack, init_declr);
 	toklist_free(&stack);
 
-	part->init = NULL;
 	if (token_is(parser->token, TOKEN_OP_ASSIGN)) {
 		parser_next(parser);
 		if (token_is(parser->token, TOKEN_LBRACE))
 			assert(0);
 		else
-			part->init = parse_expr(parser);
+			init_declr->init = parse_expr(parser);
 	}
-
-	return part;
+	else {
+		init_declr->init = NULL;
+	}
 }
 
 
-static void sanitize_declspec_member(struct parser *parser, struct ast_node *decln)
+static void sanitize_su_member_dspec(struct parser *parser, struct ast_declspec *dspec)
 {
-	if (decln->storcls) {
+	if (dspec->storcls) {
 		parse_error(parser, "Storage class specifier not valid for struct "
 			"and union members.");
-		decln->storcls = 0;
+		dspec->storcls = 0;
 	}
 }
+
+
+static void parse_decl_internal(struct parser *parser, struct ast_decl *decl);
 
 
 /*
  * Parses: 6.7.2.1 struct-or-union-specifier.
  */
-static struct ast_node *parse_struct_or_union_specifier(struct parser *parser)
+static struct ast_su_spec *parse_struct_or_union_specifier(struct parser *parser)
 {
-	struct ast_node *spec;
+	assert(token_is_keyword(parser->token, KWD_STRUCT) || token_is_keyword(parser->token, KWD_UNION));
 
-	if (token_is_keyword(parser->token, KWD_STRUCT))
-		spec = ast_node_new(&parser->ctx, AST_STRUCT_SPEC);
-	else if (token_is_keyword(parser->token, KWD_UNION))
-		spec = ast_node_new(&parser->ctx, AST_UNION_SPEC);
-	else
-		assert(0);
+	struct ast_su_spec *spec;
 
-	parser_next(parser);
-	spec->ident = NULL;
-	spec->decls = NULL;
+	spec = mcc_malloc(sizeof(*spec)); /* TODO don't malloc individual objects */
+	spec->name = NULL;
+	spec->members = array_new(4, sizeof(*spec->members));
+
+	parser_next(parser); /* the `struct' or `union' keyword */
 
 	if (token_is_name(parser->token) && !token_is_any_keyword(parser->token)) {
-		spec->ident = symbol_get_name(parser->token->symbol);
+		spec->name = symbol_get_name(parser->token->symbol);
 		parser_next(parser);
 	}
 
 	if (!parser_expect(parser, TOKEN_LBRACE)) {
-		if (!spec->ident)
+		if (!spec->name)
 			parse_error(parser, "struct name expected");
 		return spec;
 	}
 
-	spec->decls = array_new(2, sizeof(*spec->decls));
-	while (!token_is_eof(parser->token)) {
-		if (token_is(parser->token, TOKEN_RBRACE))
-			break;
-
-		spec->decls = array_claim(spec->decls, 1);
-		spec->decls[array_size(spec->decls) - 1] = parser_parse_decl(parser);
-		sanitize_declspec_member(parser, spec->decls[array_size(spec->decls) - 1]);
+	while (!token_is_eof(parser->token) && !token_is(parser->token, TOKEN_RBRACE)) {
+		parse_decl_internal(parser, array_push_new(spec->members));
+		sanitize_su_member_dspec(parser, &array_last(spec->members).declspec);
 	}
 
 	parser_require(parser, TOKEN_RBRACE);
@@ -174,13 +168,13 @@ static struct ast_node *parse_struct_or_union_specifier(struct parser *parser)
 }
 
 
-static void apply_tflag(struct parser *parser, struct ast_node *decln, const struct kwdinfo *kwd)
+static void apply_tflag(struct parser *parser, struct ast_declspec *dspec, const struct kwdinfo *kwd)
 {
-	uint8_t new_tflags = decln->tflags;
+	uint8_t new_tflags = dspec->tflags;
 
 	switch (kwd->tflags) {
 	case TFLAG_LONG:
-		if (decln->tflags & TFLAG_LONG) { /* promote long to long long */
+		if (dspec->tflags & TFLAG_LONG) { /* promote long to long long */
 			new_tflags ^= TFLAG_LONG;
 			new_tflags |= TFLAG_LONG_LONG;
 			break;
@@ -200,77 +194,73 @@ static void apply_tflag(struct parser *parser, struct ast_node *decln, const str
 		parse_error(parser, "Longer than long long? Have a break.");
 	else if (new_tflags & TFLAG_COMPLEX && new_tflags & ~(TFLAG_LONG | TFLAG_COMPLEX))
 		parse_error(parser, "Invalid type specifier for _Complex.");
-	else if (new_tflags == decln->tflags)
+	else if (new_tflags == dspec->tflags)
 		parse_error(parser, "Type specifier is redundant.");
 	else
-		decln->tflags = new_tflags;
+		dspec->tflags = new_tflags;
 }
 
 
-static void apply_tspec(struct parser *parser, struct ast_node *decln, const struct kwdinfo *kwd)
+static void apply_tspec(struct parser *parser, struct ast_declspec *dspec, const struct kwdinfo *kwd)
 {
-	if (decln->tspec)
+	if (dspec->tspec)
 		parse_error(parser, "Too many types specified.");
 	else
-		decln->tspec |= kwd->tspec;
+		dspec->tspec |= kwd->tspec;
 }
 
 
-static void apply_storcls(struct parser *parser, struct ast_node *decln, const struct kwdinfo *kwd)
+static void apply_storcls(struct parser *parser, struct ast_declspec *dspec, const struct kwdinfo *kwd)
 {
-	if (decln->storcls)
+	if (dspec->storcls)
 		parse_error(parser, "Too many storage classes specified.");
 	else
-		decln->storcls |= kwd->storcls;
+		dspec->storcls |= kwd->storcls;
 }
 
 
-static void sanitize_declspec(struct parser *parser, struct ast_node *decln)
+static void sanitize_declspec(struct parser *parser, struct ast_declspec *dspec)
 {
-	if (!decln->tspec) {
-		if (!(decln->tflags & INT_TFLAGS))
+	if (!dspec->tspec) {
+		if (!(dspec->tflags & INT_TFLAGS))
 			parse_error(parser, "Type not specified, assume it's an int.");
-		decln->tspec = TSPEC_INT;
+		dspec->tspec = TSPEC_INT;
 	}
 
-	switch (decln->tspec) {
+	switch (dspec->tspec) {
 	case TSPEC_INT:
-		if (decln->tflags & ~INT_TFLAGS) {
+		if (dspec->tflags & ~INT_TFLAGS) {
 			parse_error(parser, "Invalid type specifiers for int, ignore.");
-			decln->tflags &= INT_TFLAGS;
+			dspec->tflags &= INT_TFLAGS;
 		};
 		break;
-
 	case TSPEC_CHAR:
-		if (decln->tflags & ~CHAR_TFLAGS) {
+		if (dspec->tflags & ~CHAR_TFLAGS) {
 			parse_error(parser, "Invalid type specifiers for char, ingore.");
-			decln->tflags &= CHAR_TFLAGS;
+			dspec->tflags &= CHAR_TFLAGS;
 		}
 		break;
-
 	case TSPEC_BOOL:
-		if (decln->tflags) {
+		if (dspec->tflags) {
 			parse_error(parser, "Invalid type specifiers for _Bool, ignore.");
-			decln->tflags = 0;
+			dspec->tflags = 0;
 		}
 		break;
-
 	case TSPEC_FLOAT:
-		if (decln->tflags) {
+		if (dspec->tflags) {
 			parse_error(parser, "Invalid type specifiers for float, ignore.");
-			decln->tflags = 0;
+			dspec->tflags = 0;
 		}
 		break;
-
 	case TSPEC_DOUBLE:
-		if (decln->tflags & ~DOUBLE_TFLAGS) {
+		if (dspec->tflags & ~DOUBLE_TFLAGS) {
 			parse_error(parser, "Invalid type specifiers for double, ignore.");
-			decln->tflags &= DOUBLE_TFLAGS;
+			dspec->tflags &= DOUBLE_TFLAGS;
 		}
 	}
 
-	if (decln->tflags & TFLAG_COMPLEX
-		&& decln->tspec != TSPEC_FLOAT && decln->tspec != TSPEC_DOUBLE) {
+	if (dspec->tflags & TFLAG_COMPLEX
+		&& dspec->tspec != TSPEC_FLOAT && dspec->tspec != TSPEC_DOUBLE) {
 		parse_error(parser, "Only float and double can be _Complex.");
 	}
 }
@@ -279,14 +269,14 @@ static void sanitize_declspec(struct parser *parser, struct ast_node *decln)
 /*
  * Parses: 6.7 declaration-specifiers.
  */
-static void parse_declspec(struct parser *parser, struct ast_node *decln)
+static void parse_declspec(struct parser *parser, struct ast_declspec *dspec)
 {
 	const struct kwdinfo *kwdinfo;
 
-	decln->tspec = 0;
-	decln->tflags = 0;
-	decln->tquals = 0;
-	decln->storcls = 0;
+	dspec->tspec = 0;
+	dspec->tflags = 0;
+	dspec->tquals = 0;
+	dspec->storcls = 0;
 
 	while (token_is_any_keyword(parser->token)) {
 		kwdinfo = parser->token->symbol->def->kwdinfo;
@@ -295,60 +285,55 @@ static void parse_declspec(struct parser *parser, struct ast_node *decln)
 			case KWD_CLASS_ALIGNMENT:
 				break;
 			case KWD_CLASS_TSPEC:
-				apply_tspec(parser, decln, kwdinfo);
+				apply_tspec(parser, dspec, kwdinfo);
 				break;
 			case KWD_CLASS_TFLAG:
-				apply_tflag(parser, decln, kwdinfo);
+				apply_tflag(parser, dspec, kwdinfo);
 				break;
 			case KWD_CLASS_FUNCSPEC:
 				break;
 			case KWD_CLASS_STORCLS:
-				apply_storcls(parser, decln, kwdinfo);
+				apply_storcls(parser, dspec, kwdinfo);
 				break;
 			case KWD_CLASS_TQUAL:
-				decln->tquals |= kwdinfo->tqual;
+				dspec->tquals |= kwdinfo->tqual;
 				break;
 			default:
 				goto break_while;
 		}
 
 		if (kwdinfo->kwd == KWD_STRUCT || kwdinfo->kwd == KWD_UNION)
-			decln->spec = parse_struct_or_union_specifier(parser);
+			dspec->su_spec = parse_struct_or_union_specifier(parser);
 		else
 			parser_next(parser);
 	}
 
 break_while:
-	sanitize_declspec(parser, decln);
+	sanitize_declspec(parser, dspec);
 }
 
 
 /*
  * Parses: 6.7 declaration, 6.7 init-declarator-list.
  */
-struct ast_node *parser_parse_decl(struct parser *parser)
+static void parse_decl_internal(struct parser *parser, struct ast_decl *decl)
 {
-	struct ast_node *decl;
-	struct ast_node *declarator;
 	bool comma = false;
 
-	decl = ast_node_new(&parser->ctx, AST_DECL);
-	parse_declspec(parser, decl);
-	decl->parts = array_new(1, sizeof(*decl->parts));
+	decl->init_declrs = array_new(2, sizeof(*decl->init_declrs));
+	parse_declspec(parser, &decl->declspec);
 
 	while (!token_is_eof(parser->token)) {
 		if (token_is(parser->token, TOKEN_SEMICOLON)) {
 			if (comma)
-				parse_error(parser, "trailing `,' not allowed here, ignored");
+				parse_error(parser, "trailing `,' not allowed, ignored");
 			parser_next(parser);
 			break;
 		}
 
-		if (!comma && array_size(decl->parts) > 0)
+		if (!comma && array_size(decl->init_declrs) > 0)
 			parse_error(parser, "comma was expected");
-
-		declarator = parse_init_declarator(parser);
-		array_push(decl->parts, declarator);
+		parse_init_declr(parser, array_push_new(decl->init_declrs));
 
 		comma = false;
 		if (token_is(parser->token, TOKEN_COMMA)) {
@@ -356,12 +341,19 @@ struct ast_node *parser_parse_decl(struct parser *parser)
 			parser_next(parser);
 		}
 	}
-
-	return decl;
 }
 
 
-void print_decln(struct ast_node *decln, struct strbuf *buf);
+/*
+ * Parses: 6.7 declaration, 6.7 init-declarator-list.
+ * TODO get rid of this allocating wrapper
+ */
+struct ast_decl *parser_parse_decl(struct parser *parser)
+{
+	struct ast_decl *decl = mcc_malloc(sizeof(*decl));
+	parse_decl_internal(parser, decl);
+	return decl;
+}
 
 
 static const char *tspec_to_string(enum tspec tspec)
@@ -429,60 +421,59 @@ static const char *tflag_to_string(enum tflag tflag)
 }
 
 
-static void print_declspec(struct ast_node *node, struct strbuf *buf)
+void print_decl(struct ast_decl *decl, struct strbuf *buf);
+
+
+static void print_declspec(struct ast_declspec *dspec, struct strbuf *buf)
 {
 	size_t i;
 
-	if (node->tquals & TQUAL_CONST)
+	if (dspec->tquals & TQUAL_CONST)
 		strbuf_printf(buf, "const ");
-	if (node->tquals & TQUAL_RESTRICT)
+	if (dspec->tquals & TQUAL_RESTRICT)
 		strbuf_printf(buf, "restrict ");
-	if (node->tquals & TQUAL_VOLATILE)
+	if (dspec->tquals & TQUAL_VOLATILE)
 		strbuf_printf(buf, "volatile ");
 
-	if (node->tflags & TFLAG_UNSIGNED)
+	if (dspec->tflags & TFLAG_UNSIGNED)
 		strbuf_printf(buf, "unsigned ");
-	else if (node->tflags & TFLAG_SIGNED)
+	else if (dspec->tflags & TFLAG_SIGNED)
 		strbuf_printf(buf, "signed ");
 	
-	if (node->tflags & TFLAG_SHORT)
+	if (dspec->tflags & TFLAG_SHORT)
 		strbuf_printf(buf, "short ");
-	else if (node->tflags & TFLAG_LONG)
+	else if (dspec->tflags & TFLAG_LONG)
 		strbuf_printf(buf, "long ");
-	else if (node->tflags & TFLAG_LONG_LONG)
+	else if (dspec->tflags & TFLAG_LONG_LONG)
 		strbuf_printf(buf, "long long ");
 	
-	if (node->tflags & TFLAG_COMPLEX)
+	if (dspec->tflags & TFLAG_COMPLEX)
 		strbuf_printf(buf, "_Complex ");
 
-	strbuf_printf(buf, "%s ", tspec_to_string(node->tspec));
+	strbuf_printf(buf, "%s ", tspec_to_string(dspec->tspec));
 
-	if (node->tspec & TSPEC_STRUCT) {
-		if (node->spec->ident)
-			strbuf_printf(buf, "struct %s ", node->spec->ident);
-		else
-			strbuf_printf(buf, "struct ");
+	if (dspec->tspec & TSPEC_STRUCT) {
+		strbuf_printf(buf, "%s ", dspec->su_spec->name ? dspec->su_spec->name : ANON_STRUCT_NAME);
 
-		if (node->spec->decls) {
+		if (dspec->su_spec->members) {
 			strbuf_printf(buf, "{\n");
-			for (i = 0; i < array_size(node->spec->decls); i++) {
+			for (i = 0; i < array_size(dspec->su_spec->members); i++) {
 				strbuf_printf(buf, "\t");
-				print_decln(node->spec->decls[i], buf);
+				print_decl(&dspec->su_spec->members[i], buf);
 				strbuf_printf(buf, "\n");
 			}
 			strbuf_printf(buf, "} ");
 		}
 	}
-	if (node->tspec & TSPEC_UNION) {
-		strbuf_printf(buf, "union ");
+	if (dspec->tspec & TSPEC_UNION) {
+		TMP_ASSERT(0);
 	}
 }
 
 
-static void print_init_declarator(struct ast_node *part,
-                                  struct ast_node *decl,
-				  struct strbuf *buf)
+static void print_init_declr(struct ast_init_declr *init_decl, struct strbuf *buf)
 {
+	struct ast_declr *declr;
 	bool need_parens = false;
 	struct strbuf decl_buf;
 	struct strbuf declspec_buf;
@@ -490,24 +481,25 @@ static void print_init_declarator(struct ast_node *part,
 	strbuf_init(&decl_buf, 8);
 	strbuf_init(&declspec_buf, 16);
 
-	strbuf_printf(&decl_buf, part->ident);
-	while (decl) {
-		switch (decl->type) {
-			case AST_ARRAY:
+	strbuf_printf(&decl_buf, init_decl->ident);
+	for (size_t i = 0; i < array_size(init_decl->declrs); i++) {
+		declr = &init_decl->declrs[i];
+		switch (declr->type) {
+			case DECLR_TYPE_ARRAY:
 				if (need_parens) {
 					strbuf_prepend(&decl_buf, "(");
 					strbuf_printf(&decl_buf, ")");
 				}
 
 				strbuf_printf(&decl_buf, "[");
-				if (decl->size_expr)
-					dump_expr(decl->size_expr, &decl_buf);
+				if (declr->size)
+					dump_expr(declr->size, &decl_buf);
 				strbuf_printf(&decl_buf, "]");
 				need_parens = false;
 				break;
-			case AST_POINTER:
+			case DECLR_TYPE_PTR:
 				strbuf_reset(&declspec_buf);
-				print_declspec(decl, &declspec_buf);
+				//print_declspec(&declr->declspec, &declspec_buf);
 				if (strbuf_strlen(&declspec_buf) > 0)
 					strbuf_prepend(&decl_buf, "* %s", strbuf_get_string(&declspec_buf));
 				else
@@ -517,13 +509,11 @@ static void print_init_declarator(struct ast_node *part,
 			default:
 				TMP_ASSERT(false);
 		}
-
-		decl = decl->decl;
 	}
 
-	if (part->init) {
+	if (init_decl->init) {
 		strbuf_printf(&decl_buf, " = ");
-		dump_expr(part->init, &decl_buf);
+		dump_expr(init_decl->init, &decl_buf);
 	}
 
 	strbuf_printf(buf, strbuf_get_string(&decl_buf));
@@ -531,28 +521,27 @@ static void print_init_declarator(struct ast_node *part,
 }
 
 
-void print_decln(struct ast_node *decln, struct strbuf *buf)
+void print_decl(struct ast_decl *decl, struct strbuf *buf)
 {
 	size_t i;
 
-	print_declspec(decln, buf);
+	print_declspec(&decl->declspec, buf);
 
-	for (i = 0; i < array_size(decln->parts); i++) {
-		print_init_declarator(decln->parts[i], decln->parts[i]->decl, buf);
-		if (i < array_size(decln->parts) - 1)
+	for (i = 0; i < array_size(decl->init_declrs); i++) {
+		if (i > 0)
 			strbuf_printf(buf, ", ");
+		print_init_declr(&decl->init_declrs[i], buf);
 	}
 	strbuf_printf(buf, ";");
 }
 
 
-void dump_decln(struct ast_node *decln)
+void dump_decln(struct ast_decl *decl)
 {
 	struct strbuf buf;
 	strbuf_init(&buf, 64);
 
-	TMP_ASSERT(decln->type == AST_DECL);
-	print_decln(decln, &buf);
+	print_decl(decl, &buf);
 
 	fprintf(stderr, strbuf_get_string(&buf));
 	strbuf_free(&buf);

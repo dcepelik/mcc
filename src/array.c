@@ -88,3 +88,10 @@ void array_pop(void *arr)
 	assert(hdr->num_items > 0);
 	hdr->num_items--;
 }
+
+
+void *array_push_helper(void **arr)
+{
+	*arr = array_claim(*arr, 1);
+	return &arr[array_size(arr) - 1];
+}

@@ -69,8 +69,8 @@ struct ast_declspec
  */
 struct ast_su_spec
 {
-	char *name;
-	struct ast_decl **members;
+	char *name;			/* name of the structure or union */
+	struct ast_decl *members;	/* member declarations */
 };
 
 /*
@@ -79,7 +79,6 @@ struct ast_su_spec
 enum declr_type
 {
 	DECLR_TYPE_ARRAY,
-	DECLR_TYPE_IDENT,
 	DECLR_TYPE_PTR,
 };
 
@@ -92,11 +91,9 @@ enum declr_type
  */
 struct ast_declr
 {
-	struct list_node node;
 	union
 	{
 		struct ast_expr *size;	/* DECLR_TYPE_ARRAY */
-		char *ident;		/* DECLR_TYPE_IDENT */
 		decl_tquals_t tquals;	/* DECLR_TYPE_PTR */
 	};
 	byte_t type;		/* type of the declarator, see `enum declr_type' */
@@ -108,8 +105,9 @@ struct ast_declr
  */
 struct ast_init_declr
 {
-	struct list declrs;	/* declarators, see `struct ast_declr' */
-	struct ast_expr *init;	/* initializer */
+	char *ident;			/* identifier */
+	struct ast_declr *declrs;	/* array of declarators */
+	struct ast_expr *init;		/* optional initializer */
 };
 
 /*
@@ -118,27 +116,8 @@ struct ast_init_declr
  */
 struct ast_decl
 {
-	struct ast_declspec declspec;	/* declaration specifiers */
-	struct list init_decl_list;	/* declarators list */
-};
-
-/*
- * Type of a C expression. Used to dispatch the union in `struct ast_expr'.
- */
-enum expr_type
-{
-	/* primary expressions, see `struct ast_primary' */
-	EXPR_TYPE_PRI_IDENT,
-	EXPR_TYPE_PRI_NUMBER,	/* TODO */
-	/* ... */
-	EXPR_TYPE_PRI_GENERIC,
-
-	EXPR_TYPE_COND,
-
-	/* ... */
-
-	EXPR_TYPE_UOP,		/* unary operation */
-	EXPR_TYPE_BOP,		/* binary operation */
+	struct ast_declspec declspec;		/* declaration specifiers */
+	struct ast_init_declr *init_declrs;	/* init-declarator-list */
 };
 
 /*
@@ -197,6 +176,25 @@ struct ast_bop
 	enum oper oper;		/* the operator, see `enum oper', binary operators */
 	struct ast_expr *fst;	/* the first operand */
 	struct ast_expr *snd;	/* the second operand */
+};
+
+/*
+ * Type of a C expression. Used to dispatch the union in `struct ast_expr'.
+ */
+enum expr_type
+{
+	/* primary expressions, see `struct ast_primary' */
+	EXPR_TYPE_PRI_IDENT,
+	EXPR_TYPE_PRI_NUMBER,	/* TODO */
+	/* ... */
+	EXPR_TYPE_PRI_GENERIC,
+
+	EXPR_TYPE_COND,
+
+	/* ... */
+
+	EXPR_TYPE_UOP,		/* unary operation */
+	EXPR_TYPE_BOP,		/* binary operation */
 };
 
 /*

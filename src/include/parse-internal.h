@@ -13,8 +13,8 @@ void parser_skip_rest(struct parser *parser);
 void parse_error(struct parser *parser, char *msg, ...);
 bool parser_require(struct parser *parser, enum token_type token);
 
-struct ast_node *parser_parse_decl(struct parser *parser);
-void dump_decln(struct ast_node *decln);
+struct ast_decl *parser_parse_decl(struct parser *parser);
+void dump_decln(struct ast_decl *decln);
 
 struct ast_expr *parse_expr(struct parser *parser);
 void dump_expr(struct ast_expr *expr, struct strbuf *buf);
