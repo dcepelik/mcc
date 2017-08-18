@@ -11,7 +11,6 @@ void context_init(struct context *ctx)
 	objpool_init(&ctx->token_pool, sizeof(struct token), TOKEN_POOL_BLOCK_SIZE);
 	symtab_init(&ctx->symtab);
 	errlist_init(&ctx->errlist);
-	objpool_init(&ctx->ast_node_pool, sizeof(struct ast_node), 16); /* 1024: bugs */
 	objpool_init(&ctx->exprs, sizeof(struct ast_expr), 16);
 }
 
@@ -22,6 +21,5 @@ void context_free(struct context *ctx)
 	objpool_free(&ctx->token_pool);
 	errlist_free(&ctx->errlist);
 	symtab_free(&ctx->symtab);
-	objpool_free(&ctx->ast_node_pool);
 	objpool_free(&ctx->exprs);
 }

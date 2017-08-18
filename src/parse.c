@@ -114,7 +114,7 @@ void parser_build_ast(struct parser *parser, struct ast *tree, char *cfile)
 	//expr = parse_expr(parser);
 	cpp_close_file(parser->cpp);
 
-	dump_decln(decl);
+	dump_decl(decl);
 	//strbuf_init(&buf, 128);
 	//dump_expr(expr, &buf);
 	//fprintf(stderr, "%s\n", strbuf_get_string(&buf));

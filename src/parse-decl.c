@@ -536,7 +536,7 @@ void print_decl(struct ast_decl *decl, struct strbuf *buf)
 }
 
 
-void dump_decln(struct ast_decl *decl)
+void dump_decl(struct ast_decl *decl)
 {
 	struct strbuf buf;
 	strbuf_init(&buf, 64);
