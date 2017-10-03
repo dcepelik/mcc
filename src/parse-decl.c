@@ -11,7 +11,9 @@
  * NOTE: Only parses a single pointer declarator (without the right recursion,
  *       which is contained in parse_declrs).
  */
-static void parse_ptr_declr(struct parser *parser, struct toklist *stack, struct ast_declr *declr)
+static void parse_ptr_declr(struct parser *parser,
+                            struct toklist *stack,
+			    struct ast_declr *declr)
 {
 	(void) parser;
 
@@ -37,7 +39,9 @@ static void parse_ptr_declr(struct parser *parser, struct toklist *stack, struct
 /*
  * Parses: 6.7.6 declarator, 6.7.6 direct-declarator
  */
-static void parse_declrs(struct parser *parser, struct toklist *stack, struct ast_init_declr *init_declr)
+static void parse_declrs(struct parser *parser,
+                         struct toklist *stack,
+			 struct ast_init_declr *init_declr)
 {
 	struct ast_declr *declr;
 
@@ -201,7 +205,9 @@ static void apply_tflag(struct parser *parser, struct ast_declspec *dspec, const
 }
 
 
-static void apply_tspec(struct parser *parser, struct ast_declspec *dspec, const struct kwdinfo *kwd)
+static void apply_tspec(struct parser *parser,
+                        struct ast_declspec *dspec,
+			const struct kwdinfo *kwd)
 {
 	if (dspec->tspec)
 		parse_error(parser, "Too many types specified.");
@@ -210,7 +216,9 @@ static void apply_tspec(struct parser *parser, struct ast_declspec *dspec, const
 }
 
 
-static void apply_storcls(struct parser *parser, struct ast_declspec *dspec, const struct kwdinfo *kwd)
+static void apply_storcls(struct parser *parser,
+                          struct ast_declspec *dspec,
+			  const struct kwdinfo *kwd)
 {
 	if (dspec->storcls)
 		parse_error(parser, "Too many storage classes specified.");
@@ -453,7 +461,8 @@ static void print_declspec(struct ast_declspec *dspec, struct strbuf *buf)
 	strbuf_printf(buf, "%s ", tspec_to_string(dspec->tspec));
 
 	if (dspec->tspec & TSPEC_STRUCT) {
-		strbuf_printf(buf, "%s ", dspec->su_spec->name ? dspec->su_spec->name : ANON_STRUCT_NAME);
+		strbuf_printf(buf, "%s ",
+			dspec->su_spec->name ? dspec->su_spec->name : ANON_STRUCT_NAME);
 
 		if (dspec->su_spec->members) {
 			strbuf_printf(buf, "{\n");
@@ -501,7 +510,8 @@ static void print_init_declr(struct ast_init_declr *init_decl, struct strbuf *bu
 				strbuf_reset(&declspec_buf);
 				//print_declspec(&declr->declspec, &declspec_buf);
 				if (strbuf_strlen(&declspec_buf) > 0)
-					strbuf_prepend(&decl_buf, "* %s", strbuf_get_string(&declspec_buf));
+					strbuf_prepend(&decl_buf, "* %s",
+						strbuf_get_string(&declspec_buf));
 				else
 					strbuf_prepend(&decl_buf, "*");
 				need_parens = true;

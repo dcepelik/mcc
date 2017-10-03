@@ -88,7 +88,7 @@ const char *oper_to_string(enum oper oper)
 	case OPER_PREINC:
 		return "++<prefix>";
 	case OPER_PREDEC:
-		return "--<predec>";
+		return "--<prefix>";
 	default:
 		assert(0);
 	}

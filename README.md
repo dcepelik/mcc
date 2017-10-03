@@ -42,3 +42,7 @@
 * Highly modular
 * Highly configurable
 * Make it easy to hack
+
+## Good Reading
+
+* [John Regehr's Blog](https://blog.regehr.org/)

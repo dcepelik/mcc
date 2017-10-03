@@ -54,7 +54,7 @@ struct ast_expr *parse_expr(struct parser *parser)
 	struct ast_expr *offset_expr;		/* offset expression */
 	enum oper cur_op;			/* current operator */
 	const struct opinfo *cur_opinfo;	/* current operator's information */
-	bool prefix = true;			/* if an operator follows, it is a prefix operator */
+	bool prefix = true;			/* next operator is a prefix operator */
 
 	ops = array_new(4, sizeof(*ops));
 	args = array_new(4, sizeof(*args));
@@ -118,10 +118,18 @@ struct ast_expr *parse_expr(struct parser *parser)
 			break;
 		case TOKEN_LPAREN:
 			parser_next(parser);
-			expr = parse_expr(parser);
-			array_push(args, expr);
+			if (!array_size(args) || (array_size(ops) && (array_last(ops)->arity == 2
+				|| array_last(ops)->assoc == OPASSOC_RIGHT)))
+			{
+				expr = parse_expr(parser);
+				array_push(args, expr);
+				prefix = false;
+			} else {
+				DEBUG_MSG("funccall");
+				/* parse funccall */
+				array_pop(args);
+			}
 			parser_require(parser, TOKEN_RPAREN);
-			prefix = false;
 			continue;
 		case TOKEN_RBRACKET:
 		case TOKEN_RPAREN:

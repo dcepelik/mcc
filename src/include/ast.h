@@ -6,11 +6,10 @@
  */
 
 #include "context.h"
+#include "decl.h"
 #include "keyword.h"
 #include "list.h"
 #include "operator.h"
-
-#include "decl.h"
 
 /*
  * C declaration specifiers.
