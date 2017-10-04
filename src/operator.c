@@ -80,9 +80,9 @@ const char *oper_to_string(enum oper oper)
 	case OPER_SUB:
 		return "-";
 	case OPER_UPLUS:
-		return "U+";
+		return "+<prefix>";
 	case OPER_UMINUS:
-		return "U-";
+		return "-<prefix>";
 	case OPER_POSTINC:
 		return "++<postfix>";
 	case OPER_POSTDEC:
@@ -92,7 +92,7 @@ const char *oper_to_string(enum oper oper)
 	case OPER_PREDEC:
 		return "--<prefix>";
 	case OPER_CAST:
-		return "(cast)";
+		return "cast";
 	default:
 		assert(0);
 	}

@@ -3,8 +3,13 @@
  *
  * This is an expression parser based on shunting-yard algorithm [1].
  * Parsing of an expression is initiated with parse_expr, which
- * establishes an operator and operand stacks; these are passed to
- * and modified by functions which are involved in the process.
+ * establishes an expression parsing context which is passed around
+ * to functions which parse individual syntactic features of the language.
+ *
+ * Most functions in this module have been created to split the parsing
+ * logic up, rather than to allow for code reuse.
+ *
+ * Operator information (opinfos) are declared in operator.c.
  *
  * [1] https://en.wikipedia.org/wiki/Shunting-yard_algorithm
  */
@@ -40,8 +45,8 @@ struct expr_ctx
 	struct ast_expr **args;		/* argument stack */
 
 	/*
-	 * The prefix flag says that if an operator follow which can
-	 * either be interpreted as a prefix operator or a postfix
+	 * The prefix flag says that if an operator follows which can
+	 * either be interpreted as a prefix operator or a postfix/binary infix
 	 * operator, the prior should be favoured.
 	 *
 	 * Also, this flag is used by `handle_lparen' to tell whether
@@ -52,7 +57,7 @@ struct expr_ctx
 
 /*
  * Pop an operator off the operator stack and pop the appropriate
- * number of operands off the operand stack. Construct an appropriate
+ * number of operands off the operand stack. Construct the corresponding
  * AST node (either uop or bop node).
  */
 static void pop_operator(struct parser *parser, struct expr_ctx *ctx)
@@ -253,12 +258,7 @@ static void parse_primary_expr(struct parser *parser, struct expr_ctx *ctx)
 }
 
 /*
- * This function reads tokens and construct expression ASTs.
- *
- * It starts by translating tokens to corresponding operators
- * and then feeds them to the shunting-yard algorithm.
- *
- * NOTE: This function is corecursive with parse_function_call_expr.
+ * This function reads tokens and construct an expression AST.
  */
 struct ast_expr *parse_expr(struct parser *parser)
 {
@@ -277,9 +277,10 @@ struct ast_expr *parse_expr(struct parser *parser)
 	while (!token_is_eof(parser->token)) {
 		/*
 		 * This is the simple case. Tokens less than TOKEN_OP_CAST_MAX
-		 * always translates to the same operator, regardless of
-		 * context. Therefore, safely cast the token to the operator
-		 * and push it.
+		 * each translate to a single operator, regardless of
+		 * context in which they occur (for example, the && operator
+		 * is always logical and, no matter what). Therefore, safely
+		 * cast the token to the operator and push it.
 		 */
 		if (parser->token->type < TOKEN_OP_CAST_MAX) {
 			push_operator(parser, &ctx, (enum oper)parser->token->type); /* safe cast */
