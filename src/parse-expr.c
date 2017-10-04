@@ -5,6 +5,8 @@
  * Parsing of an expression is initiated with parse_expr, which
  * establishes an operator and operand stacks; these are passed to
  * and modified by functions which are involved in the process.
+ *
+ * [1] https://en.wikipedia.org/wiki/Shunting-yard_algorithm
  */
 
 #include "array.h"
@@ -47,6 +49,19 @@ static void push_operation(struct parser *parser,
 	}
 
 	array_push(args, expr);
+}
+
+/*
+ * Pop all greater than or equal precedence operators off the operator
+ * stack and construct the appropriate expressions.
+ */
+static void pop_ge_precedence(struct parser *p,
+	const struct opinfo **ops,
+	struct ast_expr **args,
+	size_t prio)
+{
+	while (array_size(ops) && array_last(ops)->prio >= prio)
+		push_operation(p, ops, args);
 }
 
 /*
@@ -204,10 +219,13 @@ struct ast_expr *parse_expr(struct parser *parser)
 		 */
 		case TOKEN_LPAREN:
 			parser_next(parser);
-			if (prefix)
+			if (prefix) {
+				pop_ge_precedence(parser, ops, args, opinfo[OPER_OFFSET].prio);
 				array_push(args, parse_expr(parser));
-			else
+			} else {
+				pop_ge_precedence(parser, ops, args, opinfo[OPER_FCALL].prio);
 				parse_fcall(parser, ops, args);
+			}
 			parser_require(parser, TOKEN_RPAREN);
 			prefix = false;
 			continue;
@@ -241,10 +259,8 @@ struct ast_expr *parse_expr(struct parser *parser)
 		/*
 		 * (Shunting-yard)
 		 */
-		while (array_size(ops)
-			&& array_last(ops)->prio >= cur_opinfo->prio
-			&& cur_opinfo->assoc == OPASSOC_LEFT)
-			push_operation(parser, ops, args);
+		if (cur_opinfo->assoc == OPASSOC_LEFT)
+			pop_ge_precedence(parser, ops, args, cur_opinfo->prio);
 
 		array_push(ops, cur_opinfo);
 		parser_next(parser);
@@ -263,8 +279,7 @@ end_loop:
 	/*
 	 * (Shunting-yard)
 	 */
-	while (array_size(ops) > 0)
-		push_operation(parser, ops, args);
+	pop_ge_precedence(parser, ops, args, 0);
 
 	assert(array_size(ops) == 0);
 	TMP_ASSERT(array_size(args) == 1);

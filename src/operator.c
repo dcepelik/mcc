@@ -48,6 +48,7 @@ const struct opinfo opinfo[NOPERS] = {
 	[OPER_UPLUS]	= { OPER_UPLUS,		1,	13,	OPASSOC_RIGHT },
 	[OPER_XOREQ]	= { OPER_XOREQ,		2,	2,	OPASSOC_RIGHT },
 	[OPER_XOR]	= { OPER_XOR,		2,	6,	OPASSOC_LEFT },
+	[OPER_FCALL]	= { OPER_FCALL,		1,	14,	OPASSOC_LEFT },
 };
 
 

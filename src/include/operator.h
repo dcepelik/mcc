@@ -13,9 +13,8 @@ enum oper
 	 * The operators which translate directly from the corresponding
 	 * TOKEN_OP_* tokens.
 	 *
-	 * NOTE: Please do not modify the order of items within
-	 *       this block without modifying `enum token_type'
-	 *       correspondingly. See `enum token_type'.
+	 * NOTE: Do not modify the order of items within this block without
+	 *       modifying `enum token_type' correspondingly.
 	 */
 	OPER_ADDEQ,	/* x += y */
 	OPER_AND,	/* x && y */
@@ -72,6 +71,7 @@ enum oper
 	OPER_SUB,	/* x - y */
 	OPER_UMINUS,	/* -x */
 	OPER_UPLUS,	/* +x */
+	OPER_FCALL,	/* f(...) */
 
 	NOPERS,		/* number of operators */
 };
