@@ -3,20 +3,7 @@
 #include "debug.h"
 #include <assert.h>
 
-
-struct array_header
-{
-	size_t item_size;
-	size_t num_items;
-	size_t capacity;
-};
-
-
-static inline struct array_header *array_get_header(void *arr)
-{
-	return (struct array_header *)((unsigned char *)arr - sizeof(struct array_header));
-}
-
+extern struct array_header *array_get_header(void *arr);
 
 static void *array_resize(void *arr, size_t new_capacity, size_t item_size)
 {
@@ -38,7 +25,6 @@ static void *array_resize(void *arr, size_t new_capacity, size_t item_size)
 
 }
 
-
 void *array_new(size_t init_capacity, size_t item_size)
 {
 	void *arr = array_resize(NULL, init_capacity, item_size);
@@ -46,7 +32,6 @@ void *array_new(size_t init_capacity, size_t item_size)
 	
 	return arr;
 }
-
 
 void *array_claim(void *arr, size_t num_items)
 {
@@ -63,32 +48,20 @@ void *array_claim(void *arr, size_t num_items)
 	return arr;
 }
 
-
 size_t array_size(void *arr)
 {
 	return array_get_header(arr)->num_items;
 }
-
 
 void array_reset(void *arr)
 {
 	array_get_header(arr)->num_items = 0;
 }
 
-
 void array_delete(void *arr)
 {
 	free(array_get_header(arr));
 }
-
-
-void array_pop(void *arr)
-{
-	struct array_header *hdr = array_get_header(arr);
-	assert(hdr->num_items > 0);
-	hdr->num_items--;
-}
-
 
 void *array_push_helper(void **arr)
 {

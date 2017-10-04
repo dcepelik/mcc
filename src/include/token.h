@@ -30,7 +30,6 @@ enum token_type
 	 *       block without modifying `enum oper' correspondingly.
 	 */
 	TOKEN_OP_ADDEQ,		/* OPER_ADDEQ */
-	TOKEN_OP_DOT,		/* OPER_DOT */
 	TOKEN_OP_AND,		/* OPER_AND,	*/
 	TOKEN_OP_ARROW,		/* OPER_ARROW */
 	TOKEN_OP_ASSIGN,	/* OPER_ASSIGN */
@@ -39,6 +38,7 @@ enum token_type
 	TOKEN_OP_BITOREQ,	/* OPER_BITOR */
 	TOKEN_OP_DIV,		/* OPER_DIV */
 	TOKEN_OP_DIVEQ,		/* OPER_DIVEQ */
+	TOKEN_OP_DOT,		/* OPER_DOT */
 	TOKEN_OP_EQ,		/* OPER_EQ */
 	TOKEN_OP_GE,		/* OPER_GE */
 	TOKEN_OP_GT,		/* OPER_GT */

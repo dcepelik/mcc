@@ -1,6 +1,10 @@
 /*
- * parse-expr.c:
- * A rather simple, shunting-yard based parser of C expressions.
+ * C Expression Parsing
+ *
+ * This is an expression parser based on shunting-yard algorithm [1].
+ * Parsing of an expression is initiated with parse_expr, which
+ * establishes an operator and operand stacks; these are passed to
+ * and modified by functions which are involved in the process.
  */
 
 #include "array.h"
@@ -20,7 +24,7 @@ static void push_operation(struct parser *parser,
                            const struct opinfo **ops,
                            struct ast_expr **args)
 {
-	const struct opinfo *opinfo = array_last(ops);
+	const struct opinfo *opinfo = array_pop(ops);
 	struct ast_expr *expr;
 
 	TMP_ASSERT(array_size(args) >= opinfo->arity);
@@ -30,23 +34,56 @@ static void push_operation(struct parser *parser,
 	case 1:	/* unary */
 		expr->type = EXPR_TYPE_UOP;
 		expr->uop.oper = opinfo->oper;
-		expr->uop.expr = array_last(args);
-		array_pop(args);
+		expr->uop.expr = array_pop(args);
 		break;
 	case 2: /* binary */
 		expr->type = EXPR_TYPE_BOP;
 		expr->bop.oper = opinfo->oper;
-		expr->bop.snd = array_last(args);
-		array_pop(args);
-		expr->bop.fst = array_last(args);
-		array_pop(args);
+		expr->bop.snd = array_pop(args);
+		expr->bop.fst = array_pop(args);
 		break;
 	default:
 		assert(0);
 	}
 
-	array_pop(ops);
 	array_push(args, expr);
+}
+
+/*
+ * Parse a function call.
+ *
+ * This function expects that the function pointer (or function name)
+ * expression has been pushed onto the argument stack and the current token
+ * is the first token of the first argument passed to the function, i.e.
+ *
+ *     ((void (*)(int, int))25*a + 17)(i, j)
+ *                                     ^
+ *
+ * NOTE: This function is corecursive with parse_expr.
+ */
+struct ast_expr *parse_fcall(struct parser *parser,
+	const struct opinfo **ops,
+	struct ast_expr **args)
+{
+	(void) ops;
+
+	struct ast_expr *fcall;
+	size_t i;
+
+	fcall = objpool_alloc(&parser->ctx.exprs);
+	fcall->type = EXPR_TYPE_FCALL;
+
+	fcall->fcall.fptr = array_pop(args);
+
+	fcall->fcall.args = array_new(2, sizeof(*fcall->fcall.args));
+	for (i = 0; !token_is_eof(parser->token) && !token_is(parser->token, TOKEN_RPAREN); i++) {
+		if (i > 0)
+			parser_require(parser, TOKEN_COMMA);
+		array_push(fcall->fcall.args, parse_expr(parser));
+	}
+	array_push(args, fcall);
+
+	return fcall;
 }
 
 /*
@@ -54,6 +91,8 @@ static void push_operation(struct parser *parser,
  *
  * It starts by translating tokens to corresponding operators
  * and then feeds them to the shunting-yard algorithm.
+ *
+ * NOTE: This function is corecursive with parse_fcall.
  */
 struct ast_expr *parse_expr(struct parser *parser)
 {
@@ -78,13 +117,13 @@ struct ast_expr *parse_expr(struct parser *parser)
 	prefix = true;
 
 	while (!token_is_eof(parser->token)) {
-		/* translate token(s) to operator */
 		switch (parser->token->type) {
+
 		/*
-		 * These are the simplest cases. The following tokens
-		 * always translate to the same operator. Therefore,
-		 * cur_op is set (by directly casting enum token to enum oper)
-		 * and then processed by the shunting-yard.
+		 * These are the simplest cases. Each of the following tokens
+		 * always translates to the same operator, regardless of
+		 * context. Therefore, cur_op is set (by directly casting enum
+		 * token to enum oper) and then processed by the shunting-yard.
 		 */
 		case TOKEN_OP_ADDEQ:
 		case TOKEN_OP_DOT:
@@ -115,6 +154,7 @@ struct ast_expr *parse_expr(struct parser *parser)
 		case TOKEN_OP_SUBEQ:
 		case TOKEN_OP_XOR:
 		case TOKEN_OP_XOREQ:
+			assert(parser->token->type < TOKEN_OP_CAST_MAX);
 			cur_op = (enum oper)parser->token->type;
 			break;
 
@@ -159,24 +199,15 @@ struct ast_expr *parse_expr(struct parser *parser)
 			continue;
 		
 		/*
-		 * The `(' may be either start of a (sub-expression), or a function
-		 * call f(...), or a (cast) TODO.
+		 * The `(' may be either start of a (sub-expression), or
+		 * a function call(...), or a (cast) TODO.
 		 */
 		case TOKEN_LPAREN:
 			parser_next(parser);
 			if (prefix)
-			{
 				array_push(args, parse_expr(parser));
-			} else {
-				DEBUG_MSG("funccall");
-				expr = objpool_alloc(&parser->ctx.exprs);
-				expr->type = EXPR_TYPE_FCALL;
-				expr->fcall.fptr = array_last(args);
-				array_pop(args);
-				expr->fcall.args = array_new(2, sizeof(*expr->fcall.args));
-				array_push(expr->fcall.args, parse_expr(parser));
-				array_push(args, expr);
-			}
+			else
+				parse_fcall(parser, ops, args);
 			parser_require(parser, TOKEN_RPAREN);
 			prefix = false;
 			continue;
@@ -185,20 +216,21 @@ struct ast_expr *parse_expr(struct parser *parser)
 		case TOKEN_RPAREN:
 		case TOKEN_SEMICOLON:
 		case TOKEN_COMMA: /* TODO */
-			goto break_while;
+			goto end_loop;
 
 		default:
+			expr = objpool_alloc(&parser->ctx.exprs);
 			if (parser->token->type == TOKEN_NUMBER) {
-				expr = objpool_alloc(&parser->ctx.exprs);
 				expr->type = EXPR_TYPE_PRI_NUMBER;
 				expr->number = parser->token->str;
-				array_push(args, expr);
 			} else if (parser->token->type == TOKEN_NAME) {
-				expr = objpool_alloc(&parser->ctx.exprs);
 				expr->type = EXPR_TYPE_PRI_IDENT;
 				expr->ident = symbol_get_name(parser->token->symbol);
-				array_push(args, expr);
+			} else {
+				assert(0);
 			}
+			array_push(args, expr);
+
 			parser_next(parser);
 			prefix = false;
 			continue;
@@ -219,21 +251,23 @@ struct ast_expr *parse_expr(struct parser *parser)
 
 		/*
 		 * The next operator can be a prefix operator only if it is
-		 * the first operator (it's not, we've already pushed one),
-		 * or when it follows a binary operator, or when it follows
-		 * another prefix operator (all unary prefix operators are
-		 * right-associative).
+		 * at the very beginning, or when it follows a binary operator,
+		 * or when it follows another prefix operator (all unary prefix
+		 * operators are right-associative).
 		 */
 		if (cur_opinfo->arity == 2 || cur_opinfo->assoc == OPASSOC_RIGHT)
 			prefix = true;
 	}
 
-break_while:
+end_loop:
+	/*
+	 * (Shunting-yard)
+	 */
 	while (array_size(ops) > 0)
 		push_operation(parser, ops, args);
 
 	assert(array_size(ops) == 0);
-	assert(array_size(args) == 1);
+	TMP_ASSERT(array_size(args) == 1);
 
 	expr = array_last(args);
 	array_delete(ops);
