@@ -18,83 +18,238 @@
 #include <assert.h>
 
 /*
+ * Expression parsing context. This encapsulates the state of the
+ * shunting-yard algorithm as it works it's way through an expression.
+ * By expression I mean the whole expression which delimits a parsing
+ * context, such as `a + b - 11', not  the individual partial ast_exprs
+ * such as `a + b'.
+ *
+ * This means that when a sub-expression is parsed within an expression,
+ * a new context is created, as in `1 + 17 / (2 + 13 * c) - 2'. This reflects
+ * the fact that the sub-expression `2 + 13 * c' itself has to be a valid
+ * expression and it's parsing is independent of the parsing of the ``main''
+ * expression.
+ */
+struct expr_ctx
+{
+	/*
+	 * The following two stacks are used by the shunting-yard
+	 * algorithm to parse expressions in infix notation.
+	 */
+	const struct opinfo **ops;	/* opinfo stack */
+	struct ast_expr **args;		/* argument stack */
+
+	/*
+	 * The prefix flag says that if an operator follow which can
+	 * either be interpreted as a prefix operator or a postfix
+	 * operator, the prior should be favoured.
+	 *
+	 * Also, this flag is used by `handle_lparen' to tell whether
+	 * a parenthesized expression is a function call or a sub-expression.
+	 */
+	bool prefix;
+};
+
+/*
  * Pop an operator off the operator stack and pop the appropriate
  * number of operands off the operand stack. Construct an appropriate
  * AST node (either uop or bop node).
  */
-static void pop_op(struct parser *parser, const struct opinfo **ops, struct ast_expr **args)
+static void pop_operator(struct parser *parser, struct expr_ctx *ctx)
 {
-	const struct opinfo *opinfo = array_pop(ops);
+	const struct opinfo *opinfo = array_pop(ctx->ops);
 	struct ast_expr *expr;
 
-	TMP_ASSERT(array_size(args) >= opinfo->arity);
+	TMP_ASSERT(array_size(ctx->args) >= opinfo->arity);
 
 	expr = objpool_alloc(&parser->ctx.exprs);
 	switch (opinfo->arity) {
 	case 1:	/* unary */
 		expr->type = EXPR_TYPE_UOP;
 		expr->uop.oper = opinfo->oper;
-		expr->uop.expr = array_pop(args);
+		expr->uop.expr = array_pop(ctx->args);
 		break;
 	case 2: /* binary */
 		expr->type = EXPR_TYPE_BOP;
 		expr->bop.oper = opinfo->oper;
-		expr->bop.snd = array_pop(args);
-		expr->bop.fst = array_pop(args);
+		expr->bop.snd = array_pop(ctx->args);
+		expr->bop.fst = array_pop(ctx->args);
 		break;
 	default:
 		assert(0);
 	}
 
-	array_push(args, expr);
+	array_push(ctx->args, expr);
 }
 
 /*
- * Pop all greater than or equal precedence operators off the operator
- * stack and construct the appropriate expressions.
+ * Keep popping operators off the operator stack while the top operator's
+ * priority exceeds the given lower bound. This is the core of the shunting-yard
+ * algorithm.
  */
-static void pop_ge_priority(struct parser *p,
-	const struct opinfo **ops,
-	struct ast_expr **args,
-	size_t prio)
+static void pop_ge_priority_operators(struct parser *p, struct expr_ctx *ctx, size_t prio)
 {
-	while (array_size(ops) && array_last(ops)->prio >= prio)
-		pop_op(p, ops, args);
+	while (array_size(ctx->ops) && array_last(ctx->ops)->prio >= prio)
+		pop_operator(p, ctx);
 }
 
 /*
- * Parse a function call.
- *
- * This function expects that the function pointer (or function name)
- * expression has been pushed onto the argument stack and the current token
- * is the first token of the first argument passed to the function, i.e.
- *
- *     ((void (*)(int, int))25*a + 17)(i, j)
- *                                     ^
- *
- * NOTE: This function is corecursive with parse_expr.
+ * Push an operator onto the operator stack according to the rules of the
+ * shunting-yard algorithm.
  */
-struct ast_expr *parse_fcall(struct parser *parser, const struct opinfo **ops,
-	struct ast_expr **args)
+static void push_operator(struct parser *parser, struct expr_ctx *ctx, enum oper cur_op)
 {
-	(void) ops;
+	const struct opinfo *cur_opinfo;
 
-	struct ast_expr *fcall;
+	cur_opinfo = &opinfo[cur_op];
+
+	if (cur_opinfo->assoc == OPASSOC_LEFT)
+		pop_ge_priority_operators(parser, ctx, cur_opinfo->prio);
+
+	array_push(ctx->ops, cur_opinfo);
+	parser_next(parser);
+
+	/*
+	 * Maintain the `prefix' flag. TODO
+	 *
+	 * The next operator can be a prefix operator only if it is
+	 * at the very beginning, or when it follows a binary operator,
+	 * or when it follows another prefix operator (all unary prefix
+	 * operators are right-associative).
+	 */
+	if (cur_opinfo->arity == 2 || cur_opinfo->assoc == OPASSOC_RIGHT)
+		ctx->prefix = true;
+}
+
+/*
+ * Parse an offset operator.
+ *
+ * NOTE: This function is corecursive with `parse_expr'.
+ */
+static void parse_offset_operator(struct parser *parser, struct expr_ctx *ctx)
+{
+	struct ast_expr *expr;
+
+	assert(token_is(parser->token, TOKEN_LBRACKET));
+	parser_next(parser);
+
+	/*
+	 * This is correct, the [*] operator is left-associative.
+	 * Otherwise, we wouldn't be allowed to call `pop_ge_priority_operators'.
+	 */
+	pop_ge_priority_operators(parser, ctx, opinfo[OPER_OFFSET].prio);
+
+	expr = objpool_alloc(&parser->ctx.exprs);
+	expr->type = EXPR_TYPE_BOP;
+	expr->bop.oper = OPER_OFFSET;
+	expr->bop.fst = array_pop(ctx->args);
+	expr->bop.snd = parse_expr(parser);
+	array_push(ctx->args, expr);
+
+	parser_require(parser, TOKEN_RBRACKET);
+}
+
+/*
+ * Parse a function call expression.
+ *
+ * NOTE: This function is corecursive with `parse_expr'.
+ */
+static void parse_function_call_expr(struct parser *parser, struct expr_ctx *ctx)
+{
+	struct ast_expr *expr;
 	size_t i;
 
-	fcall = objpool_alloc(&parser->ctx.exprs);
-	fcall->type = EXPR_TYPE_FCALL;
-	fcall->fcall.fptr = array_pop(args);
+	expr = objpool_alloc(&parser->ctx.exprs);
+	expr->type = EXPR_TYPE_FCALL;
+	expr->fcall.fptr = array_pop(ctx->args);
 
-	fcall->fcall.args = array_new(2, sizeof(*fcall->fcall.args));
+	expr->fcall.args = array_new(2, sizeof(*expr->fcall.args));
 	for (i = 0; !token_is_eof(parser->token) && !token_is(parser->token, TOKEN_RPAREN); i++) {
 		if (i > 0)
 			parser_require(parser, TOKEN_COMMA);
-		array_push(fcall->fcall.args, parse_expr(parser));
+		array_push(expr->fcall.args, parse_expr(parser));
 	}
-	array_push(args, fcall);
+	array_push(ctx->args, expr);
+}
 
-	return fcall;
+/*
+ * Parse a cast operator.
+ *
+ * NOTE: `parse_declspec' is reused here to parse the specifier-qualifier-list.
+ *       Obviously, this will accept invalid casts such as `(volatile int j)x'.
+ *       I assume it is better to accept them at the syntax level and reject
+ *       them later, as it will likely yield better diagnostics.
+ *
+ * FIXME: I think that the following (bad) thing may happen: When the
+ *        input expression is invalid in the ``right'' way, maybe the
+ *        type of the cast (which is itself an expression) could end
+ *        up being some other operator's operand.
+ */
+static void parse_cast_operator(struct parser *parser, struct expr_ctx *ctx)
+{
+	struct ast_expr *expr;
+
+	expr = objpool_alloc(&parser->ctx.exprs);
+	expr->type = EXPR_TYPE_CAST;
+	parse_declspec(parser, &expr->dspec);
+	array_push(ctx->args, expr);
+	push_operator(parser, ctx, OPER_CAST);
+}
+
+/*
+ * Handle the occurrence of a left opening parentheses within an expression.
+ * The `(' may be either start of a sub-expression, or a function call,
+ * or a cast operator.
+ */
+static void handle_lparen(struct parser *parser, struct expr_ctx *ctx)
+{
+	assert(token_is(parser->token, TOKEN_LPAREN));
+	parser_next(parser);
+
+	if (!ctx->prefix) {
+		parse_function_call_expr(parser, ctx);
+		ctx->prefix = false;
+	} else if (token_is_any_keyword(parser->token)) { /* TODO or a typedef'd name */
+		parse_cast_operator(parser, ctx);
+		/* NOTE: ctx->prefix maintained by `parse_cast_operator' */
+	} else {
+		array_push(ctx->args, parse_expr(parser));
+		ctx->prefix = false;
+	}
+
+	parser_require(parser, TOKEN_RPAREN);
+}
+
+/*
+ * Parse a primary expression.
+ * See 6.5.1.
+ */
+static void parse_primary_expr(struct parser *parser, struct expr_ctx *ctx)
+{
+	struct ast_expr *expr;
+
+	expr = objpool_alloc(&parser->ctx.exprs);
+
+	switch (parser->token->type) {
+	case TOKEN_NUMBER:
+		expr->type = EXPR_TYPE_PRI_NUMBER;
+		expr->number = parser->token->str;
+		break;
+
+	case TOKEN_NAME:
+		expr->type = EXPR_TYPE_PRI_IDENT;
+		expr->ident = symbol_get_name(parser->token->symbol);
+		break;
+
+	default:
+		parse_error(parser, "primary expression was expected");
+		break;
+	}
+
+	array_push(ctx->args, expr);
+	ctx->prefix = false;
+
+	parser_next(parser);
 }
 
 /*
@@ -103,198 +258,92 @@ struct ast_expr *parse_fcall(struct parser *parser, const struct opinfo **ops,
  * It starts by translating tokens to corresponding operators
  * and then feeds them to the shunting-yard algorithm.
  *
- * NOTE: This function is corecursive with parse_fcall.
+ * NOTE: This function is corecursive with parse_function_call_expr.
  */
 struct ast_expr *parse_expr(struct parser *parser)
 {
-	const struct opinfo **ops;		/* operator stack */
-	struct ast_expr **args;			/* operands stack */
-	struct ast_expr *expr;			/* sub-expression */
-	enum oper cur_op;			/* current operator */
-	const struct opinfo *cur_opinfo;	/* current operator's information */
-	bool prefix;				/* next operator may be a prefix operator */
-
-	ops = array_new(4, sizeof(*ops));
-	args = array_new(4, sizeof(*args));
+	struct expr_ctx ctx;
+	struct ast_expr *result;
 
 	/*
-	 * Initialize the prefix flag. The prefix flag says that if a token
-	 * follows which can be understood as either a prefix operator or
-	 * a suffix operator, the former should be preferred. Therefore, the
-	 * flag is true initially.
-	 *
-	 * The flag is set at the end of the loop and before each `continue'.
+	 * Initialize an expression-parsing context for this expression.
 	 */
-	prefix = true;
+	ctx = (struct expr_ctx) {
+		.ops = array_new(4, sizeof(*ctx.ops)),
+		.args = array_new(4, sizeof(*ctx.args)),
+		.prefix = true,
+	};
 
 	while (!token_is_eof(parser->token)) {
-		switch (parser->token->type) {
-
 		/*
-		 * These are the simplest cases. Each of the following tokens
+		 * This is the simple case. Tokens less than TOKEN_OP_CAST_MAX
 		 * always translates to the same operator, regardless of
-		 * context. Therefore, cur_op is set (by directly casting enum
-		 * token to enum oper) and then processed by the shunting-yard.
+		 * context. Therefore, safely cast the token to the operator
+		 * and push it.
 		 */
-		case TOKEN_OP_ADDEQ:
-		case TOKEN_OP_DOT:
-		case TOKEN_OP_AND:
-		case TOKEN_OP_ARROW:
-		case TOKEN_OP_ASSIGN:
-		case TOKEN_OP_BITANDEQ:
-		case TOKEN_OP_BITOR:
-		case TOKEN_OP_BITOREQ:
-		case TOKEN_OP_DIV:
-		case TOKEN_OP_DIVEQ:
-		case TOKEN_OP_EQ:
-		case TOKEN_OP_GE:
-		case TOKEN_OP_GT:
-		case TOKEN_OP_LE:
-		case TOKEN_OP_LT:
-		case TOKEN_OP_MOD:
-		case TOKEN_OP_MODEQ:
-		case TOKEN_OP_MULEQ:
-		case TOKEN_OP_NEG:
-		case TOKEN_OP_NEQ:
-		case TOKEN_OP_NOT:
-		case TOKEN_OP_OR:
-		case TOKEN_OP_SHL:
-		case TOKEN_OP_SHLEQ:
-		case TOKEN_OP_SHR:
-		case TOKEN_OP_SHREQ:
-		case TOKEN_OP_SUBEQ:
-		case TOKEN_OP_XOR:
-		case TOKEN_OP_XOREQ:
-			assert(parser->token->type < TOKEN_OP_CAST_MAX);
-			cur_op = (enum oper)parser->token->type;
-			break;
+		if (parser->token->type < TOKEN_OP_CAST_MAX) {
+			push_operator(parser, &ctx, (enum oper)parser->token->type); /* safe cast */
+		}
 
-		/*
-		 * These tokens may translate to either a prefix operator
-		 * or a suffix one; use the `prefix' flag to decide as
-		 * described earlier.
-		 *
-		 * Set cur_op and then continue to the shunting-yard.
-		 */
-		case TOKEN_PLUS:
-			cur_op = prefix ? OPER_UPLUS : OPER_ADD;
-			break;
-		case TOKEN_MINUS:
-			cur_op = prefix ? OPER_UMINUS : OPER_SUB;
-			break;
-		case TOKEN_PLUSPLUS:
-			cur_op = prefix ? OPER_PREINC : OPER_POSTINC;
-			break;
-		case TOKEN_AMP:
-			cur_op = prefix ? OPER_ADDROF : OPER_BITAND;
-			break;
-		case TOKEN_ASTERISK:
-			cur_op = prefix ? OPER_DEREF : OPER_MUL;
-			break;
-
-		/*
-		 * The `[' always designates an array offset expression.
-		 *
-		 * TODO
-		 *
-		 * To do that, we push the operator and argument stack and
-		 * rely on pop_op to construct the appropriate AST node.
-		 */
-		case TOKEN_LBRACKET:
-			parser_next(parser);
-			array_push(ops, &opinfo[OPER_OFFSET]);
-			array_push(args, parse_expr(parser));
-			pop_op(parser, ops, args);
-			parser_require(parser, TOKEN_RBRACKET);
-			continue;
-		
-		/*
-		 * The `(' may be either start of a (sub-expression), or
-		 * a function call(...), or a (cast) TODO.
-		 */
-		case TOKEN_LPAREN:
-			parser_next(parser);
-			if (prefix) {
-				if (token_is_any_keyword(parser->token)) {
-					expr = objpool_alloc(&parser->ctx.exprs);
-					expr->type = EXPR_TYPE_CAST;
-					/*
-					 * parse_declspec will parse ``more'' than we need,
-					 * obviously, `volatile' is not valid in a cast.
-					 * This will be sanitized later.
-					 */
-					parse_declspec(parser, &expr->dspec);
-					array_push(args, expr);
-					pop_ge_priority(parser, ops, args, opinfo[OPER_CAST].prio);
-					array_push(ops, &opinfo[OPER_CAST]);
-					prefix = true;
-				}
-				else {
-					pop_ge_priority(parser, ops, args, opinfo[OPER_OFFSET].prio);
-					array_push(args, parse_expr(parser));
-					prefix = false;
-				}
-			} else {
-				pop_ge_priority(parser, ops, args, opinfo[OPER_FCALL].prio);
-				parse_fcall(parser, ops, args);
-				prefix = false;
-			}
-			parser_require(parser, TOKEN_RPAREN);
-			continue;
-
+		switch (parser->token->type) {
 		case TOKEN_RBRACKET:
 		case TOKEN_RPAREN:
 		case TOKEN_SEMICOLON:
 		case TOKEN_COMMA: /* TODO */
 			goto end_while;
 
-		default:
-			expr = objpool_alloc(&parser->ctx.exprs);
-			if (parser->token->type == TOKEN_NUMBER) {
-				expr->type = EXPR_TYPE_PRI_NUMBER;
-				expr->number = parser->token->str;
-			} else if (parser->token->type == TOKEN_NAME) {
-				expr->type = EXPR_TYPE_PRI_IDENT;
-				expr->ident = symbol_get_name(parser->token->symbol);
-			} else {
-				assert(0);
-			}
-			array_push(args, expr);
-
-			parser_next(parser);
-			prefix = false;
-			continue;
-		}
-
-		cur_opinfo = &opinfo[cur_op];
-
-		if (cur_opinfo->assoc == OPASSOC_LEFT)
-			pop_ge_priority(parser, ops, args, cur_opinfo->prio);
-
-		array_push(ops, cur_opinfo);
-		parser_next(parser);
-
-		/*
-		 * The next operator can be a prefix operator only if it is
-		 * at the very beginning, or when it follows a binary operator,
-		 * or when it follows another prefix operator (all unary prefix
-		 * operators are right-associative).
+		/* 
+		 * The following tokens are ``ambiguous'' in the sense that they
+		 * may either produce a prefix or a postfix/infix binary operator.
+		 *
+		 * Use the aforementioned `prefix' flag to decide which should be used.
 		 */
-		if (cur_opinfo->arity == 2 || cur_opinfo->assoc == OPASSOC_RIGHT)
-			prefix = true;
+		case TOKEN_PLUS:
+			push_operator(parser, &ctx, ctx.prefix ? OPER_UPLUS : OPER_ADD);
+			break;
+		case TOKEN_MINUS:
+			push_operator(parser, &ctx, ctx.prefix ? OPER_UMINUS : OPER_SUB);
+			break;
+		case TOKEN_PLUSPLUS:
+			push_operator(parser, &ctx, ctx.prefix ? OPER_PREINC : OPER_POSTINC);
+			break;
+		case TOKEN_MINUSMINUS:
+			push_operator(parser, &ctx, ctx.prefix ? OPER_PREDEC : OPER_POSTDEC);
+			break;
+		case TOKEN_AMP:
+			push_operator(parser, &ctx, ctx.prefix ? OPER_ADDROF : OPER_BITAND);
+			break;
+		case TOKEN_ASTERISK:
+			push_operator(parser, &ctx, ctx.prefix ? OPER_DEREF : OPER_MUL);
+			break;
+		case TOKEN_LBRACKET:
+			parse_offset_operator(parser, &ctx);
+			break;
+		case TOKEN_LPAREN:
+			handle_lparen(parser, &ctx);
+			break;
+
+		default:
+			parse_primary_expr(parser, &ctx);
+			break;
+		}
 	}
 
 end_while:
-	pop_ge_priority(parser, ops, args, 0); /* 0 => will pop everything */
+	/*
+	 * Reuse `pop_ge_priority_operators' to pop off everything else.
+	 * (Every operator on the stack has priority >= 0.)
+	 */
+	pop_ge_priority_operators(parser, &ctx, 0);
+	assert(array_size(ctx.ops) == 0);
 
-	assert(array_size(ops) == 0);
-	TMP_ASSERT(array_size(args) == 1);
+	TMP_ASSERT(array_size(ctx.args) == 1);
+	result = array_last(ctx.args);
 
-	expr = array_last(args);
-	array_delete(ops);
-	array_delete(args);
+	array_delete(ctx.ops);
+	array_delete(ctx.args); /* safe to delete, result is allocated separately */
 
-	return expr;
+	return result;
 }
 
 void dump_expr(struct ast_expr *expr, struct strbuf *buf)
