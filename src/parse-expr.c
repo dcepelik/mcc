@@ -22,9 +22,7 @@
  * number of operands off the operand stack. Construct an appropriate
  * AST node (either uop or bop node).
  */
-static void push_operation(struct parser *parser,
-                           const struct opinfo **ops,
-                           struct ast_expr **args)
+static void pop_op(struct parser *parser, const struct opinfo **ops, struct ast_expr **args)
 {
 	const struct opinfo *opinfo = array_pop(ops);
 	struct ast_expr *expr;
@@ -55,13 +53,13 @@ static void push_operation(struct parser *parser,
  * Pop all greater than or equal precedence operators off the operator
  * stack and construct the appropriate expressions.
  */
-static void pop_ge_precedence(struct parser *p,
+static void pop_ge_priority(struct parser *p,
 	const struct opinfo **ops,
 	struct ast_expr **args,
 	size_t prio)
 {
 	while (array_size(ops) && array_last(ops)->prio >= prio)
-		push_operation(p, ops, args);
+		pop_op(p, ops, args);
 }
 
 /*
@@ -76,8 +74,7 @@ static void pop_ge_precedence(struct parser *p,
  *
  * NOTE: This function is corecursive with parse_expr.
  */
-struct ast_expr *parse_fcall(struct parser *parser,
-	const struct opinfo **ops,
+struct ast_expr *parse_fcall(struct parser *parser, const struct opinfo **ops,
 	struct ast_expr **args)
 {
 	(void) ops;
@@ -87,7 +84,6 @@ struct ast_expr *parse_fcall(struct parser *parser,
 
 	fcall = objpool_alloc(&parser->ctx.exprs);
 	fcall->type = EXPR_TYPE_FCALL;
-
 	fcall->fcall.fptr = array_pop(args);
 
 	fcall->fcall.args = array_new(2, sizeof(*fcall->fcall.args));
@@ -198,18 +194,17 @@ struct ast_expr *parse_expr(struct parser *parser)
 
 		/*
 		 * The `[' always designates an array offset expression.
-		 * As the offset operator has the highest priority, we can
-		 * bypass the shunting-yard for simplicity and construct
-		 * the expression straight away.
+		 *
+		 * TODO
 		 *
 		 * To do that, we push the operator and argument stack and
-		 * rely on push_operation to construct the appropriate AST node.
+		 * rely on pop_op to construct the appropriate AST node.
 		 */
 		case TOKEN_LBRACKET:
 			parser_next(parser);
 			array_push(ops, &opinfo[OPER_OFFSET]);
 			array_push(args, parse_expr(parser));
-			push_operation(parser, ops, args);
+			pop_op(parser, ops, args);
 			parser_require(parser, TOKEN_RBRACKET);
 			continue;
 		
@@ -220,21 +215,38 @@ struct ast_expr *parse_expr(struct parser *parser)
 		case TOKEN_LPAREN:
 			parser_next(parser);
 			if (prefix) {
-				pop_ge_precedence(parser, ops, args, opinfo[OPER_OFFSET].prio);
-				array_push(args, parse_expr(parser));
+				if (token_is_any_keyword(parser->token)) {
+					expr = objpool_alloc(&parser->ctx.exprs);
+					expr->type = EXPR_TYPE_CAST;
+					/*
+					 * parse_declspec will parse ``more'' than we need,
+					 * obviously, `volatile' is not valid in a cast.
+					 * This will be sanitized later.
+					 */
+					parse_declspec(parser, &expr->dspec);
+					array_push(args, expr);
+					pop_ge_priority(parser, ops, args, opinfo[OPER_CAST].prio);
+					array_push(ops, &opinfo[OPER_CAST]);
+					prefix = true;
+				}
+				else {
+					pop_ge_priority(parser, ops, args, opinfo[OPER_OFFSET].prio);
+					array_push(args, parse_expr(parser));
+					prefix = false;
+				}
 			} else {
-				pop_ge_precedence(parser, ops, args, opinfo[OPER_FCALL].prio);
+				pop_ge_priority(parser, ops, args, opinfo[OPER_FCALL].prio);
 				parse_fcall(parser, ops, args);
+				prefix = false;
 			}
 			parser_require(parser, TOKEN_RPAREN);
-			prefix = false;
 			continue;
 
 		case TOKEN_RBRACKET:
 		case TOKEN_RPAREN:
 		case TOKEN_SEMICOLON:
 		case TOKEN_COMMA: /* TODO */
-			goto end_loop;
+			goto end_while;
 
 		default:
 			expr = objpool_alloc(&parser->ctx.exprs);
@@ -256,11 +268,8 @@ struct ast_expr *parse_expr(struct parser *parser)
 
 		cur_opinfo = &opinfo[cur_op];
 
-		/*
-		 * (Shunting-yard)
-		 */
 		if (cur_opinfo->assoc == OPASSOC_LEFT)
-			pop_ge_precedence(parser, ops, args, cur_opinfo->prio);
+			pop_ge_priority(parser, ops, args, cur_opinfo->prio);
 
 		array_push(ops, cur_opinfo);
 		parser_next(parser);
@@ -275,11 +284,8 @@ struct ast_expr *parse_expr(struct parser *parser)
 			prefix = true;
 	}
 
-end_loop:
-	/*
-	 * (Shunting-yard)
-	 */
-	pop_ge_precedence(parser, ops, args, 0);
+end_while:
+	pop_ge_priority(parser, ops, args, 0); /* 0 => will pop everything */
 
 	assert(array_size(ops) == 0);
 	TMP_ASSERT(array_size(args) == 1);
@@ -299,14 +305,17 @@ void dump_expr(struct ast_expr *expr, struct strbuf *buf)
 	case EXPR_TYPE_PRI_NUMBER:
 		strbuf_printf(buf, "%s", expr->number);
 		break;
+
 	case EXPR_TYPE_PRI_IDENT:
 		strbuf_printf(buf, "%s", expr->ident);
 		break;
+
 	case EXPR_TYPE_UOP:
 		strbuf_printf(buf, "%s(", oper_to_string(expr->uop.oper));
 		dump_expr(expr->uop.expr, buf);
 		strbuf_printf(buf, ")");
 		break;
+
 	case EXPR_TYPE_BOP:
 		strbuf_printf(buf, "%s(", oper_to_string(expr->bop.oper));
 		dump_expr(expr->bop.fst, buf);
@@ -314,6 +323,7 @@ void dump_expr(struct ast_expr *expr, struct strbuf *buf)
 		dump_expr(expr->bop.snd, buf);
 		strbuf_printf(buf, ")");
 		break;
+
 	case EXPR_TYPE_FCALL:
 		dump_expr(expr->fcall.fptr, buf);
 		strbuf_printf(buf, "(");
@@ -324,6 +334,11 @@ void dump_expr(struct ast_expr *expr, struct strbuf *buf)
 		}
 		strbuf_printf(buf, ")");
 		break;
+
+	case EXPR_TYPE_CAST:
+		print_declspec(&expr->dspec, buf);
+		break;
+
 	default:
 		assert(0);
 	}

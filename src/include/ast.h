@@ -113,18 +113,6 @@ struct ast_cexpr
 };
 
 /*
- * Cast expression.
- * A type name and the expression to be cast to that type.
- *
- * See 6.5.4.
- */
-struct ast_cast
-{
-	char *type_name;	/* target type name */
-	struct ast_expr *expr;	/* expression to be cast */
-};
-
-/*
  * Unary operation.
  * A unary operator and a single expression operand.
  */
@@ -171,6 +159,7 @@ enum expr_type
 	EXPR_TYPE_UOP,		/* unary operation */
 	EXPR_TYPE_BOP,		/* binary operation */
 	EXPR_TYPE_FCALL,	/* function call */
+	EXPR_TYPE_CAST,		/* cast expression */
 };
 
 /*
@@ -181,13 +170,13 @@ struct ast_expr
 {
 	enum expr_type type;
 	union {
-		struct ast_cexpr cexpr;	/* conditional expression */
-		struct ast_cast cast;	/* cast expression */
-		struct ast_uop uop;	/* unary operation */
-		struct ast_bop bop;	/* binary operation */
-		struct ast_fcall fcall;	/* function call */
-		char *number;		/* TODO number string */
-		char *ident;		/* TODO identifier */
+		struct ast_cexpr cexpr;		/* conditional expression */
+		struct ast_declspec dspec;	/* cast expression */
+		struct ast_uop uop;		/* unary operation */
+		struct ast_bop bop;		/* binary operation */
+		struct ast_fcall fcall;		/* function call */
+		char *number;			/* TODO number string */
+		char *ident;			/* TODO identifier */
 	};
 };
 

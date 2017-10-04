@@ -71,7 +71,8 @@ enum oper
 	OPER_SUB,	/* x - y */
 	OPER_UMINUS,	/* -x */
 	OPER_UPLUS,	/* +x */
-	OPER_FCALL,	/* f(...) */
+	OPER_FCALL,	/* f(argument-list) */
+	OPER_CAST,	/* (specifier-qualifier-list) */
 
 	NOPERS,		/* number of operators */
 };

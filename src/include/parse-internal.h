@@ -19,4 +19,7 @@ void dump_decl(struct ast_decl *decl);
 struct ast_expr *parse_expr(struct parser *parser);
 void dump_expr(struct ast_expr *expr, struct strbuf *buf);
 
+void parse_declspec(struct parser *parser, struct ast_declspec *dspec);
+void print_declspec(struct ast_declspec *dspec, struct strbuf *buf);
+
 #endif

@@ -4,7 +4,6 @@
 
 #define ANON_STRUCT_NAME	"<anonymous>"
 
-
 /*
  * Parses: 6.7.6 pointer
  *
@@ -34,7 +33,6 @@ static void parse_ptr_declr(struct parser *parser,
 	declr->type = DECLR_TYPE_PTR;
 	declr->tquals = tquals;
 }
-
 
 /*
  * Parses: 6.7.6 declarator, 6.7.6 direct-declarator
@@ -80,7 +78,6 @@ static void parse_declrs(struct parser *parser,
 	}
 }
 
-
 /*
  * Parses: 6.7 init-declarator.
  */
@@ -122,7 +119,6 @@ static void parse_init_declr(struct parser *parser, struct ast_init_declr *init_
 	}
 }
 
-
 static void sanitize_su_member_dspec(struct parser *parser, struct ast_declspec *dspec)
 {
 	if (dspec->storcls) {
@@ -132,16 +128,15 @@ static void sanitize_su_member_dspec(struct parser *parser, struct ast_declspec 
 	}
 }
 
-
 static void parse_decl_internal(struct parser *parser, struct ast_decl *decl);
-
 
 /*
  * Parses: 6.7.2.1 struct-or-union-specifier.
  */
 static struct ast_su_spec *parse_struct_or_union_specifier(struct parser *parser)
 {
-	assert(token_is_keyword(parser->token, KWD_STRUCT) || token_is_keyword(parser->token, KWD_UNION));
+	assert(token_is_keyword(parser->token, KWD_STRUCT)
+		|| token_is_keyword(parser->token, KWD_UNION));
 
 	struct ast_su_spec *spec;
 
@@ -170,7 +165,6 @@ static struct ast_su_spec *parse_struct_or_union_specifier(struct parser *parser
 	parser_require(parser, TOKEN_RBRACE);
 	return spec;
 }
-
 
 static void apply_tflag(struct parser *parser, struct ast_declspec *dspec, const struct kwdinfo *kwd)
 {
@@ -204,7 +198,6 @@ static void apply_tflag(struct parser *parser, struct ast_declspec *dspec, const
 		dspec->tflags = new_tflags;
 }
 
-
 static void apply_tspec(struct parser *parser,
                         struct ast_declspec *dspec,
 			const struct kwdinfo *kwd)
@@ -215,7 +208,6 @@ static void apply_tspec(struct parser *parser,
 		dspec->tspec |= kwd->tspec;
 }
 
-
 static void apply_storcls(struct parser *parser,
                           struct ast_declspec *dspec,
 			  const struct kwdinfo *kwd)
@@ -225,7 +217,6 @@ static void apply_storcls(struct parser *parser,
 	else
 		dspec->storcls |= kwd->storcls;
 }
-
 
 static void sanitize_declspec(struct parser *parser, struct ast_declspec *dspec)
 {
@@ -273,11 +264,12 @@ static void sanitize_declspec(struct parser *parser, struct ast_declspec *dspec)
 	}
 }
 
-
 /*
  * Parses: 6.7 declaration-specifiers.
+ *
+ * NOTE: This function is used by expression parser to parse cast expressions.
  */
-static void parse_declspec(struct parser *parser, struct ast_declspec *dspec)
+void parse_declspec(struct parser *parser, struct ast_declspec *dspec)
 {
 	const struct kwdinfo *kwdinfo;
 
@@ -320,7 +312,6 @@ break_while:
 	sanitize_declspec(parser, dspec);
 }
 
-
 /*
  * Parses: 6.7 declaration, 6.7 init-declarator-list.
  */
@@ -351,7 +342,6 @@ static void parse_decl_internal(struct parser *parser, struct ast_decl *decl)
 	}
 }
 
-
 /*
  * Parses: 6.7 declaration, 6.7 init-declarator-list.
  * TODO get rid of this allocating wrapper
@@ -362,7 +352,6 @@ struct ast_decl *parser_parse_decl(struct parser *parser)
 	parse_decl_internal(parser, decl);
 	return decl;
 }
-
 
 static const char *tspec_to_string(enum tspec tspec)
 {
@@ -390,7 +379,6 @@ static const char *tspec_to_string(enum tspec tspec)
 	}
 }
 
-
 static const char *tqual_to_string(enum tqual tqual)
 {
 	switch (tqual) {
@@ -406,7 +394,6 @@ static const char *tqual_to_string(enum tqual tqual)
 		assert(0);
 	}
 }
-
 
 static const char *tflag_to_string(enum tflag tflag)
 {
@@ -428,11 +415,12 @@ static const char *tflag_to_string(enum tflag tflag)
 	}
 }
 
-
 void print_decl(struct ast_decl *decl, struct strbuf *buf);
 
-
-static void print_declspec(struct ast_declspec *dspec, struct strbuf *buf)
+/*
+ * NOTE: This function is used by dump_expr.
+ */
+void print_declspec(struct ast_declspec *dspec, struct strbuf *buf)
 {
 	size_t i;
 
@@ -478,7 +466,6 @@ static void print_declspec(struct ast_declspec *dspec, struct strbuf *buf)
 		TMP_ASSERT(0);
 	}
 }
-
 
 static void print_init_declr(struct ast_init_declr *init_decl, struct strbuf *buf)
 {
@@ -530,7 +517,6 @@ static void print_init_declr(struct ast_init_declr *init_decl, struct strbuf *bu
 	strbuf_free(&decl_buf);
 }
 
-
 void print_decl(struct ast_decl *decl, struct strbuf *buf)
 {
 	size_t i;
@@ -544,7 +530,6 @@ void print_decl(struct ast_decl *decl, struct strbuf *buf)
 	}
 	strbuf_printf(buf, ";");
 }
-
 
 void dump_decl(struct ast_decl *decl)
 {
