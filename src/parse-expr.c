@@ -284,6 +284,7 @@ struct ast_expr *parse_expr(struct parser *parser)
 		 */
 		if (parser->token->type < TOKEN_OP_CAST_MAX) {
 			push_operator(parser, &ctx, (enum oper)parser->token->type); /* safe cast */
+			continue;
 		}
 
 		switch (parser->token->type) {
