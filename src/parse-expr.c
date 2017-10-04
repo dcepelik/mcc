@@ -11,7 +11,11 @@
 #include "strbuf.h"
 #include <assert.h>
 
-
+/*
+ * Pop an operator off the operator stack and pop the appropriate
+ * number of operands off the operand stack. Construct an appropriate
+ * AST node (either uop or bop node).
+ */
 static void push_operation(struct parser *parser,
                            const struct opinfo **ops,
                            struct ast_expr **args)
@@ -19,7 +23,7 @@ static void push_operation(struct parser *parser,
 	const struct opinfo *opinfo = array_last(ops);
 	struct ast_expr *expr;
 
-	assert(array_size(args) >= opinfo->arity);
+	TMP_ASSERT(array_size(args) >= opinfo->arity);
 
 	expr = objpool_alloc(&parser->ctx.exprs);
 	switch (opinfo->arity) {
@@ -45,23 +49,43 @@ static void push_operation(struct parser *parser,
 	array_push(args, expr);
 }
 
-
+/*
+ * This function reads tokens and construct expression ASTs.
+ *
+ * It starts by translating tokens to corresponding operators
+ * and then feeds them to the shunting-yard algorithm.
+ */
 struct ast_expr *parse_expr(struct parser *parser)
 {
 	const struct opinfo **ops;		/* operator stack */
 	struct ast_expr **args;			/* operands stack */
-	struct ast_expr *expr;			/* current expression */
-	struct ast_expr *offset_expr;		/* offset expression */
+	struct ast_expr *expr;			/* sub-expression */
 	enum oper cur_op;			/* current operator */
 	const struct opinfo *cur_opinfo;	/* current operator's information */
-	bool prefix = true;			/* next operator is a prefix operator */
+	bool prefix;				/* next operator may be a prefix operator */
 
 	ops = array_new(4, sizeof(*ops));
 	args = array_new(4, sizeof(*args));
 
+	/*
+	 * Initialize the prefix flag. The prefix flag says that if a token
+	 * follows which can be understood as either a prefix operator or
+	 * a suffix operator, the former should be preferred. Therefore, the
+	 * flag is true initially.
+	 *
+	 * The flag is set at the end of the loop and before each `continue'.
+	 */
+	prefix = true;
+
 	while (!token_is_eof(parser->token)) {
 		/* translate token(s) to operator */
 		switch (parser->token->type) {
+		/*
+		 * These are the simplest cases. The following tokens
+		 * always translate to the same operator. Therefore,
+		 * cur_op is set (by directly casting enum token to enum oper)
+		 * and then processed by the shunting-yard.
+		 */
 		case TOKEN_OP_ADDEQ:
 		case TOKEN_OP_DOT:
 		case TOKEN_OP_AND:
@@ -93,6 +117,14 @@ struct ast_expr *parse_expr(struct parser *parser)
 		case TOKEN_OP_XOREQ:
 			cur_op = (enum oper)parser->token->type;
 			break;
+
+		/*
+		 * These tokens may translate to either a prefix operator
+		 * or a suffix one; use the `prefix' flag to decide as
+		 * described earlier.
+		 *
+		 * Set cur_op and then continue to the shunting-yard.
+		 */
 		case TOKEN_PLUS:
 			cur_op = prefix ? OPER_UPLUS : OPER_ADD;
 			break;
@@ -108,60 +140,92 @@ struct ast_expr *parse_expr(struct parser *parser)
 		case TOKEN_ASTERISK:
 			cur_op = prefix ? OPER_DEREF : OPER_MUL;
 			break;
+
+		/*
+		 * The `[' always designates an array offset expression.
+		 * As the offset operator has the highest priority, we can
+		 * bypass the shunting-yard for simplicity and construct
+		 * the expression straight away.
+		 *
+		 * To do that, we push the operator and argument stack and
+		 * rely on push_operation to construct the appropriate AST node.
+		 */
 		case TOKEN_LBRACKET:
 			parser_next(parser);
-			offset_expr = parse_expr(parser);
-			if (!token_is(parser->token, TOKEN_RBRACKET))
-				parse_error(parser, "] was expected");
-			prefix = false;
-			cur_op = OPER_OFFSET;
-			break;
+			array_push(ops, &opinfo[OPER_OFFSET]);
+			array_push(args, parse_expr(parser));
+			push_operation(parser, ops, args);
+			parser_require(parser, TOKEN_RBRACKET);
+			continue;
+		
+		/*
+		 * The `(' may be either start of a (sub-expression), or a function
+		 * call f(...), or a (cast) TODO.
+		 */
 		case TOKEN_LPAREN:
 			parser_next(parser);
-			if (!array_size(args) || (array_size(ops) && (array_last(ops)->arity == 2
-				|| array_last(ops)->assoc == OPASSOC_RIGHT)))
+			if (prefix)
 			{
-				expr = parse_expr(parser);
-				array_push(args, expr);
-				prefix = false;
+				array_push(args, parse_expr(parser));
 			} else {
 				DEBUG_MSG("funccall");
-				/* parse funccall */
+				expr = objpool_alloc(&parser->ctx.exprs);
+				expr->type = EXPR_TYPE_FCALL;
+				expr->fcall.fptr = array_last(args);
 				array_pop(args);
+				expr->fcall.args = array_new(2, sizeof(*expr->fcall.args));
+				array_push(expr->fcall.args, parse_expr(parser));
+				array_push(args, expr);
 			}
 			parser_require(parser, TOKEN_RPAREN);
+			prefix = false;
 			continue;
+
 		case TOKEN_RBRACKET:
 		case TOKEN_RPAREN:
 		case TOKEN_SEMICOLON:
 		case TOKEN_COMMA: /* TODO */
 			goto break_while;
+
 		default:
 			if (parser->token->type == TOKEN_NUMBER) {
 				expr = objpool_alloc(&parser->ctx.exprs);
 				expr->type = EXPR_TYPE_PRI_NUMBER;
 				expr->number = parser->token->str;
 				array_push(args, expr);
+			} else if (parser->token->type == TOKEN_NAME) {
+				expr = objpool_alloc(&parser->ctx.exprs);
+				expr->type = EXPR_TYPE_PRI_IDENT;
+				expr->ident = symbol_get_name(parser->token->symbol);
+				array_push(args, expr);
 			}
-			prefix = false;
 			parser_next(parser);
+			prefix = false;
 			continue;
 		}
 
 		cur_opinfo = &opinfo[cur_op];
-		if (cur_opinfo->assoc == OPASSOC_RIGHT)
-			prefix = true;
 
+		/*
+		 * (Shunting-yard)
+		 */
 		while (array_size(ops)
 			&& array_last(ops)->prio >= cur_opinfo->prio
 			&& cur_opinfo->assoc == OPASSOC_LEFT)
 			push_operation(parser, ops, args);
 
-		if (cur_op == OPER_OFFSET)
-			array_push(args, offset_expr);
-
 		array_push(ops, cur_opinfo);
 		parser_next(parser);
+
+		/*
+		 * The next operator can be a prefix operator only if it is
+		 * the first operator (it's not, we've already pushed one),
+		 * or when it follows a binary operator, or when it follows
+		 * another prefix operator (all unary prefix operators are
+		 * right-associative).
+		 */
+		if (cur_opinfo->arity == 2 || cur_opinfo->assoc == OPASSOC_RIGHT)
+			prefix = true;
 	}
 
 break_while:
@@ -178,12 +242,16 @@ break_while:
 	return expr;
 }
 
-
 void dump_expr(struct ast_expr *expr, struct strbuf *buf)
 {
+	size_t i;
+
 	switch (expr->type) {
 	case EXPR_TYPE_PRI_NUMBER:
 		strbuf_printf(buf, "%s", expr->number);
+		break;
+	case EXPR_TYPE_PRI_IDENT:
+		strbuf_printf(buf, "%s", expr->ident);
 		break;
 	case EXPR_TYPE_UOP:
 		strbuf_printf(buf, "%s(", oper_to_string(expr->uop.oper));
@@ -195,6 +263,16 @@ void dump_expr(struct ast_expr *expr, struct strbuf *buf)
 		dump_expr(expr->bop.fst, buf);
 		strbuf_printf(buf, ", ");
 		dump_expr(expr->bop.snd, buf);
+		strbuf_printf(buf, ")");
+		break;
+	case EXPR_TYPE_FCALL:
+		dump_expr(expr->fcall.fptr, buf);
+		strbuf_printf(buf, "(");
+		for (i = 0; i < array_size(expr->fcall.args); i++) {
+			if (i > 0)
+				strbuf_printf(buf, ", ");
+			dump_expr(expr->fcall.args[i], buf);
+		}
 		strbuf_printf(buf, ")");
 		break;
 	default:

@@ -146,6 +146,14 @@ struct ast_bop
 };
 
 /*
+ */
+struct ast_fcall
+{
+	struct ast_expr *fptr;	/* function pointer expression */
+	struct ast_expr **args;	/* function arguments */
+};
+
+/*
  * Type of a C expression. Used to dispatch the union in `struct ast_expr'.
  */
 enum expr_type
@@ -162,6 +170,7 @@ enum expr_type
 
 	EXPR_TYPE_UOP,		/* unary operation */
 	EXPR_TYPE_BOP,		/* binary operation */
+	EXPR_TYPE_FCALL,	/* function call */
 };
 
 /*
@@ -176,7 +185,9 @@ struct ast_expr
 		struct ast_cast cast;	/* cast expression */
 		struct ast_uop uop;	/* unary operation */
 		struct ast_bop bop;	/* binary operation */
-		char *number;		/* TODO */
+		struct ast_fcall fcall;	/* function call */
+		char *number;		/* TODO number string */
+		char *ident;		/* TODO identifier */
 	};
 };
 
