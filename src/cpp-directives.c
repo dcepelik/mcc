@@ -44,7 +44,7 @@ static inline void skip_find_eol(struct cpp *cpp)
 {
 	assert(cpp_cur_file(cpp)->lexer.emit_eols == true);
 
-	bool last_was_eol = false;
+	bool last_was_eol = true;
 
 	while (!token_is_eof(cpp->token) && !cpp->token->is_at_bol) {
 		last_was_eol = token_is_eol(cpp->token);
@@ -52,17 +52,6 @@ static inline void skip_find_eol(struct cpp *cpp)
 	}
 	
 	assert(last_was_eol || token_is_eof(cpp->token));
-}
-
-
-static inline void skip2(struct cpp *cpp)
-{
-	/* TODO Consider freeing those tokens */
-
-	assert(cpp_cur_file(cpp)->lexer.emit_eols == true);
-
-	while (!token_is_eol_or_eof(cpp->token))
-		cpp_next_token(cpp);
 }
 
 
@@ -241,7 +230,7 @@ static void cpp_parse_error(struct cpp *cpp)
 {
 	/* TODO cat tokens to get error message */
 	cpp_error(cpp, "%s", "#error");
-	skip2(cpp);
+	skip_find_eol(cpp);
 	//cpp_match_eol_or_eof(cpp);
 }
 
@@ -285,7 +274,7 @@ static void cpp_parse_include(struct cpp *cpp)
 	}
 	else {
 		cpp_error(cpp, "cannot include file %s: %s", filename, error_str(err));
-		skip2(cpp); /* skip is delayed: error location */
+		skip_find_eol(cpp); /* skip is delayed: error location */
 	}
 
 	cpp_cur_file(cpp)->lexer.inside_include = false;

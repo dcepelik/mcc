@@ -9,5 +9,5 @@
 #define DEFINED	defined
 
 #if DEFINED(a)
-#error This shouldn't pass.
+#error "This shouldn't pass."
 #endif
