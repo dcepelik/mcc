@@ -149,8 +149,8 @@ static void cpp_setup_symtab(struct cpp *cpp)
 
 void cpp_next_token(struct cpp *cpp)
 {
-	if (!toklist_is_empty(&cpp->tokens))
-		cpp->token = toklist_remove_first(&cpp->tokens);
+	if (!toklist_is_empty(&cpp_cur_file(cpp)->tokens))
+		cpp->token = toklist_remove_first(&cpp_cur_file(cpp)->tokens);
 	else
 		cpp->token = lexer_next(&cpp_cur_file(cpp)->lexer);
 
@@ -172,7 +172,6 @@ struct cpp *cpp_new(struct context *ctx)
 	objpool_init(&cpp->file_pool, sizeof(struct cpp_file), FILE_POOL_BLOCK_SIZE);
 
 	list_init(&cpp->file_stack);
-	toklist_init(&cpp->tokens);
 
 	cpp_init_ifstack(cpp);
 	cpp_setup_symtab(cpp);
@@ -186,7 +185,6 @@ void cpp_delete(struct cpp *cpp)
 	objpool_free(&cpp->macro_pool);
 	objpool_free(&cpp->file_pool);
 	list_free(&cpp->file_stack);
-	toklist_free(&cpp->tokens);
 
 	free(cpp);
 }
@@ -243,7 +241,7 @@ void cpp_error(struct cpp *cpp, char *fmt, ...)
 
 static void cpp_requeue_current(struct cpp *cpp)
 {
-	toklist_insert_first(&cpp->tokens, cpp->token);
+	toklist_insert_first(&cpp_cur_file(cpp)->tokens, cpp->token);
 }
 
 
@@ -306,7 +304,7 @@ static void cpp_parse_macro_invocation(struct cpp *cpp)
 
 	macro_expand(cpp, &invocation, &expansion);
 	cpp_requeue_current(cpp);
-	toklist_prepend(&cpp->tokens, &expansion);
+	toklist_prepend(&cpp_cur_file(cpp)->tokens, &expansion);
 	cpp_next_token(cpp);
 }
 
@@ -370,14 +368,14 @@ static void cpp_parse(struct cpp *cpp)
 				cpp_next_token(cpp);
 
 				if (token_is(cpp->token, TOKEN_LPAREN)) {
-					toklist_insert_first(&cpp->tokens, cpp->token);
+					toklist_insert_first(&cpp_cur_file(cpp)->tokens, cpp->token);
 					cpp->token = macro_name;
 					cpp_parse_macro_invocation(cpp);
 				}
 				else {
 					macro_name->noexpand = true;
 					cpp->token = macro_name;
-					toklist_insert_first(&cpp->tokens, cpp->token);
+					toklist_insert_first(&cpp_cur_file(cpp)->tokens, cpp->token);
 				}
 
 			}

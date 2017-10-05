@@ -27,7 +27,6 @@ struct cpp
 	struct objpool file_pool;	/* objpool for open files */
 
 	struct list file_stack;		/* stack of open files */
-	struct toklist tokens;		/* token queue */
 	struct token *token;		/* most recent token */
 	struct list ifs;		/* if-directive control stack */
 };
@@ -48,6 +47,7 @@ struct cpp_file
 	char *filename;
 	struct lexer lexer;
 	struct inbuf inbuf;
+	struct toklist tokens;		/* token queue */
 };
 
 mcc_error_t cpp_file_init(struct cpp *cpp, struct cpp_file *file, char *filename);

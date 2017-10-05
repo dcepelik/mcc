@@ -30,6 +30,7 @@ mcc_error_t cpp_file_init(struct cpp *cpp, struct cpp_file *file, char *filename
 
 	lexer_init(&file->lexer, cpp->ctx, &file->inbuf);
 	file->filename = mempool_strdup(&cpp->ctx->token_data, filename);
+	toklist_init(&file->tokens);
 
 	return MCC_ERROR_OK;
 }
@@ -44,6 +45,8 @@ void cpp_file_include(struct cpp *cpp, struct cpp_file *file)
 	 * we're done reading the included file). Therefore, we'll enqueue
 	 * the token, then include the file.
 	 */
+	if (cpp->token)
+		toklist_insert_first(&cpp_cur_file(cpp)->tokens, cpp->token);
 	list_insert_first(&cpp->file_stack, &file->list_node);
 }
 
@@ -112,6 +115,7 @@ void cpp_file_free(struct cpp *cpp, struct cpp_file *file)
 	(void) cpp;
 	inbuf_close(&file->inbuf);
 	lexer_free(&file->lexer);
+	toklist_free(&file->tokens);
 }
 
 

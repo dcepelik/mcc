@@ -280,7 +280,7 @@ static void cpp_parse_include(struct cpp *cpp)
 	}
 
 	if (err == MCC_ERROR_OK) {
-		skip2(cpp); /* get rid of those tokens now */
+		skip_find_eol(cpp); /* get rid of those tokens now */
 		cpp_file_include(cpp, file);
 	}
 	else {
