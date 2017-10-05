@@ -37,11 +37,21 @@ mcc_error_t cpp_file_init(struct cpp *cpp, struct cpp_file *file, char *filename
 
 void cpp_file_include(struct cpp *cpp, struct cpp_file *file)
 {
+	/*
+	 * Whenever we process a token, we call `cpp_next_token' to indicate
+	 * that we're done with it. Therefore, we're not done with `cpp->token',
+	 * whatever it is, and thus we'd like to keep it (and read it when
+	 * we're done reading the included file). Therefore, we'll enqueue
+	 * the token, then include the file.
+	 */
 	list_insert_first(&cpp->file_stack, &file->list_node);
 }
 
 
-static mcc_error_t cpp_file_include_searchpath_do(struct cpp *cpp, const char **search_dirs, char *filename, struct cpp_file *file)
+static mcc_error_t cpp_file_include_searchpath_do(struct cpp *cpp,
+	const char **search_dirs,
+	char *filename,
+	struct cpp_file *file)
 {
 	(void) search_dirs; /* TODO Use this */
 

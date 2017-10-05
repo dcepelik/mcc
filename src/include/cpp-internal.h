@@ -39,6 +39,7 @@ void cpp_error(struct cpp *cpp, char *fmt, ...);
 void cpp_warn(struct cpp *cpp, char *fmt, ...);
 
 void cpp_next_token(struct cpp *cpp);
+struct token *cpp_peek(struct cpp *cpp);
 bool cpp_skipping(struct cpp *cpp);
 
 struct cpp_file

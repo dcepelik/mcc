@@ -657,7 +657,7 @@ static struct token *lexer_new_eol(struct lexer *lexer)
 
 	token = objpool_alloc(&lexer->ctx->token_pool);
 	token->type = TOKEN_EOL;
-	token->is_at_bol = lexer->next_at_bol;
+	token->is_at_bol = false;
 	token->noexpand = false;
 	token->after_white = lexer->had_whitespace;
 	token->startloc = lexer->location;

@@ -30,22 +30,32 @@ static inline bool cpp_directive(struct cpp *cpp, enum cpp_directive directive)
 		&& cpp->token->symbol->def->directive == directive;
 }
 
+//static bool cpp_eol_follows(struct cpp *cpp)
+//{
+//	return cpp_peek(cpp)->is_at_bol;
+//}
 
-static inline void cpp_skip_till_eol(struct cpp *cpp)
+/*
+ * Skip all tokens on the current line.
+ *
+ * TODO Free the tokens!
+ */
+static inline void skip_find_eol(struct cpp *cpp)
 {
-	/* TODO Consider freeing those tokens */
-
 	assert(cpp_cur_file(cpp)->lexer.emit_eols == true);
 
-	while (!token_is_eol_or_eof(cpp->token))
-		cpp_next_token(cpp);
+	bool last_was_eol = false;
 
-	if (token_is_eol(cpp->token))
+	while (!token_is_eof(cpp->token) && !cpp->token->is_at_bol) {
+		last_was_eol = token_is_eol(cpp->token);
 		cpp_next_token(cpp);
+	}
+	
+	assert(last_was_eol || token_is_eof(cpp->token));
 }
 
 
-static inline void cpp_skip_find_eol(struct cpp *cpp)
+static inline void skip2(struct cpp *cpp)
 {
 	/* TODO Consider freeing those tokens */
 
@@ -87,9 +97,8 @@ static inline void cpp_match_eol_or_eof(struct cpp *cpp)
 {
 	if (!token_is(cpp->token, TOKEN_EOL) && !token_is_eof(cpp->token)) {
 		cpp_warn(cpp, "extra tokens will be skipped");
-		cpp_skip_till_eol(cpp);
-	}
-	else if (token_is(cpp->token, TOKEN_EOL)) {
+		skip_find_eol(cpp);
+	} else if (token_is(cpp->token, TOKEN_EOL)) {
 		cpp_next_token(cpp);
 	}
 }
@@ -175,7 +184,7 @@ static void cpp_parse_define(struct cpp *cpp)
 	struct symdef *symdef;
 
 	if (!cpp_expect(cpp, TOKEN_NAME)) {
-		cpp_skip_till_eol(cpp);
+		skip_find_eol(cpp);
 		return;
 	}
 
@@ -215,7 +224,7 @@ static void cpp_parse_define(struct cpp *cpp)
 static void cpp_parse_undef(struct cpp *cpp)
 {
 	if (!cpp_expect(cpp, TOKEN_NAME)) {
-		cpp_skip_till_eol(cpp);
+		skip_find_eol(cpp);
 		return;
 	}
 
@@ -232,7 +241,7 @@ static void cpp_parse_error(struct cpp *cpp)
 {
 	/* TODO cat tokens to get error message */
 	cpp_error(cpp, "%s", "#error");
-	cpp_skip_find_eol(cpp);
+	skip2(cpp);
 	//cpp_match_eol_or_eof(cpp);
 }
 
@@ -247,7 +256,7 @@ static void cpp_parse_include(struct cpp *cpp)
 	struct cpp_file *file;
 
 	if (cpp_skipping(cpp)) {
-		cpp_skip_find_eol(cpp);
+		skip_find_eol(cpp);
 		return;
 	}
 
@@ -266,17 +275,17 @@ static void cpp_parse_include(struct cpp *cpp)
 	}
 	else {
 		cpp_error(cpp, "header name was expected, got %s", token_get_name(cpp->token->type));
-		cpp_skip_find_eol(cpp);
+		skip_find_eol(cpp);
 		return;
 	}
 
 	if (err == MCC_ERROR_OK) {
-		cpp_skip_find_eol(cpp); /* get rid of those tokens now */
+		skip2(cpp); /* get rid of those tokens now */
 		cpp_file_include(cpp, file);
 	}
 	else {
 		cpp_error(cpp, "cannot include file %s: %s", filename, error_str(err));
-		cpp_skip_find_eol(cpp); /* skip is delayed: error location */
+		skip2(cpp); /* skip is delayed: error location */
 	}
 
 	cpp_cur_file(cpp)->lexer.inside_include = false;
@@ -291,11 +300,11 @@ void cpp_parse_directive(struct cpp *cpp)
 	bool skipping;
 	bool test_cond;
 
-	if (token_is(cpp->token, TOKEN_EOL))
-		return; /* null directive */
+	if (cpp->token->is_at_bol)
+		return;
 
 	if (!cpp_expect_directive(cpp)) {
-		cpp_skip_till_eol(cpp);
+		skip_find_eol(cpp);
 		return;
 	}
 
