@@ -83,7 +83,7 @@ enum token_type
 	/*
 	 * Markers for internal use.
 	 */
-	TOKEN_EOF, TOKEN_EOL, TOKEN_PLACEMARKER
+	TOKEN_EOF, TOKEN_PLACEMARKER
 };
 
 struct location
@@ -140,8 +140,6 @@ bool token_is_name(struct token *token);
 bool token_is_macro(struct token *token);
 bool token_is_macro_arg(struct token *token);
 bool token_is_eof(struct token *token);
-bool token_is_eol(struct token *token);
-bool token_is_eol_or_eof(struct token *token);
 bool token_is_keyword(struct token *token, enum kwd type);
 bool token_is_any_keyword(struct token *token);
 bool token_is_tqual(struct token *token);

@@ -46,10 +46,9 @@ int main(int argc, char *argv[])
 
 	strbuf_init(&buf, 256);
 	for (i = 1; (token = cpp_next(cpp)); i++) {	
-		if (token->type  == TOKEN_EOL) {
+		if (token->is_at_bol) {
 			strbuf_putc(&buf, '\n');
-			i = 0;
-			continue;
+			i = 1;
 		}
 
 		if (i != 1)

@@ -18,7 +18,6 @@ const char *token_names[] = {
 	[TOKEN_OP_DOT] = ".",
 	[TOKEN_ELLIPSIS] = "...",
 	[TOKEN_EOF] = "<<EOF>>",
-	[TOKEN_EOL] = "<<EOL>>",
 	[TOKEN_OP_ASSIGN] = "=",
 	[TOKEN_OP_EQ] = "==",
 	[TOKEN_OP_GE] = ">=",
@@ -120,18 +119,6 @@ bool token_is_macro_arg(struct token *token)
 bool token_is_eof(struct token *token)
 {
 	return token_is(token, TOKEN_EOF);
-}
-
-
-bool token_is_eol(struct token *token)
-{
-	return token_is(token, TOKEN_EOL);
-}
-
-
-bool token_is_eol_or_eof(struct token *token)
-{
-	return token_is_eol(token) || token_is_eof(token);
 }
 
 

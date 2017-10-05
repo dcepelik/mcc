@@ -356,7 +356,6 @@ static void cpp_parse(struct cpp *cpp)
 {
 	while (!token_is_eof(cpp->token)) {
 		if (cpp_got_hash(cpp)) {
-			cpp_cur_file(cpp)->lexer.emit_eols = true;
 			cpp_next_token(cpp);
 			cpp_parse_directive(cpp);
 

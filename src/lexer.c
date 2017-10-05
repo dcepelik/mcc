@@ -60,7 +60,6 @@ void lexer_init(struct lexer *lexer, struct context *ctx, struct inbuf *inbuf)
 	lexer->c = strbuf_get_string(&lexer->linebuf);
 	lexer->location.line_no = 0;
 	lexer->inside_include = false;
-	lexer->emit_eols = false;
 	lexer->next_at_bol = true;
 	lexer->first_token = true;
 	lexer->had_whitespace = false;
@@ -651,21 +650,6 @@ search_comment_terminator:
 }
 
 
-static struct token *lexer_new_eol(struct lexer *lexer)
-{
-	struct token *token;
-
-	token = objpool_alloc(&lexer->ctx->token_pool);
-	token->type = TOKEN_EOL;
-	token->is_at_bol = false;
-	token->noexpand = false;
-	token->after_white = lexer->had_whitespace;
-	token->startloc = lexer->location;
-
-	return token;
-}
-
-
 /*
  * This is a utility function used by lexer_next.
  */
@@ -699,9 +683,6 @@ next_nonwhite_char:
 
 		if (err != MCC_ERROR_OK)
 			return NULL;
-
-		if (!lexer->first_token && lexer->emit_eols)
-			return lexer_new_eol(lexer);
 	}
 
 	lexer->first_token = false; /* move down? */
