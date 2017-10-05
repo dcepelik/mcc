@@ -9,7 +9,7 @@
  * Most functions in this module have been created to split the parsing
  * logic up, rather than to allow for code reuse.
  *
- * Operator information (opinfos) are declared in operator.c.
+ * Operator information (`opinfo's) are declared in operator.c.
  *
  * [1] https://en.wikipedia.org/wiki/Shunting-yard_algorithm
  */
@@ -24,7 +24,7 @@
 
 /*
  * Expression parsing context. This encapsulates the state of the
- * shunting-yard algorithm as it works it's way through an expression.
+ * shunting-yard algorithm as it works its way through an expression.
  * By expression I mean the whole expression which delimits a parsing
  * context, such as `a + b - 11', not  the individual partial ast_exprs
  * such as `a + b'.
@@ -32,7 +32,7 @@
  * This means that when a sub-expression is parsed within an expression,
  * a new context is created, as in `1 + 17 / (2 + 13 * c) - 2'. This reflects
  * the fact that the sub-expression `2 + 13 * c' itself has to be a valid
- * expression and it's parsing is independent of the parsing of the ``main''
+ * expression and its parsing is independent of the parsing of the ``main''
  * expression.
  */
 struct expr_ctx
