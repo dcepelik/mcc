@@ -5,9 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-
 #define MAX(a, b) ((a) >= (b) ? (a) : (b))
-
 
 static void strbuf_resize(struct strbuf *buf, size_t new_size)
 {
@@ -20,7 +18,6 @@ static void strbuf_resize(struct strbuf *buf, size_t new_size)
 		buf->len = buf->size - 1;
 }
 
-
 void strbuf_init(struct strbuf *buf, size_t init_size)
 {
 	assert(init_size > 0);
@@ -32,20 +29,17 @@ void strbuf_init(struct strbuf *buf, size_t init_size)
 	strbuf_resize(buf, init_size);
 }
 
-
 void strbuf_prepare_write(struct strbuf *buf, size_t count)
 {
 	if (buf->len + count >= buf->size) /* >= because of the '\0' */
 		strbuf_resize(buf, MAX(count, 2 * buf->size));
 }
 
-
 void strbuf_putc(struct strbuf *buf, char c)
 {
 	strbuf_prepare_write(buf, 1);
 	buf->str[buf->len++] = c;
 }
-
 
 void strbuf_putwc(struct strbuf *buf, wchar_t wc)
 {
@@ -58,19 +52,16 @@ void strbuf_putwc(struct strbuf *buf, wchar_t wc)
 		strbuf_putc(buf, bytes[i]);
 }
 
-
 char *strbuf_get_string(struct strbuf *buf)
 {
 	buf->str[buf->len] = '\0'; /* there's room for the NUL */
 	return buf->str;
 }
 
-
 size_t strbuf_strlen(struct strbuf *buf)
 {
 	return buf->len;
 }
-
 
 char *strbuf_strcpy(struct strbuf *buf)
 {
@@ -81,7 +72,6 @@ char *strbuf_strcpy(struct strbuf *buf)
 
 	return copy;
 }
-
 
 char *strbuf_copy_to_mempool(struct strbuf *buf, struct mempool *pool)
 {
@@ -94,18 +84,15 @@ char *strbuf_copy_to_mempool(struct strbuf *buf, struct mempool *pool)
 	return str;
 }
 
-
 void strbuf_reset(struct strbuf *buf)
 {
 	buf->len = 0;
 }
 
-
 void strbuf_free(struct strbuf *buf)
 {
 	free(buf->str);
 }
-
 
 size_t strbuf_vprintf_at(struct strbuf *buf, size_t offset, char *fmt, va_list args)
 {
@@ -132,7 +119,6 @@ size_t strbuf_vprintf_at(struct strbuf *buf, size_t offset, char *fmt, va_list a
 	return num_written;
 }
 
-
 size_t strbuf_printf(struct strbuf *buf, char *fmt, ...)
 {
 	size_t num_written;
@@ -144,7 +130,6 @@ size_t strbuf_printf(struct strbuf *buf, char *fmt, ...)
 
 	return num_written;
 }
-
 
 size_t strbuf_prepend(struct strbuf *buf, char *fmt, ...)
 {

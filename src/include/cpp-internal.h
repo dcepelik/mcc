@@ -81,7 +81,6 @@ enum cpp_directive
 
 void cpp_parse_directive(struct cpp *cpp);
 
-
 struct cpp_if
 {
 	struct list_node list_node;
@@ -91,7 +90,6 @@ struct cpp_if
 };
 
 void cpp_init_ifstack(struct cpp *cpp);
-
 
 /*
  * C preprocessor macro flags.

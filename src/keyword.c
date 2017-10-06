@@ -1,6 +1,5 @@
 #include "keyword.h"
 
-
 /*
  * Definition of C keywords.
  */

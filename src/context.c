@@ -4,7 +4,6 @@
 #define TOKEN_POOL_BLOCK_SIZE	256
 #define TOKEN_DATA_BLOCK_SIZE	1024
 
-
 void context_init(struct context *ctx)
 {
 	mempool_init(&ctx->token_data, TOKEN_DATA_BLOCK_SIZE);
@@ -13,7 +12,6 @@ void context_init(struct context *ctx)
 	errlist_init(&ctx->errlist);
 	objpool_init(&ctx->exprs, sizeof(struct ast_expr), 16);
 }
-
 
 void context_free(struct context *ctx)
 {

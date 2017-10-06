@@ -4,7 +4,6 @@
 #include <inttypes.h>
 #include <string.h>
 
-
 /*
  * TODO Use of this hashing function is not backed up by any analysis of its
  *      performance. Measure and, if necessary, improve the function.
@@ -22,7 +21,6 @@ static inline uint64_t hashtab_hash(char *key)
 	return hash;
 }
 
-
 static void hashtab_insert_internal(struct hashtab *hashtab, struct hashnode *new_node)
 {
 	uint64_t hash = hashtab_hash(new_node->key) % hashtab->size;
@@ -32,7 +30,6 @@ static void hashtab_insert_internal(struct hashtab *hashtab, struct hashnode *ne
 	new_node->next = node->next;
 	node->next = new_node;
 }
-
 
 static void hashtab_resize(struct hashtab *hashtab, size_t new_size)
 {
@@ -60,7 +57,6 @@ static void hashtab_resize(struct hashtab *hashtab, size_t new_size)
 	free(old_table);
 }
 
-
 void hashtab_init(struct hashtab *hashtab, struct objpool *pool, size_t init_size)
 {
 	(void) pool; /* TODO why unused? */
@@ -72,13 +68,11 @@ void hashtab_init(struct hashtab *hashtab, struct objpool *pool, size_t init_siz
 	hashtab_resize(hashtab, init_size);
 }
 
-
 void hashtab_free(struct hashtab *hashtab)
 {
 	mempool_free(&hashtab->keys);
 	free(hashtab->table);
 }
-
 
 void *hashtab_insert(struct hashtab *hashtab, char *key, struct hashnode *node)
 {
@@ -102,7 +96,6 @@ void *hashtab_insert(struct hashtab *hashtab, char *key, struct hashnode *node)
 	return node;
 }
 
-
 bool hashtab_remove(struct hashtab *hashtab, struct hashnode *node)
 {
 	uint64_t hash;
@@ -125,18 +118,15 @@ bool hashtab_remove(struct hashtab *hashtab, struct hashnode *node)
 	return true;
 }
 
-
 size_t hashtab_count(struct hashtab *hashtab)
 {
 	return hashtab->count;
 }
 
-
 bool hashtab_contains(struct hashtab *hashtab, char *key)
 {
 	return hashtab_search(hashtab, key) != NULL;
 }
-
 
 void *hashtab_search(struct hashtab *hashtab, char *key)
 {
@@ -149,7 +139,6 @@ void *hashtab_search(struct hashtab *hashtab, char *key)
 
 	return hashtab_next(hashtab, node);
 }
-
 
 void *hashtab_next(struct hashtab *hashtab, struct hashnode *node)
 {

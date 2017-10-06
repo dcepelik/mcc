@@ -13,7 +13,6 @@
 
 static struct token eof = { .type = TOKEN_EOF };
 
-
 /*
  * Single-char escape sequences: mapping from what follows the \ to the resulting character.
  */
@@ -31,7 +30,6 @@ static const char simple_escape_seq[256] = {
 	['\?'] = '\?',
 };
 
-
 /*
  * See 5.2.1.1 Trigraph sequences
  */
@@ -46,7 +44,6 @@ static const char trigraph[256] = {
 	['>'] = '}',
 	['-'] = '~',
 };
-
 
 void lexer_init(struct lexer *lexer, struct context *ctx, struct inbuf *inbuf)
 {
@@ -67,14 +64,12 @@ void lexer_init(struct lexer *lexer, struct context *ctx, struct inbuf *inbuf)
 	lexer->filename = NULL; /* TODO */
 }
 
-
 void lexer_free(struct lexer *lexer)
 {
 	strbuf_free(&lexer->linebuf);
 	strbuf_free(&lexer->strbuf);
 	strbuf_free(&lexer->spelling);
 }
-
 
 static void lexer_error_internal(struct lexer *lexer, enum error_level level,
 	char *fmt, va_list args, char *context, size_t context_len,
@@ -96,7 +91,6 @@ static void lexer_error_internal(struct lexer *lexer, enum error_level level,
 	strbuf_free(&msg);
 }
 
-
 static void lexer_error(struct lexer *lexer, char *fmt, ...)
 {
 	va_list args;
@@ -111,7 +105,6 @@ static void lexer_error(struct lexer *lexer, char *fmt, ...)
 	va_end(args);
 }
 
-
 static void lexer_error_noctx(struct lexer *lexer, char *fmt, ...)
 {
 	va_list args;
@@ -121,12 +114,10 @@ static void lexer_error_noctx(struct lexer *lexer, char *fmt, ...)
 	va_end(args);
 }
 
-
 static inline void lexer_spelling_start(struct lexer *lexer)
 {
 	lexer->spelling_start = lexer->c;
 }
-
 
 static inline char *lexer_spelling_end(struct lexer *lexer)
 {
@@ -141,36 +132,30 @@ static inline char *lexer_spelling_end(struct lexer *lexer)
 	return strbuf_copy_to_mempool(&lexer->spelling, &lexer->ctx->token_data);
 }
 
-
 inline static bool is_ascii_letter(int c)
 {
 	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
 }
-
 
 inline static bool is_digit(int c)
 {
 	return c >= '0' && c <= '9';
 }
 
-
 inline static bool is_whitespace(int c)
 {
 	return c == '\t' || c == 0x0C || c == ' ';
 }
-
 
 inline static bool is_hex_digit(int c)
 {
 	return is_digit(c) || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f');
 }
 
-
 inline static bool is_octal_digit(int c)
 {
 	return c >= '0' && c <= '7';
 }
-
 
 static bool is_valid_qchar(char c)
 {
@@ -187,12 +172,10 @@ static bool is_valid_qchar(char c)
 	}
 }
 
-
 static bool is_valid_hchar(char c)
 {
 	return is_valid_qchar(c) || c != '\"';
 }
-
 
 static int32_t read_octal_number(struct lexer *lexer)
 {
@@ -216,7 +199,6 @@ static int32_t read_octal_number(struct lexer *lexer)
 	return val;
 }
 
-
 static inline int hex_val(int c)
 {
 	if (c >= '0' && c <= '9')
@@ -230,7 +212,6 @@ static inline int hex_val(int c)
 
 	return -1;
 }
-
 
 static uint32_t read_hex_number(struct lexer *lexer, size_t min_len, size_t max_len)
 {	
@@ -250,10 +231,8 @@ static uint32_t read_hex_number(struct lexer *lexer, size_t min_len, size_t max_
 	if (i < min_len)
 		lexer_error(lexer, "hex digit expected");
 
-
 	return val;
 }
-
 
 static uint32_t read_escape_sequence(struct lexer *lexer)
 {
@@ -287,7 +266,6 @@ static uint32_t read_escape_sequence(struct lexer *lexer)
 	}
 }
 
-
 static uint64_t lexer_read_ucn(struct lexer *lexer)
 {
 	uint32_t number;
@@ -316,7 +294,6 @@ static uint64_t lexer_read_ucn(struct lexer *lexer)
 	return number;
 }
 
-
 static struct token *lexer_lex_name(struct lexer *lexer, struct token *token)
 {
 	strbuf_reset(&lexer->strbuf);
@@ -344,7 +321,6 @@ static struct token *lexer_lex_name(struct lexer *lexer, struct token *token)
 
 	return token;
 }
-
 
 static struct token *lexer_lex_char(struct lexer *lexer, struct token *token)
 {
@@ -387,13 +363,11 @@ static struct token *lexer_lex_char(struct lexer *lexer, struct token *token)
 	return token;
 }
 
-
 static inline bool lexer_is_eol(struct lexer *lexer)
 {
 	return (size_t)(lexer->c - strbuf_get_string(&lexer->linebuf))
 		>= strbuf_strlen(&lexer->linebuf);
 }
-
 
 struct token *lexer_lex_pp_number(struct lexer *lexer, struct token *token)
 {
@@ -436,7 +410,6 @@ struct token *lexer_lex_pp_number(struct lexer *lexer, struct token *token)
 	return token;
 }
 
-
 struct token *lexer_lex_string_literal(struct lexer *lexer, struct token *token)
 {
 	bool seen_delim = false;
@@ -473,7 +446,6 @@ struct token *lexer_lex_string_literal(struct lexer *lexer, struct token *token)
 	return token;
 }
 
-
 struct token *lexer_lex_header_name(struct lexer *lexer, struct token *token, bool (*is_valid_char)(char c), char delim)
 {
 	char c;
@@ -506,7 +478,6 @@ struct token *lexer_lex_header_name(struct lexer *lexer, struct token *token, bo
 	return token;
 }
 
-
 struct token *lexer_lex_header_hname(struct lexer *lexer, struct token *token)
 {
 	token->type = TOKEN_HEADER_HNAME;
@@ -514,14 +485,12 @@ struct token *lexer_lex_header_hname(struct lexer *lexer, struct token *token)
 	return token;
 }
 
-
 struct token *lexer_lex_header_qname(struct lexer *lexer, struct token *token)
 {
 	token->type = TOKEN_HEADER_QNAME;
 	lexer_lex_header_name(lexer, token, is_valid_qchar, '\"');
 	return token;
 }
-
 
 /*
  * TODO Refactor, don't use mcc_error_t to signalize EOF
@@ -611,7 +580,6 @@ eol_or_eof:
 	return MCC_ERROR_OK;
 }
 
-
 static inline void eat_whitespace(struct lexer *lexer)
 {
 	while (is_whitespace(*lexer->c)) {
@@ -620,14 +588,12 @@ static inline void eat_whitespace(struct lexer *lexer)
 	}
 }
 
-
 void eat_cpp_comment(struct lexer *lexer)
 {
 	while (!lexer_is_eol(lexer)) {
 		lexer->c++;
 	}
 }
-
 
 void eat_c_comment(struct lexer *lexer)
 {
@@ -649,7 +615,6 @@ search_comment_terminator:
 	lexer_error_noctx(lexer, "missing */");
 }
 
-
 /*
  * This is a utility function used by lexer_next.
  */
@@ -666,7 +631,6 @@ static inline enum enc_prefix get_enc_prefix(char c)
 
 	return ENC_PREFIX_NONE;
 }
-
 
 struct token *lexer_next(struct lexer *lexer)
 {

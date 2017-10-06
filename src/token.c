@@ -3,7 +3,6 @@
 #include "token.h"
 #include <string.h>
 
-
 const char *token_names[] = {
 	[TOKEN_AMP] = "&",
 	[TOKEN_OP_BITANDEQ] = "&=",
@@ -64,12 +63,10 @@ const char *token_names[] = {
 	[TOKEN_PLACEMARKER] = "{placemarker}",
 };
 
-
 const char *token_get_name(enum token_type token)
 {
 	return token_names[token];
 }
-
 
 char *token_get_spelling(struct token *token)
 {
@@ -89,18 +86,15 @@ char *token_get_spelling(struct token *token)
 	}
 }
 
-
 bool token_is(struct token *token, enum token_type token_type)
 {
 	return token && token->type == token_type;
 }
 
-
 bool token_is_name(struct token *token)
 {
 	return token_is(token, TOKEN_NAME);
 }
-
 
 bool token_is_macro(struct token *token)
 {
@@ -108,19 +102,16 @@ bool token_is_macro(struct token *token)
 		&& token->symbol->def->type == SYMBOL_TYPE_CPP_MACRO;
 }
 
-
 bool token_is_macro_arg(struct token *token)
 {
 	return token_is_name(token)
 		&& token->symbol->def->type == SYMBOL_TYPE_CPP_MACRO_ARG;
 }
 
-
 bool token_is_eof(struct token *token)
 {
 	return token_is(token, TOKEN_EOF);
 }
-
 
 bool token_is_any_keyword(struct token *token)
 {
@@ -128,12 +119,10 @@ bool token_is_any_keyword(struct token *token)
 		&& token->symbol->def->type == SYMBOL_TYPE_C_KEYWORD;
 }
 
-
 bool token_is_keyword(struct token *token, enum kwd kwd)
 {
 	return token_is_any_keyword(token) && token->symbol->def->kwdinfo->kwd == kwd;
 }
-
 
 bool token_is_tqual(struct token *token)
 {
@@ -141,7 +130,6 @@ bool token_is_tqual(struct token *token)
 		&& (token->symbol->def->kwdinfo->class == KWD_CLASS_TQUAL
 		|| token->symbol->def->kwdinfo->class == KWD_CLASS_TFLAG);
 }
-
 
 char *token_to_string(struct token *token)
 {
@@ -156,7 +144,6 @@ char *token_to_string(struct token *token)
 
 	return copy;
 }
-
 
 void token_print(struct token *token, struct strbuf *buf)
 {
@@ -199,7 +186,6 @@ void token_print(struct token *token, struct strbuf *buf)
 	}
 }
 
-
 void token_dump(struct token *token, FILE *fout)
 {
 	struct strbuf buf;
@@ -208,7 +194,6 @@ void token_dump(struct token *token, FILE *fout)
 	fprintf(fout, "%s\n", strbuf_get_string(&buf));
 	strbuf_free(&buf);
 }
-
 
 void location_dump(struct location *loc)
 {

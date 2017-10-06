@@ -2,13 +2,11 @@
 #include "debug.h"
 #include <assert.h>
 
-
 void list_init(struct list *lst)
 {
 	lst->head.next = NULL;
 	lst->last = &lst->head;
 }
-
 
 size_t list_length(struct list *lst)
 {
@@ -21,12 +19,10 @@ size_t list_length(struct list *lst)
 	return len;
 }
 
-
 bool list_is_empty(struct list *lst)
 {
 	return lst->last == &lst->head;
 }
-
 
 void list_insert_after(struct list *lst, struct list_node *after, struct list_node *node)
 {
@@ -36,7 +32,6 @@ void list_insert_after(struct list *lst, struct list_node *after, struct list_no
 	if (after == lst->last)
 		lst->last = node;
 }
-
 
 void list_insert_list_after(struct list *lst, struct list_node *after, struct list *lst_to_insert)
 {
@@ -49,7 +44,6 @@ void list_insert_list_after(struct list *lst, struct list_node *after, struct li
 	}
 }
 
-
 void *list_insert_last(struct list *lst, struct list_node *node)
 {
 	node->next = NULL;
@@ -58,7 +52,6 @@ void *list_insert_last(struct list *lst, struct list_node *node)
 
 	return node;
 }
-
 
 void *list_insert_first(struct list *lst, struct list_node *node)
 {
@@ -70,7 +63,6 @@ void *list_insert_first(struct list *lst, struct list_node *node)
 
 	return node;
 }
-
 
 void *list_remove_first(struct list *lst)
 {
@@ -86,7 +78,6 @@ void *list_remove_first(struct list *lst)
 	return first;
 }
 
-
 void *list_remove_last(struct list *lst)
 {
 	struct list_node *last = lst->last;
@@ -100,7 +91,6 @@ void *list_remove_last(struct list *lst)
 	return last;
 }
 
-
 void *list_find_predecessor(struct list *lst, struct list_node *node)
 {
 	struct list_node *cur;
@@ -112,7 +102,6 @@ void *list_find_predecessor(struct list *lst, struct list_node *node)
 
 	return cur;
 }
-
 
 void *list_remove(struct list *lst, struct list_node *node)
 {
@@ -126,7 +115,6 @@ void *list_remove(struct list *lst, struct list_node *node)
 
 	return node;
 }
-
 
 struct list list_remove_range(struct list *lst, struct list_node *start, struct list_node *end)
 {
@@ -146,36 +134,30 @@ struct list list_remove_range(struct list *lst, struct list_node *start, struct 
 	return rem_list;
 }
 
-
 void *list_first(struct list *lst)
 {
 	return lst->head.next;
 }
-
 
 struct list_node *list_head(struct list *lst)
 {
 	return &lst->head;
 }
 
-
 void *list_last(struct list *lst)
 {
 	return lst->last;
 }
-
 
 void *list_next(struct list_node *node)
 {
 	return node->next;
 }
 
-
 void list_free(struct list *lst)
 {
 	(void) lst;
 }
-
 
 void list_prepend(struct list *lst, struct list *lst_to_prepend)
 {
@@ -198,7 +180,6 @@ void list_prepend(struct list *lst, struct list *lst_to_prepend)
 	}
 }
 
-
 void list_append(struct list *lst, struct list *lst_to_append)
 {
 	if (!list_is_empty(lst_to_append)) {
@@ -206,7 +187,6 @@ void list_append(struct list *lst, struct list *lst_to_append)
 		lst->last = list_last(lst_to_append);
 	}
 }
-
 
 void list_insert_list_before(struct list *lst, struct list *to_insert, struct list_node *node)
 {

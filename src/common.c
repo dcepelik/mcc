@@ -1,7 +1,6 @@
 #include "common.h"
 #include <stdio.h>
 
-
 void *mcc_realloc(void *ptr, size_t new_size)
 {
 	void *x = realloc(ptr, new_size);

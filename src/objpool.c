@@ -4,7 +4,6 @@
 #include "objpool.h"
 #include <assert.h>
 
-
 void objpool_init(struct objpool *objpool, size_t obj_size, size_t objs_per_block)
 {
 	size_t min_size;
@@ -25,7 +24,6 @@ void objpool_init(struct objpool *objpool, size_t obj_size, size_t objs_per_bloc
 	while (min_size > objpool->block_size)
 		objpool->block_size *= 2;
 }
-
 
 static void alloc_new_block(struct objpool *pool)
 {
@@ -54,7 +52,6 @@ static void alloc_new_block(struct objpool *pool)
 	pool->num_blocks++;
 }
 
-
 void *objpool_alloc(struct objpool *pool)
 {
 	DEBUG_MSG("Allocating new object from pool");
@@ -74,7 +71,6 @@ void *objpool_alloc(struct objpool *pool)
 	return mem;
 }
 
-
 void objpool_dealloc(struct objpool *pool, void *mem)
 {
 	struct objpool_unused *unused = mem;
@@ -85,7 +81,6 @@ void objpool_dealloc(struct objpool *pool, void *mem)
 	assert(pool->num_objs > 0);
 	pool->num_objs--;
 }
-
 
 void objpool_free(struct objpool *pool)
 {
@@ -98,7 +93,6 @@ void objpool_free(struct objpool *pool)
 		free(block);
 	}
 }
-
 
 void objpool_print_stats(struct objpool *pool)
 {

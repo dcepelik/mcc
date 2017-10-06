@@ -6,7 +6,6 @@
 #include "strbuf.h"
 #include "toklist.h"
 
-
 void macro_init(struct macro *macro)
 {
 	macro->name = NULL;
@@ -16,19 +15,16 @@ void macro_init(struct macro *macro)
 	macro->flags = 0;
 }
 
-
 void macro_free(struct macro *macro)
 {
 	toklist_free(&macro->args);
 	toklist_free(&macro->expansion);
 }
 
-
 bool macro_is_funclike(struct macro *macro)
 {
 	return macro->flags & MACRO_FLAGS_FUNCLIKE;
 }
-
 
 static inline bool token_is_expandable_macro(struct token *token)
 {
@@ -46,7 +42,6 @@ static inline bool token_is_expandable_macro(struct token *token)
 
 	return true;
 }
-
 
 static void macro_print(struct macro *macro, struct strbuf *buf)
 {
@@ -69,7 +64,6 @@ static void macro_print(struct macro *macro, struct strbuf *buf)
 		strbuf_putc(buf, ' ');
 	}
 }
-
 
 /*
  * See 6.10.3.2 The # operator, par. 2.
@@ -123,10 +117,8 @@ static struct token *cpp_stringify(struct cpp *cpp, struct token *token)
 	return result;
 }
 
-
 static struct token *macro_expand_internal(struct cpp *cpp, struct toklist *in, struct toklist *out);
 static void macro_expand_rescan(struct cpp *cpp, struct toklist *in, struct toklist *out);
-
 
 /*
  * Identify and recursively expand arguments of macro invocation.
@@ -198,7 +190,6 @@ static struct token *macro_parse_args(struct cpp *cpp, struct macro *macro, stru
 	return token;
 }
 
-
 static void macro_expand_rescan(struct cpp *cpp, struct toklist *in, struct toklist *out)
 {
 	struct token *token;
@@ -224,7 +215,6 @@ static void macro_expand_rescan(struct cpp *cpp, struct toklist *in, struct tokl
 	}
 }
 
-
 static struct token *new_placemarker(struct cpp *cpp)
 {
 	struct token *token;
@@ -234,7 +224,6 @@ static struct token *new_placemarker(struct cpp *cpp)
 
 	return token;
 }
-
 
 static struct toklist macro_paste_do(struct cpp *cpp, struct token *a, struct token *b)
 {
@@ -286,7 +275,6 @@ static struct toklist macro_paste_do(struct cpp *cpp, struct token *a, struct to
 	return tokens;
 }
 
-
 /*
  * If arg is a macro parameter, insert arg's replacement tokens into lst.
  * If the resulting list is empty, insert a placemarker.
@@ -305,7 +293,6 @@ void macro_paste_arg_prepare(struct cpp *cpp, struct token *arg, struct toklist 
 		toklist_insert_last(lst, arg);
 	}
 }
-
 
 static struct toklist macro_paste(struct cpp *cpp, struct token *a, struct token *b)
 {
@@ -333,7 +320,6 @@ static struct toklist macro_paste(struct cpp *cpp, struct token *a, struct token
 
 	return result;
 }
-
 
 static void macro_replace_args(struct cpp *cpp, struct toklist *in, struct toklist *out)
 {
@@ -382,7 +368,6 @@ static void macro_replace_args(struct cpp *cpp, struct toklist *in, struct tokli
 		}
 	}
 }
-
 
 static struct token *macro_expand_internal(struct cpp *cpp, struct toklist *in, struct toklist *out)
 {
@@ -440,7 +425,6 @@ static struct token *macro_expand_internal(struct cpp *cpp, struct toklist *in, 
 
 	return end;
 }
-
 
 void macro_expand(struct cpp *cpp, struct toklist *in, struct toklist *out)
 {

@@ -6,7 +6,6 @@
 #define STRING_POOL_BLOCK_SIZE	512
 #define ERROR_POOL_BLOCK_SIZE	16
 
-
 void errlist_init(struct errlist *errlist)
 {
 	size_t i;
@@ -19,14 +18,12 @@ void errlist_init(struct errlist *errlist)
 		errlist->num_errors_by_level[i] = 0;
 }
 
-
 void errlist_free(struct errlist *errlist)
 {
 	list_free(&errlist->errors);
 	mempool_free(&errlist->string_pool);
 	objpool_free(&errlist->error_pool);
 }
-
 
 void errlist_insert(struct errlist *errlist, enum error_level level,
 	char *filename, char *message, char *context, size_t context_len,
@@ -44,7 +41,6 @@ void errlist_insert(struct errlist *errlist, enum error_level level,
 
 	list_insert_last(&errlist->errors, &error->list_node);
 }
-
 
 const char *error_level_to_string(enum error_level level)
 {
@@ -64,7 +60,6 @@ const char *error_level_to_string(enum error_level level)
 
 	return NULL;
 }
-
 
 static void error_dump(struct error *error, FILE *fout)
 {
@@ -88,7 +83,6 @@ static void error_dump(struct error *error, FILE *fout)
 		fputc('\n', fout);
 	}
 }
-
 
 void errlist_dump(struct errlist *errlist, FILE *fout)
 {

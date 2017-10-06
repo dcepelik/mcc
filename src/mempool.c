@@ -4,7 +4,6 @@
 #include <assert.h>
 #include <string.h>
 
-
 static void mempool_init_chain(struct mempool_chain *chain)
 {
 	chain->last = NULL;
@@ -12,7 +11,6 @@ static void mempool_init_chain(struct mempool_chain *chain)
 	chain->num_blocks = 0;
 	chain->total_size = 0;
 }
-
 
 static void mempool_free_chain(struct mempool_chain *chain)
 {
@@ -31,7 +29,6 @@ static void mempool_free_chain(struct mempool_chain *chain)
 		free(mem);
 	}
 }
-
 
 struct mempool_block *mempool_new_block(struct mempool_chain *chain, size_t size)
 {
@@ -66,7 +63,6 @@ struct mempool_block *mempool_new_block(struct mempool_chain *chain, size_t size
 	return new_block;
 }
 
-
 static inline void *mempool_alloc_chain(struct mempool_chain *chain, size_t size)
 {
 	size_t free_size;
@@ -80,7 +76,6 @@ static inline void *mempool_alloc_chain(struct mempool_chain *chain, size_t size
 	return (unsigned char *)chain->last - free_size;
 }
 
-
 void mempool_init(struct mempool *pool, size_t block_size)
 {
 	pool->block_size = block_size;
@@ -89,7 +84,6 @@ void mempool_init(struct mempool *pool, size_t block_size)
 	mempool_init_chain(&pool->small);
 	mempool_init_chain(&pool->big);
 }
-
 
 void *mempool_alloc(struct mempool *pool, size_t size)
 {
@@ -110,19 +104,16 @@ void *mempool_alloc(struct mempool *pool, size_t size)
 	}
 }
 
-
 void mempool_free(struct mempool *pool)
 {
 	mempool_free_chain(&pool->small);
 	mempool_free_chain(&pool->big);
 }
 
-
 static void mempool_print_chain_stats(struct mempool_chain *chain)
 {
 	printf("%lu blocks, %lu B total\n", chain->num_blocks, chain->total_size);
 }
-
 
 void mempool_print_stats(struct mempool *pool)
 {
@@ -132,7 +123,6 @@ void mempool_print_stats(struct mempool *pool)
 	printf("\tSmall objects chain: ");
 	mempool_print_chain_stats(&pool->small);
 }
-
 
 char *mempool_memcpy(struct mempool *pool, char *src, size_t len)
 {
@@ -148,7 +138,6 @@ char *mempool_memcpy(struct mempool *pool, char *src, size_t len)
 	memcpy(dst, src, len);
 	return dst;
 }
-
 
 char *mempool_strdup(struct mempool *pool, char *orig)
 {

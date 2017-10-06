@@ -2,96 +2,80 @@
 #include "inbuf.h"
 #include "context.h"
 
-
 void toklist_init(struct toklist *lst)
 {
 	list_init(&lst->tokens);
 }
-
 
 void toklist_free(struct toklist *lst)
 {
 	list_free(&lst->tokens);
 }
 
-
 struct token *toklist_first(struct toklist *lst)
 {
 	return list_first(&lst->tokens);
 }
-
 
 struct token *toklist_last(struct toklist *lst)
 {
 	return list_last(&lst->tokens);
 }
 
-
 struct token *toklist_next(struct token *token)
 {
 	return list_next(&token->list_node);
 }
-
 
 bool toklist_is_empty(struct toklist *lst)
 {
 	return list_is_empty(&lst->tokens);
 }
 
-
 size_t toklist_length(struct toklist *lst)
 {
 	return list_length(&lst->tokens);
 }
-
 
 struct token *toklist_insert_first(struct toklist *lst, struct token *token)
 {
 	return list_insert_first(&lst->tokens, &token->list_node);
 }
 
-
 struct token *toklist_insert_last(struct toklist *lst, struct token *token)
 {
 	return list_insert_last(&lst->tokens, &token->list_node);
 }
-
 
 void toklist_prepend(struct toklist *lst, struct toklist *lst_to_prepend)
 {
 	list_prepend(&lst->tokens, &lst_to_prepend->tokens);
 }
 
-
 void toklist_append(struct toklist *lst, struct toklist *lst_to_append)
 {
 	list_append(&lst->tokens, &lst_to_append->tokens);
 }
-
 
 struct token *toklist_remove_first(struct toklist *lst)
 {
 	return list_remove_first(&lst->tokens);
 }
 
-
 struct token *toklist_remove_last(struct toklist *lst)
 {
 	return list_remove_last(&lst->tokens);
 }
-
 
 struct token *toklist_remove(struct toklist *lst, struct token *token)
 {
 	return list_remove(&lst->tokens, &token->list_node);
 }
 
-
 void toklist_remove_range(struct toklist *lst, struct token *a, struct token *b)
 {
 	list_remove_range(&lst->tokens, &a->list_node, &b->list_node);
 }
-
 
 void toklist_copy(struct context *ctx, struct toklist *src, struct toklist *dst)
 {
@@ -105,7 +89,6 @@ void toklist_copy(struct context *ctx, struct toklist *src, struct toklist *dst)
 
 	/* TODO handle errors */
 }
-
 
 void toklist_print(struct toklist *tokens, struct strbuf *buf)
 {
@@ -124,7 +107,6 @@ void toklist_print(struct toklist *tokens, struct strbuf *buf)
 	}
 }
 
-
 void toklist_dump(struct toklist *tokens, FILE *fout)
 {
 	struct strbuf buf;
@@ -133,7 +115,6 @@ void toklist_dump(struct toklist *tokens, FILE *fout)
 	fprintf(fout, "%s\n", strbuf_get_string(&buf));
 	strbuf_free(&buf);
 }
-
 
 void toklist_load_from_strbuf(struct toklist *lst, struct context *ctx, struct strbuf *str)
 {
@@ -154,7 +135,6 @@ void toklist_load_from_strbuf(struct toklist *lst, struct context *ctx, struct s
 	lexer_free(&lexer);
 	inbuf_close(&inbuf);
 }
-
 
 void toklist_load_from_string(struct toklist *lst, struct context *ctx, char *fmt, ...)
 {

@@ -3,7 +3,6 @@
 
 #define VA_ARGS_NAME	"__VA_ARGS__"
 
-
 /*
  * Artificial item to be kept at the bottom of the if stack to avoid special
  * cases in the code. Its presence is equivalent to the whole file being
@@ -15,13 +14,11 @@ static struct cpp_if ifstack_bottom = {
 	.skip_next_branch = true /* no other branches */
 };
 
-
 void cpp_init_ifstack(struct cpp *cpp)
 {
 	list_init(&cpp->ifs);
 	list_insert_first(&cpp->ifs, &ifstack_bottom.list_node);
 }
-
 
 static inline bool cpp_directive(struct cpp *cpp, enum cpp_directive directive)
 {
@@ -49,7 +46,6 @@ static void assume_bol_or_skip_and_warn(struct cpp *cpp)
 	}
 }
 
-
 static bool cpp_expect(struct cpp *cpp, enum token_type token)
 {
 	if (cpp->token->type == token)
@@ -60,7 +56,6 @@ static bool cpp_expect(struct cpp *cpp, enum token_type token)
 
 	return false;
 }
-
 
 static bool cpp_expect_directive(struct cpp *cpp)
 {
@@ -76,7 +71,6 @@ static bool cpp_expect_directive(struct cpp *cpp)
 	return true;
 }
 
-
 static struct cpp_if *cpp_ifstack_push(struct cpp *cpp, struct token *token)
 {
 	/* TODO Use a different pool for struct cpp_if? */
@@ -90,24 +84,20 @@ static struct cpp_if *cpp_ifstack_push(struct cpp *cpp, struct token *token)
 	return cpp_if;
 }
 
-
 static struct cpp_if *cpp_ifstack_pop(struct cpp *cpp)
 {
 	return list_remove_first(&cpp->ifs);
 }
-
 
 static struct cpp_if *cpp_ifstack_top(struct cpp *cpp)
 {
 	return list_first(&cpp->ifs);
 }
 
-
 bool cpp_skipping(struct cpp *cpp)
 {
 	return cpp_ifstack_top(cpp)->skip_this_branch;
 }
-
 
 static void cpp_parse_macro_arglist(struct cpp *cpp, struct macro *macro)
 {
@@ -151,7 +141,6 @@ static void cpp_parse_macro_arglist(struct cpp *cpp, struct macro *macro)
 		cpp_error(cpp, "macro arglist misses a )");
 }
 
-
 static void cpp_parse_define(struct cpp *cpp)
 {
 	struct symdef *symdef;
@@ -193,7 +182,6 @@ static void cpp_parse_define(struct cpp *cpp)
 	//symtab_dump(&cpp->ctx->symtab, stderr);
 }
 
-
 static void cpp_parse_undef(struct cpp *cpp)
 {
 	if (!cpp_expect(cpp, TOKEN_NAME)) {
@@ -209,7 +197,6 @@ static void cpp_parse_undef(struct cpp *cpp)
 	cpp_next_token(cpp);
 }
 
-
 static void cpp_parse_error(struct cpp *cpp)
 {
 	/* TODO cat tokens to get error message */
@@ -217,7 +204,6 @@ static void cpp_parse_error(struct cpp *cpp)
 	skip_rest_of_line(cpp);
 	//assume_bol_or_skip_and_warn(cpp);
 }
-
 
 /*
  * TODO warn if tokens skipped
@@ -264,7 +250,6 @@ static void cpp_parse_include(struct cpp *cpp)
 	cpp_cur_file(cpp)->lexer.inside_include = false;
 }
 
-
 void cpp_parse_directive(struct cpp *cpp)
 {
 	struct cpp_if *cpp_if;
@@ -272,6 +257,11 @@ void cpp_parse_directive(struct cpp *cpp)
 	enum cpp_directive dir;
 	bool skipping;
 	bool test_cond;
+
+	assert(token_is(cpp->token, TOKEN_HASH));
+	assert(cpp->token->is_at_bol);
+
+	cpp_next_token(cpp);
 
 	if (cpp->token->is_at_bol)
 		return;

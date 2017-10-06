@@ -1,7 +1,6 @@
 #include "debug.h"
 #include <string.h>
 
-
 bool shall_debug_file(const char *filename)
 {
 	if (strcmp(filename, "cpp.c") == 0)

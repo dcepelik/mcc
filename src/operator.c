@@ -2,7 +2,6 @@
 #include "token.h"
 #include <assert.h>
 
-
 const struct opinfo opinfo[NOPERS] = {
 	[OPER_ADDEQ]	= { OPER_ADDEQ,		2,	2,	OPASSOC_RIGHT },
 	[OPER_ADDROF]	= { OPER_ADDROF,	1,	13,	OPASSOC_RIGHT },
@@ -51,7 +50,6 @@ const struct opinfo opinfo[NOPERS] = {
 	[OPER_FCALL]	= { OPER_FCALL,		0,	14,	OPASSOC_LEFT },
 	[OPER_CAST]	= { OPER_CAST,		2,	13,	OPASSOC_RIGHT },
 };
-
 
 const char *oper_to_string(enum oper oper)
 {

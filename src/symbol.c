@@ -8,18 +8,15 @@
 #include <stddef.h>
 #include <string.h>
 
-
 struct symbol *symtab_search(struct symtab *symtab, char *name)
 {
 	return hashtab_search(&symtab->table, name);
 }
 
-
 bool symtab_contains(struct symtab *symtab, char *name)
 {
 	return hashtab_contains(&symtab->table, name);
 }
-
 
 /*
  * Artificial symbol definition. It's the definition that every symbol->def
@@ -31,12 +28,10 @@ static struct symdef symbol_undef = {
 	.type = SYMBOL_TYPE_UNDEF
 };
 
-
 static inline void scope_init(struct scope *scope)
 {
 	list_init(&scope->defs);
 }
-
 
 static inline struct scope *scope_new(struct symtab *table)
 {
@@ -49,19 +44,16 @@ static inline struct scope *scope_new(struct symtab *table)
 	return scope;
 }
 
-
 static inline void scope_free(struct scope *scope)
 {
 	list_free(&scope->defs);
 }
-
 
 static inline void scope_delete(struct symtab *table, struct scope *scope)
 {
 	scope_free(scope);
 	objpool_dealloc(&table->scope_pool, scope);
 }
-
 
 void symtab_init(struct symtab *table)
 {
@@ -76,7 +68,6 @@ void symtab_init(struct symtab *table)
 	hashtab_init(&table->table, &table->symbol_pool, 256);
 }
 
-
 void symtab_free(struct symtab *table)
 {
 	objpool_free(&table->symbol_pool);
@@ -86,7 +77,6 @@ void symtab_free(struct symtab *table)
 	scope_free(&table->file_scope);
 	hashtab_free(&table->table);
 }
-
 
 static inline struct symbol *symbol_new(struct symtab *table)
 {
@@ -99,13 +89,11 @@ static inline struct symbol *symbol_new(struct symtab *table)
 	return symbol;
 }
 
-
 static void symbol_delete(struct symtab *table, struct symbol *symbol)
 {
 	list_free(&symbol->def_stack);
 	objpool_dealloc(&table->symbol_pool, symbol);
 }
-
 
 struct symdef *symbol_define(struct symtab *table, struct symbol *symbol)
 {
@@ -125,14 +113,12 @@ struct symdef *symbol_define(struct symtab *table, struct symbol *symbol)
 	return symbol->def;
 }
 
-
 char *symbol_get_name(struct symbol *symbol)
 {
 	assert(symbol);
 
 	return symbol->hashnode.key;
 }
-
 
 const char *symbol_type_to_string(enum symbol_type type)
 {
@@ -157,7 +143,6 @@ const char *symbol_type_to_string(enum symbol_type type)
 	return NULL;
 }
 
-
 struct symbol *symtab_insert(struct symtab *table, char *name)
 {
 	struct symbol *symbol;
@@ -167,7 +152,6 @@ struct symbol *symtab_insert(struct symtab *table, char *name)
 
 	return symbol;
 }
-
 
 struct symbol *symtab_search_or_insert(struct symtab *table, char *name)
 {
@@ -180,13 +164,11 @@ struct symbol *symtab_search_or_insert(struct symtab *table, char *name)
 	return symbol;
 }
 
-
 void symtab_scope_begin(struct symtab *table)
 {
 	struct scope *scope = scope_new(table);
 	list_insert_first(&table->scope_stack, &scope->scope_stack_node);
 }
-
 
 void symtab_scope_end(struct symtab *table)
 {
@@ -215,7 +197,6 @@ void symtab_scope_end(struct symtab *table)
 
 	scope_delete(table, scope);
 }
-
 
 void symtab_dump(struct symtab *table, FILE *fout)
 {

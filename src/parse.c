@@ -3,7 +3,6 @@
 #include "parse.h"
 #include <stdarg.h>
 
-
 void parser_setup_symtab(struct symtab *table)
 {
 	struct symbol *symbol;
@@ -19,7 +18,6 @@ void parser_setup_symtab(struct symtab *table)
 	}
 }
 
-
 void parser_init(struct parser *parser)
 {
 	context_init(&parser->ctx);
@@ -27,26 +25,22 @@ void parser_init(struct parser *parser)
 	parser->cpp = cpp_new(&parser->ctx);
 }
 
-
 void parser_free(struct parser *parser)
 {
 	context_free(&parser->ctx);
 	cpp_delete(parser->cpp);
 }
 
-
 void parser_next(struct parser *parser)
 {
 	parser->token = cpp_next(parser->cpp);
 }
-
 
 void parser_skip(struct parser *parser)
 {
 	/* TODO free */
 	(void) parser_next(parser);
 }
-
 
 void parser_next_push(struct parser *parser, struct toklist *toklist)
 {
@@ -59,12 +53,10 @@ bool parser_is_eof(struct parser *parser)
 	return token_is(parser->token, TOKEN_EOF);
 }
 
-
 void parser_skip_rest(struct parser *parser)
 {
 	(void) parser;
 }
-
 
 void parse_error(struct parser *parser, char *msg, ...)
 {
@@ -78,7 +70,6 @@ void parse_error(struct parser *parser, char *msg, ...)
 	va_end(args);
 }
 
-
 bool parser_require(struct parser *parser, enum token_type token)
 {
 	if (!parser_expect(parser, token)) {
@@ -87,7 +78,6 @@ bool parser_require(struct parser *parser, enum token_type token)
 	}
 	return true;
 }
-
 
 bool parser_expect(struct parser *parser, enum token_type type)
 {
@@ -98,7 +88,6 @@ bool parser_expect(struct parser *parser, enum token_type type)
 
 	return false;
 }
-
 
 void parser_build_ast(struct parser *parser, struct ast *tree, char *cfile)
 {

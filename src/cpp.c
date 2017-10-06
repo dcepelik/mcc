@@ -14,7 +14,6 @@
 #define MACRO_POOL_BLOCK_SIZE	32
 #define TOKEN_DATA_BLOCK_SIZE	1024
 
-
 static const struct {
 	char *name;
 	enum cpp_directive directive;
@@ -34,7 +33,6 @@ directives[] = {
 	{ .name = "pragma", .directive = CPP_DIRECTIVE_PRAGMA },
 };
 
-
 /*
  * Setup CPP directives. See 6.10 Preprocessing directives.
  */
@@ -53,7 +51,6 @@ static void cpp_setup_symtab_directives(struct symtab *table)
 	}
 }
 
-
 static void cpp_setup_builtin_handled(struct cpp *cpp, char *name, macro_handler_t *handler)
 {
 	struct symbol *symbol;
@@ -68,7 +65,6 @@ static void cpp_setup_builtin_handled(struct cpp *cpp, char *name, macro_handler
 	def->macro.flags = MACRO_FLAGS_BUILTIN | MACRO_FLAGS_HANDLED;
 	def->macro.handler = handler;
 }
-
 
 /*
  * Setup CPP built-in macro.
@@ -97,7 +93,6 @@ static void cpp_setup_builtin(struct cpp *cpp, char *name, char *fmt, ...)
 	strbuf_free(&str);
 }
 
-
 /* TODO */
 static void cpp_builtin_file(struct cpp *cpp, struct macro *macro, struct toklist *out)
 {
@@ -111,7 +106,6 @@ static void cpp_builtin_line(struct cpp *cpp, struct macro *macro, struct toklis
 	(void) macro;
 	toklist_load_from_string(out, cpp->ctx, "%lu", 128);
 }
-
 
 /*
  * Setup CPP built-ins. See 6.10.8 Predefined macros.
@@ -139,13 +133,11 @@ static void cpp_setup_symtab_builtins(struct cpp *cpp)
 	cpp_setup_builtin_handled(cpp, "__LINE__", cpp_builtin_line);
 }
 
-
 static void cpp_setup_symtab(struct cpp *cpp)
 {
 	cpp_setup_symtab_directives(&cpp->ctx->symtab);
 	cpp_setup_symtab_builtins(cpp);
 }
-
 
 void cpp_next_token(struct cpp *cpp)
 {
@@ -156,7 +148,6 @@ void cpp_next_token(struct cpp *cpp)
 
 	assert(cpp->token != NULL); /* invariant: EOF guards the list */
 }
-
 
 struct cpp *cpp_new(struct context *ctx)
 {
@@ -179,7 +170,6 @@ struct cpp *cpp_new(struct context *ctx)
 	return cpp;
 }
 
-
 void cpp_delete(struct cpp *cpp)
 {
 	objpool_free(&cpp->macro_pool);
@@ -188,7 +178,6 @@ void cpp_delete(struct cpp *cpp)
 
 	free(cpp);
 }
-
 
 static void cpp_error_internal(struct cpp *cpp, enum error_level level,
 	char *fmt, va_list args)
@@ -211,7 +200,6 @@ static void cpp_error_internal(struct cpp *cpp, enum error_level level,
 	strbuf_free(&msg);
 }
 
-
 //static void cpp_notice(struct cpp *cpp, char *fmt, ...)
 //{
 //	va_list args;
@@ -219,7 +207,6 @@ static void cpp_error_internal(struct cpp *cpp, enum error_level level,
 //	cpp_error_internal(cpp, ERROR_LEVEL_NOTICE, fmt, args);
 //	va_end(args);
 //}
-
 
 void cpp_warn(struct cpp *cpp, char *fmt, ...)
 {
@@ -229,7 +216,6 @@ void cpp_warn(struct cpp *cpp, char *fmt, ...)
 	va_end(args);
 }
 
-
 void cpp_error(struct cpp *cpp, char *fmt, ...)
 {
 	va_list args;
@@ -238,12 +224,10 @@ void cpp_error(struct cpp *cpp, char *fmt, ...)
 	va_end(args);
 }
 
-
 static void cpp_requeue_current(struct cpp *cpp)
 {
 	toklist_insert_first(&cpp_cur_file(cpp)->tokens, cpp->token);
 }
-
 
 struct token *cpp_peek(struct cpp *cpp)
 {
@@ -258,7 +242,6 @@ struct token *cpp_peek(struct cpp *cpp)
 
 	return peek;
 }
-
 
 static void cpp_parse_macro_invocation(struct cpp *cpp)
 {
@@ -308,16 +291,8 @@ static void cpp_parse_macro_invocation(struct cpp *cpp)
 	cpp_next_token(cpp);
 }
 
-
-static inline bool cpp_got_hash(struct cpp *cpp)
-{
-	return token_is(cpp->token, TOKEN_HASH) && cpp->token->is_at_bol;
-}
-
-
 static void cpp_parse(struct cpp *cpp);
 struct token *cpp_next(struct cpp *cpp);
-
 
 static struct token *cpp_cat_literals(struct cpp *cpp, struct toklist *literals)
 {
@@ -351,46 +326,31 @@ static struct token *cpp_cat_literals(struct cpp *cpp, struct toklist *literals)
 	return strtoken;
 }
 
-
 static void cpp_parse(struct cpp *cpp)
 {
-	while (!token_is_eof(cpp->token)) {
-		if (cpp_got_hash(cpp)) {
-			cpp_next_token(cpp);
-			cpp_parse_directive(cpp);
+	struct macro *macro;
 
+	while (!token_is_eof(cpp->token)) {
+		if (token_is(cpp->token, TOKEN_HASH) && cpp->token->is_at_bol) {
+			cpp_parse_directive(cpp);
 		}
 		else if (token_is_macro(cpp->token) && !cpp->token->noexpand) {
-			/* TODO no cpp_next_token(cpp) here */
-			if (macro_is_funclike(&cpp->token->symbol->def->macro)) {
-				struct token *macro_name = cpp->token;
-				cpp_next_token(cpp);
-
-				if (token_is(cpp->token, TOKEN_LPAREN)) {
-					toklist_insert_first(&cpp_cur_file(cpp)->tokens, cpp->token);
-					cpp->token = macro_name;
-					cpp_parse_macro_invocation(cpp);
-				}
-				else {
-					macro_name->noexpand = true;
-					cpp->token = macro_name;
-					toklist_insert_first(&cpp_cur_file(cpp)->tokens, cpp->token);
-				}
-
-			}
-			else {
+			macro = &cpp->token->symbol->def->macro;
+			if (!macro_is_funclike(macro)
+				|| token_is(cpp_peek(cpp), TOKEN_LPAREN)) {
 				cpp_parse_macro_invocation(cpp);
+			} else {
+				cpp->token->noexpand = true;
 			}
 		}
-		else {
-			if (!cpp_skipping(cpp))
-				break;
-
+		else if (cpp_skipping(cpp)) {
 			cpp_next_token(cpp);
+		}
+		else {
+			break;
 		}
 	}
 }
-
 
 struct token *cpp_next(struct cpp *cpp)
 {

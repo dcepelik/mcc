@@ -1,7 +1,6 @@
 #include "print.h"
 #include <ctype.h>
 
-
 void print_char(char c, struct strbuf *buf)
 {
 	switch (c)
@@ -54,7 +53,6 @@ void print_char(char c, struct strbuf *buf)
 	}
 }
 
-
 void print_char_stringify(char c, struct strbuf *buf)
 {
 	switch (c) {
@@ -71,7 +69,6 @@ void print_char_stringify(char c, struct strbuf *buf)
 	}
 }
 
-
 void print_string(utf8_t *str, struct strbuf *buf)
 {
 	char c;
@@ -80,7 +77,6 @@ void print_string(utf8_t *str, struct strbuf *buf)
 	while ((c = str[i++]))
 		print_char(c, buf);
 }
-
 
 void print_string_stringify(char *str, struct strbuf *buf)
 {

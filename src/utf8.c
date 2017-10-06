@@ -1,7 +1,6 @@
 #include "utf8.h"
 #include <assert.h>
 
-
 void utf8_from_wchar(wchar_t wc, utf8_t *bytes)
 {
 	assert(wc <= 0x007F);

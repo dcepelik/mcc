@@ -14,12 +14,10 @@ static const char *include_dirs[] = {
 	NULL,
 };
 
-
 struct cpp_file *cpp_cur_file(struct cpp *cpp)
 {
 	return list_first(&cpp->file_stack);
 }
-
 
 mcc_error_t cpp_file_init(struct cpp *cpp, struct cpp_file *file, char *filename)
 {
@@ -35,7 +33,6 @@ mcc_error_t cpp_file_init(struct cpp *cpp, struct cpp_file *file, char *filename
 	return MCC_ERROR_OK;
 }
 
-
 void cpp_file_include(struct cpp *cpp, struct cpp_file *file)
 {
 	/*
@@ -49,7 +46,6 @@ void cpp_file_include(struct cpp *cpp, struct cpp_file *file)
 		toklist_insert_first(&cpp_cur_file(cpp)->tokens, cpp->token);
 	list_insert_first(&cpp->file_stack, &file->list_node);
 }
-
 
 static mcc_error_t cpp_file_include_searchpath_do(struct cpp *cpp,
 	const char **search_dirs,
@@ -97,18 +93,15 @@ static mcc_error_t cpp_file_include_searchpath_do(struct cpp *cpp,
 	return err;
 }
 
-
 mcc_error_t cpp_file_include_qheader(struct cpp *cpp, char *filename, struct cpp_file *file)
 {
 	return cpp_file_include_searchpath_do(cpp, include_dirs, filename, file);
 }
 
-
 mcc_error_t cpp_file_include_hheader(struct cpp *cpp, char *filename, struct cpp_file *file)
 {
 	return cpp_file_include_searchpath_do(cpp, include_dirs, filename, file);
 }
-
 
 void cpp_file_free(struct cpp *cpp, struct cpp_file *file)
 {
@@ -117,7 +110,6 @@ void cpp_file_free(struct cpp *cpp, struct cpp_file *file)
 	lexer_free(&file->lexer);
 	toklist_free(&file->tokens);
 }
-
 
 mcc_error_t cpp_open_file(struct cpp *cpp, char *filename)
 {
@@ -136,7 +128,6 @@ mcc_error_t cpp_open_file(struct cpp *cpp, char *filename)
 
 	return MCC_ERROR_OK;
 }
-
 
 void cpp_close_file(struct cpp *cpp)
 {
