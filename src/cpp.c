@@ -343,7 +343,7 @@ static void cpp_parse(struct cpp *cpp)
 				cpp->token->noexpand = true;
 			}
 		}
-		else if (cpp_skipping(cpp)) {
+		else if (lets_skip(cpp)) {
 			cpp_next_token(cpp);
 		}
 		else {

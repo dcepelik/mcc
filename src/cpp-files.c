@@ -40,7 +40,8 @@ void cpp_file_include(struct cpp *cpp, struct cpp_file *file)
 	 * that we're done with it. Therefore, we're not done with `cpp->token',
 	 * whatever it is, and thus we'd like to keep it (and read it when
 	 * we're done reading the included file). Therefore, we'll enqueue
-	 * the token, then include the file.
+	 * the token into the current file's unprocessed queue, then include
+	 * the other file.
 	 */
 	if (cpp->token)
 		toklist_insert_first(&cpp_cur_file(cpp)->tokens, cpp->token);

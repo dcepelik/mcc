@@ -1,6 +1,11 @@
 #ifndef CPP_INTERNAL_H
 #define CPP_INTERNAL_H
 
+/*
+ * TODO: (Globally) Free tokens (tokinfos) which I don't need anymore
+ *       Maybe use a refcount?
+ */
+
 #include "common.h"
 #include "debug.h"
 #include "error.h"
@@ -39,7 +44,7 @@ void cpp_warn(struct cpp *cpp, char *fmt, ...);
 
 void cpp_next_token(struct cpp *cpp);
 struct token *cpp_peek(struct cpp *cpp);
-bool cpp_skipping(struct cpp *cpp);
+bool lets_skip(struct cpp *cpp);
 
 struct cpp_file
 {
@@ -80,14 +85,6 @@ enum cpp_directive
 };
 
 void cpp_parse_directive(struct cpp *cpp);
-
-struct cpp_if
-{
-	struct list_node list_node;
-	struct token *token;
-	bool skip_this_branch;
-	bool skip_next_branch;
-};
 
 void cpp_init_ifstack(struct cpp *cpp);
 

@@ -113,6 +113,11 @@ bool token_is_eof(struct token *token)
 	return token_is(token, TOKEN_EOF);
 }
 
+bool token_is_eof_or_bol(struct token *token)
+{
+	return token_is(token, TOKEN_EOF) || token->is_at_bol;
+}
+
 bool token_is_any_keyword(struct token *token)
 {
 	return token_is_name(token)

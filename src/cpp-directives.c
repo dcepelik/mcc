@@ -1,12 +1,27 @@
+/*
+ * See 6.10 Preprocessing directives.
+ */
+
 #include "context.h"
 #include "cpp-internal.h"
 
 #define VA_ARGS_NAME	"__VA_ARGS__"
 
 /*
- * Artificial item to be kept at the bottom of the if stack to avoid special
- * cases in the code. Its presence is equivalent to the whole file being
- * wrapped in a big #if 1...#endif block.
+ * Represents a currently processed CPP `if' directive.
+ */
+struct cpp_if
+{
+	struct list_node list_node;
+	struct token *token;
+	bool skip_this_branch;
+	bool skip_next_branch;
+};
+
+/*
+ * ``Artificial'' item to be kept at the bottom of the if stack to avoid 
+ * special cases in the code. Its presence is equivalent to the whole file 
+ * being wrapped in a big #if 1 ... #endif directive.
  */
 static struct cpp_if ifstack_bottom = {
 	.token = NULL,
@@ -14,13 +29,21 @@ static struct cpp_if ifstack_bottom = {
 	.skip_next_branch = true /* no other branches */
 };
 
+/*
+ * Initialize the stack of `cpp_if' structures. The stack represents the 
+ * currently processed (``open'') `if' directives. Whenever an `if' block 
+ * ends with an `endif', the matching `cpp_if' structure is popped off the 
+ * stack.
+ *
+ * The `ifstack_bottom' item is inserted here. See above.
+ */
 void cpp_init_ifstack(struct cpp *cpp)
 {
 	list_init(&cpp->ifs);
 	list_insert_first(&cpp->ifs, &ifstack_bottom.list_node);
 }
 
-static inline bool cpp_directive(struct cpp *cpp, enum cpp_directive directive)
+static bool have_directive(struct cpp *cpp, enum cpp_directive directive)
 {
 	return token_is(cpp->token, TOKEN_NAME)
 		&& cpp->token->symbol->def->type == SYMBOL_TYPE_CPP_DIRECTIVE
@@ -28,9 +51,9 @@ static inline bool cpp_directive(struct cpp *cpp, enum cpp_directive directive)
 }
 
 /*
- * Skip all tokens on the current line.
+ * Skip rest of current line.
  *
- * TODO Free the tokens!
+ * NOTE: Nothing will be skipped if we're at the beginning of a line!
  */
 static void skip_rest_of_line(struct cpp *cpp)
 {
@@ -38,42 +61,59 @@ static void skip_rest_of_line(struct cpp *cpp)
 		cpp_next_token(cpp);
 }
 
-static void assume_bol_or_skip_and_warn(struct cpp *cpp)
+/*
+ * Skip rest of current line, issuing a warning if anything was there. This 
+ * is used when I assume there are no more tokens on a line, but if I'm 
+ * wrong, I want to skip them and let the user know I omitted something.
+ *
+ * NOTE: Nothing will be skiped if we're at the beginning of a line!
+ */
+static void skip_rest_and_warn(struct cpp *cpp)
 {
 	if (!cpp->token->is_at_bol && !token_is_eof(cpp->token)) {
-		cpp_warn(cpp, "extra tokens will be skipped");
+		cpp_warn(cpp, "unexpected extra tokens will be skipped");
 		skip_rest_of_line(cpp);
 	}
 }
 
-static bool cpp_expect(struct cpp *cpp, enum token_type token)
+/*
+ * Expect a token @token on the input. If it's not there, issue an error.
+ */
+static bool expect_token(struct cpp *cpp, enum token_type token)
 {
 	if (cpp->token->type == token)
 		return true;
 
 	cpp_error(cpp, "%s was expected, got %s",
 		token_get_name(token), token_get_name(cpp->token->type));
-
 	return false;
 }
 
-static bool cpp_expect_directive(struct cpp *cpp)
+/*
+ * Expect any directive on the input. If it's not there, issue an error.
+ */
+static bool expect_directive(struct cpp *cpp)
 {
-	if (!cpp_expect(cpp, TOKEN_NAME))
+	if (!expect_token(cpp, TOKEN_NAME))
 		return false;
 
 	if (cpp->token->symbol->def->type != SYMBOL_TYPE_CPP_DIRECTIVE) {
-		cpp_error(cpp, "'%s' is not a C preprocessor directive",
+		cpp_error(cpp, "`%s' is not a C preprocessor directive",
 			symbol_get_name(cpp->token->symbol));
 		return false;
 	}
-
 	return true;
 }
 
-static struct cpp_if *cpp_ifstack_push(struct cpp *cpp, struct token *token)
+/*
+ * Allocate and push a new `cpp_if' structure onto the `if' stack and 
+ * initialize and return it. The @token shall be the [if] token.
+ *
+ * PERF: For performance reasons, it might be fruitful to use an objpool 
+ *       for `cpp_if' structures.
+ */
+static struct cpp_if *push_if(struct cpp *cpp, struct token *token)
 {
-	/* TODO Use a different pool for struct cpp_if? */
 	struct cpp_if *cpp_if = mempool_alloc(&cpp->ctx->token_data, sizeof(*cpp_if));
 	cpp_if->token = token;
 	cpp_if->skip_this_branch = false;
@@ -84,39 +124,48 @@ static struct cpp_if *cpp_ifstack_push(struct cpp *cpp, struct token *token)
 	return cpp_if;
 }
 
-static struct cpp_if *cpp_ifstack_pop(struct cpp *cpp)
+/*
+ * Pop a `cpp_if' structure off the `if' stack.
+ */
+static struct cpp_if *pop_if(struct cpp *cpp)
 {
+	assert(!list_is_empty(&cpp->ifs));
 	return list_remove_first(&cpp->ifs);
 }
 
-static struct cpp_if *cpp_ifstack_top(struct cpp *cpp)
+/*
+ * Return the top (or current, matching) `cpp_if' of the `if' stack.
+ */
+static struct cpp_if *current_if(struct cpp *cpp)
 {
+	assert(!list_is_empty(&cpp->ifs));
 	return list_first(&cpp->ifs);
 }
 
-bool cpp_skipping(struct cpp *cpp)
+/*
+ * Are we inside an `if'/`elif'/`else' branch which should be skipped?
+ */
+bool lets_skip(struct cpp *cpp)
 {
-	return cpp_ifstack_top(cpp)->skip_this_branch;
+	return current_if(cpp)->skip_this_branch;
 }
 
-static void cpp_parse_macro_arglist(struct cpp *cpp, struct macro *macro)
+/*
+ * Parse the argument list in the definition of a CPP macro. The document
+ * list may only contain the opening parenthesis (already processed TODO),
+ * a list of comma-separated identifiers, and a closing parentheses.
+ */
+static void parse_macro_arglist(struct cpp *cpp, struct macro *macro)
 {
 	bool expect_comma = false;
 	bool arglist_ended = false;
 
-	while (!token_is_eof(cpp->token) && !cpp->token->is_at_bol) {
-		if (token_is(cpp->token, TOKEN_LPAREN)) {
-			cpp_error(cpp, "the '(' may not appear inside macro argument list");
-			break;
-		}
-
+	while (!token_is_eof_or_bol(cpp->token)) {
 		if (token_is(cpp->token, TOKEN_COMMA)) {
-			if (expect_comma)
-				expect_comma = false;
-			else
+			if (!expect_comma)
 				cpp_error(cpp, "comma was unexpected here");
-
-			cpp_next_token(cpp);
+			expect_comma = false;
+			cpp_next_token(cpp); /* `,' */
 			continue;
 		}
 
@@ -128,93 +177,131 @@ static void cpp_parse_macro_arglist(struct cpp *cpp, struct macro *macro)
 
 		if (expect_comma)
 			cpp_error(cpp, "comma was expected here");
+			/* fall-through: we know there should be a comma, act as if */
 
 		if (cpp->token->type == TOKEN_ELLIPSIS)
-			cpp->token->symbol = symtab_search_or_insert(&cpp->ctx->symtab, VA_ARGS_NAME);
+			cpp->token->symbol = symtab_search_or_insert(&cpp->ctx->symtab,
+				VA_ARGS_NAME);
+		else if (!expect_token(cpp, TOKEN_NAME))
+			continue;
 
 		toklist_insert_last(&macro->args, cpp->token);
 		expect_comma = true;
-		cpp_next_token(cpp);
+		cpp_next_token(cpp); /* argument identifier or __VA_ARGS__ */
 	}
 
 	if (!arglist_ended)
-		cpp_error(cpp, "macro arglist misses a )");
+		cpp_error(cpp, "macro arglist not terminated with a `)'");
 }
 
-static void cpp_parse_define(struct cpp *cpp)
+/*
+ * Parse a C preprocessor's `define' directive.
+ * See 6.10.3 Macro replacement
+ */
+static void parse_define(struct cpp *cpp)
 {
 	struct symdef *symdef;
 
-	if (!cpp_expect(cpp, TOKEN_NAME)) {
+	if (lets_skip(cpp)) {
 		skip_rest_of_line(cpp);
 		return;
 	}
 
-	if (!cpp_skipping(cpp)) {
-		symdef = symbol_define(&cpp->ctx->symtab, cpp->token->symbol);
-		symdef->type = SYMBOL_TYPE_CPP_MACRO;
-
-		macro_init(&symdef->macro);
-		symdef->macro.name = symbol_get_name(cpp->token->symbol);
-
-		cpp_next_token(cpp);
-
-		if (cpp->token->type == TOKEN_LPAREN && !cpp->token->after_white) {
-			cpp_next_token(cpp);
-			cpp_parse_macro_arglist(cpp, &symdef->macro);
-			symdef->macro.flags = MACRO_FLAGS_FUNCLIKE;
-			//macro_dump(macro);
-		}
-		else {
-			symdef->macro.flags = MACRO_FLAGS_OBJLIKE;
-			//macro_dump(macro);
-		}
-
-		while (!token_is_eof(cpp->token) && !cpp->token->is_at_bol) {
-			toklist_insert_last(&symdef->macro.expansion, cpp->token);
-			cpp_next_token(cpp);
-		}
+	if (!expect_token(cpp, TOKEN_NAME)) {
+		skip_rest_and_warn(cpp);
+		return;
 	}
-	else {
+
+	/*
+	 * We will provide a new definition for macro name, which will be a CPP 
+	 * macro; either object-like or function like.
+	 */
+	symdef = symbol_define(&cpp->ctx->symtab, cpp->token->symbol);
+	symdef->type = SYMBOL_TYPE_CPP_MACRO;
+	macro_init(&symdef->macro);
+	symdef->macro.name = symbol_get_name(cpp->token->symbol);
+
+	cpp_next_token(cpp); /* macro name */
+
+	if (cpp->token->type == TOKEN_LPAREN && !cpp->token->after_white) {
+		symdef->macro.flags = MACRO_FLAGS_FUNCLIKE;
+		cpp_next_token(cpp); /* ( */
+		parse_macro_arglist(cpp, &symdef->macro);
+	} else {
+		symdef->macro.flags = MACRO_FLAGS_OBJLIKE;
+	}
+		
+	//macro_dump(macro);
+
+	/*
+	 * For both object-like and function-like macros, construct the
+	 * replacement list (expansion) from the tokens on the current
+	 * line.
+	 */
+	while (!token_is_eof(cpp->token) && !cpp->token->is_at_bol) {
+		toklist_insert_last(&symdef->macro.expansion, cpp->token);
 		cpp_next_token(cpp);
 	}
 
 	//symtab_dump(&cpp->ctx->symtab, stderr);
 }
 
-static void cpp_parse_undef(struct cpp *cpp)
+/*
+ * TODO symbol_pop_definition(&cpp->ctx->symtab, cpp->token->symbol);
+ */
+static void process_undef(struct cpp *cpp)
 {
-	if (!cpp_expect(cpp, TOKEN_NAME)) {
+	if (lets_skip(cpp)) {
 		skip_rest_of_line(cpp);
 		return;
 	}
 
-	if (!cpp_skipping(cpp)) {
-		/* TODO check it's defined */
-		//TODO symbol_pop_definition(&cpp->ctx->symtab, cpp->token->symbol); 
+	if (!expect_token(cpp, TOKEN_NAME)) {
+		skip_rest_and_warn(cpp);
+		return;
 	}
 
 	cpp_next_token(cpp);
+	skip_rest_and_warn(cpp);
 }
 
-static void cpp_parse_error(struct cpp *cpp)
+/*
+ * Process the `error' directive.
+ *
+ * 6.10.5 Error directive:
+ *
+ *     A preprocessing directive of the form
+ *
+ *       # error [pp-tokens] new-line
+ *
+ *     causes the implementation to produce a diagnostic message that     
+ *     includes the specified sequence of preprocessing tokens.
+ *
+ * To fulfill that, we'll simply raise an error whenever we encounter the 
+ * directive and we'll rely on `cpp_error' to produce a pretty error 
+ * message which will contain a sample of the input.
+ */
+static void process_error(struct cpp *cpp)
 {
-	/* TODO cat tokens to get error message */
+	if (lets_skip(cpp)) {
+		skip_rest_of_line(cpp);
+		return;
+	}
+
 	cpp_error(cpp, "%s", "#error");
 	skip_rest_of_line(cpp);
-	//assume_bol_or_skip_and_warn(cpp);
 }
 
 /*
  * TODO warn if tokens skipped
  */
-static void cpp_parse_include(struct cpp *cpp)
+static void process_include(struct cpp *cpp)
 {
 	char *filename;
 	mcc_error_t err;
 	struct cpp_file *file;
 
-	if (cpp_skipping(cpp)) {
+	if (lets_skip(cpp)) {
 		skip_rest_of_line(cpp);
 		return;
 	}
@@ -266,7 +353,7 @@ void cpp_parse_directive(struct cpp *cpp)
 	if (cpp->token->is_at_bol)
 		return;
 
-	if (!cpp_expect_directive(cpp)) {
+	if (!expect_directive(cpp)) {
 		skip_rest_of_line(cpp);
 		return;
 	}
@@ -274,8 +361,7 @@ void cpp_parse_directive(struct cpp *cpp)
 	prev = cpp->token;
 	dir = cpp->token->symbol->def->directive;
 
-	cpp_cur_file(cpp)->lexer.inside_include
-		= cpp_directive(cpp, CPP_DIRECTIVE_INCLUDE);
+	cpp_cur_file(cpp)->lexer.inside_include = have_directive(cpp, CPP_DIRECTIVE_INCLUDE);
 
 	cpp_next_token(cpp);
 
@@ -294,15 +380,15 @@ void cpp_parse_directive(struct cpp *cpp)
 		test_cond = true; /* TODO */
 
 push_if:
-		skipping = cpp_skipping(cpp);
-		cpp_if = cpp_ifstack_push(cpp, prev);
+		skipping = lets_skip(cpp);
+		cpp_if = push_if(cpp, prev);
 		cpp_if->skip_next_branch = skipping;
 
 		goto conclude;
 
 	case CPP_DIRECTIVE_ELIF:
 		test_cond = true; /* TODO */
-		cpp_if = cpp_ifstack_top(cpp);
+		cpp_if = current_if(cpp);
 
 conclude:
 		cpp_if->skip_this_branch = !test_cond || cpp_if->skip_next_branch;
@@ -311,27 +397,27 @@ conclude:
 	
 	case CPP_DIRECTIVE_ELSE:
 		/* TODO check elif after else */
-		cpp_if = cpp_ifstack_top(cpp);
+		cpp_if = current_if(cpp);
 		cpp_if->skip_this_branch = cpp_if->skip_next_branch;
 		break;
 
 	case CPP_DIRECTIVE_ENDIF:
-		assert(cpp_ifstack_top(cpp) != &ifstack_bottom); /* TODO */
+		assert(current_if(cpp) != &ifstack_bottom); /* TODO */
 
-		if (cpp_ifstack_top(cpp) == &ifstack_bottom)
+		if (current_if(cpp) == &ifstack_bottom)
 			cpp_error(cpp, "endif without matching if/ifdef/ifndef");
 		else
-			cpp_ifstack_pop(cpp);
+			pop_if(cpp);
 
 		break;
 
 	case CPP_DIRECTIVE_DEFINE:
-		cpp_parse_define(cpp);
+		parse_define(cpp);
 		//symtab_dump(&cpp->ctx->symtab, stderr);
 		break;
 
 	case CPP_DIRECTIVE_INCLUDE:
-		cpp_parse_include(cpp);
+		process_include(cpp);
 
 		/*
 		 * TODO To keep tokens after the #include "filename" (if any).
@@ -340,16 +426,16 @@ conclude:
 		return;
 
 	case CPP_DIRECTIVE_ERROR:
-		cpp_parse_error(cpp);
+		process_error(cpp);
 		break;
 
 	case CPP_DIRECTIVE_UNDEF:
-		cpp_parse_undef(cpp);
+		process_undef(cpp);
 		break;
 
 	default:
 		return;
 	}
 
-	assume_bol_or_skip_and_warn(cpp);
+	skip_rest_and_warn(cpp);
 }
