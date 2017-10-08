@@ -56,7 +56,7 @@ static bool have_directive(struct cpp *cpp, enum cpp_directive directive)
  */
 static void skip_rest_of_line(struct cpp *cpp)
 {
-	while (!token_is_eof(cpp->token) && !cpp->token->is_at_bol)
+	while (!token_is_eol_or_eof(cpp->token))
 		cpp_next_token(cpp);
 }
 
@@ -69,7 +69,7 @@ static void skip_rest_of_line(struct cpp *cpp)
  */
 static void skip_rest_and_warn(struct cpp *cpp)
 {
-	if (!cpp->token->is_at_bol && !token_is_eof(cpp->token)) {
+	if (!token_is_eol_or_eof(cpp->token)) {
 		cpp_warn(cpp, "unexpected extra tokens will be skipped");
 		skip_rest_of_line(cpp);
 	}
@@ -237,7 +237,7 @@ static void parse_define(struct cpp *cpp)
 	 * replacement list (expansion) from the tokens on the current
 	 * line.
 	 */
-	while (!token_is_eof(cpp->token) && !cpp->token->is_at_bol) {
+	while (!token_is_eol_or_eof(cpp->token)) {
 		toklist_insert_last(&symdef->macro.expansion, cpp->token);
 		cpp_next_token(cpp);
 	}

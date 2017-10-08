@@ -24,7 +24,7 @@ bool shall_debug_file(const char *filename)
 	if (strcmp(filename, "macro.c") == 0)
 		return true;
 
-	if (strcmp(filename, "cpp-files.c") == 0)
+	if (strcmp(filename, "src/cpp-macros.c") == 0)
 		return true;
 
 	if (strcmp(filename, "cpp-directives.c") == 0)

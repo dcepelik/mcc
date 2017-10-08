@@ -46,12 +46,10 @@ int main(int argc, char *argv[])
 
 	strbuf_init(&buf, 256);
 	for (i = 1; (token = cpp_next(cpp)); i++) {	
-		if (token_is_eol(token))
-			continue; /* TODO refactoring aid */
-
-		if (token->is_at_bol) {
+		if (token_is_eol(token)) {
 			strbuf_putc(&buf, '\n');
 			i = 1;
+			continue;
 		}
 
 		if (i != 1)

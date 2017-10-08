@@ -252,6 +252,8 @@ static struct toklist macro_paste_do(struct cpp *cpp, struct token *a, struct to
 	strbuf_init(&buf, 32);
 	strbuf_printf(&buf, "%s%s", token_get_spelling(a), token_get_spelling(b));
 
+	DEBUG_EXPR("%s", strbuf_get_string(&buf));
+
 	toklist_load_from_strbuf(&tokens, cpp->ctx, &buf);
 	if (toklist_length(&tokens) != 1)
 		DEBUG_PRINTF("pasting %s and %s does not yield single valid preprocessing token",
@@ -399,10 +401,11 @@ static struct token *macro_expand_internal(struct cpp *cpp, struct toklist *in, 
 	toklist_foreach(token, &replaced_args) {
 		if (token->type == TOKEN_PLACEMARKER)
 			toklist_remove(&replaced_args, token);
+		assert(!token_is_eol(token));
 	}
 
 	/*
-	 * Notice: symtab scope ended prior to recursive expansion.
+	 * NOTE: symtab scope ended prior to recursive expansion.
 	 */
 	symtab_scope_end(&cpp->ctx->symtab);
 

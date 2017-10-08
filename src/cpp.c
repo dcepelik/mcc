@@ -144,55 +144,25 @@ void cpp_next_token(struct cpp *cpp)
 	struct token *t;
 	if (toklist_is_empty(&cpp_cur_file(cpp)->tokens)) {
 		t = objpool_alloc(&cpp->ctx->token_pool);
-	/*
-	 * This ``again'' label is a refactoring aid.
-	 */
-again:
 		lexer_next(&cpp_cur_file(cpp)->lexer, t);
-		if (token_is_eol(t))
-			goto again;
 		/* TODO make this per-file, too */
 		toklist_insert_first(&cpp_cur_file(cpp)->tokens, t);
 	}
 
 	cpp->token = toklist_remove_first(&cpp_cur_file(cpp)->tokens);
-	assert(cpp->token != NULL); /* invariant: EOF guards the list */
+	assert(cpp->token != NULL); /* NOTE: EOF guards the list */
+}
+
+void cpp_next_noeol(struct cpp *cpp)
+{
+	do {
+		cpp_next_token(cpp);
+	} while (token_is_eol(cpp->token));
 }
 
 static void cpp_requeue_current(struct cpp *cpp)
 {
 	toklist_insert_first(&cpp_cur_file(cpp)->tokens, cpp->token);
-}
-
-/*
- * Get the next token to be preprocessed. This function works just as `cpp_next_token',
- * except that it returns a TOKEN_EOL token when the token returned by `cpp_next_token'
- * is on a new line.
- *
- * This is to simplify the processing of CPP directives, because each CPP directive
- * has to be contained in a single logical line. This way, we know that an EOL
- * token is always produced.
- *
- * TODO Produce EOL before EOF, always.
- */
-void cpp_next_eol(struct cpp *cpp)
-{
-	struct token *eol;
-
-	cpp_next_token(cpp);
-	if (cpp->token->is_at_bol) {
-		eol = objpool_alloc(&cpp->ctx->token_pool);
-		eol->is_at_bol = false;
-		eol->after_white = false;
-		eol->noexpand = true;
-		eol->enc_prefix = ENC_PREFIX_NONE;
-		eol->startloc = cpp->token->startloc;
-		eol->endloc = eol->startloc;
-		eol->type = TOKEN_EOL;
-
-		cpp_requeue_current(cpp);
-		cpp->token = eol;
-	}
 }
 
 struct cpp *cpp_new(struct context *ctx)
@@ -276,7 +246,7 @@ struct token *cpp_peek(struct cpp *cpp)
 	struct token *peek;
 
 	tmp = cpp->token;
-	cpp_next_token(cpp);
+	cpp_next_noeol(cpp); /* TODO */
 	peek = cpp->token;
 	cpp_requeue_current(cpp);
 	cpp->token = tmp;
@@ -299,7 +269,7 @@ static void cpp_parse_macro_invocation(struct cpp *cpp)
 	toklist_init(&expansion);
 
 	toklist_insert_last(&invocation, cpp->token); /* macro name */
-	cpp_next_token(cpp);
+	cpp_next_noeol(cpp);
 
 	/*
 	 * For invocations of function-like macros, this code block will grab
@@ -319,7 +289,7 @@ static void cpp_parse_macro_invocation(struct cpp *cpp)
 			}
 
 			toklist_insert_last(&invocation, cpp->token);
-			cpp_next_token(cpp);
+			cpp_next_noeol(cpp);
 
 			if (args_ended)
 				break;
@@ -406,6 +376,10 @@ again:
 	cpp_parse(cpp);
 	tmp = cpp->token;
 
+	if (token_is_eol(cpp->token)) {
+		cpp_next_token(cpp);
+		goto again;
+	}
 	if (token_is(cpp->token, TOKEN_STRING_LITERAL)) {
 		cpp_next_token(cpp);
 		toklist_insert_last(&stringles, tmp);

@@ -12,7 +12,7 @@ validate_output() {
 		return
 	fi
 
-	diff <(cat $1 | tr -s '\n' | tr '\n' ' ') <(cat $2 | tr -s '\n' | tr '\n' ' ') >/dev/null
+	diff --ignore-space-change <(cat $1 | tr -s '\n' | tr '\n' ' ') <(cat $2 | tr -s '\n' | tr '\n' ' ') >/dev/null
 
 	if [ $? -ne 0 ]; then
 		echo -n "  !$1"
