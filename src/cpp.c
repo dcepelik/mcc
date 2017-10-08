@@ -153,13 +153,6 @@ void cpp_next_token(struct cpp *cpp)
 	assert(cpp->token != NULL); /* NOTE: EOF guards the list */
 }
 
-void cpp_next_noeol(struct cpp *cpp)
-{
-	do {
-		cpp_next_token(cpp);
-	} while (token_is_eol(cpp->token));
-}
-
 static void cpp_requeue_current(struct cpp *cpp)
 {
 	toklist_insert_first(&cpp_cur_file(cpp)->tokens, cpp->token);
@@ -246,7 +239,7 @@ struct token *cpp_peek(struct cpp *cpp)
 	struct token *peek;
 
 	tmp = cpp->token;
-	cpp_next_noeol(cpp); /* TODO */
+	cpp_next_token(cpp); /* TODO */
 	peek = cpp->token;
 	cpp_requeue_current(cpp);
 	cpp->token = tmp;
@@ -269,7 +262,7 @@ static void cpp_parse_macro_invocation(struct cpp *cpp)
 	toklist_init(&expansion);
 
 	toklist_insert_last(&invocation, cpp->token); /* macro name */
-	cpp_next_noeol(cpp);
+	cpp_next_token(cpp);
 
 	/*
 	 * For invocations of function-like macros, this code block will grab
@@ -289,7 +282,7 @@ static void cpp_parse_macro_invocation(struct cpp *cpp)
 			}
 
 			toklist_insert_last(&invocation, cpp->token);
-			cpp_next_noeol(cpp);
+			cpp_next_token(cpp);
 
 			if (args_ended)
 				break;

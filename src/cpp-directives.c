@@ -50,6 +50,38 @@ static bool have_directive(struct cpp *cpp, enum cpp_directive directive)
 }
 
 /*
+ * Move to the next token. Does to same as `next_weol', except that
+ * `next_weol' will produce a TOKEN_EOL when end-of-line is reached.
+ *
+ * This is suitable (only for) directive processing, because CPP directives
+ * are required to be contained within a single logical line.
+ */
+static void next_weol(struct cpp *cpp)
+{
+	struct token *t;
+	if (toklist_is_empty(&cpp_cur_file(cpp)->tokens)) {
+		t = objpool_alloc(&cpp->ctx->token_pool);
+		lexer_next(&cpp_cur_file(cpp)->lexer, t);
+		/* TODO make this per-file, too */
+		toklist_insert_first(&cpp_cur_file(cpp)->tokens, t);
+
+		if (t->is_at_bol) {
+			t = objpool_alloc(&cpp->ctx->token_pool);
+			t->type = TOKEN_EOL;
+			t->is_at_bol = false;
+			t->after_white = true;
+			t->enc_prefix = ENC_PREFIX_NONE;
+			/* TODO gosh! */
+			t->startloc = toklist_first(&cpp_cur_file(cpp)->tokens)->startloc;
+			t->endloc = toklist_first(&cpp_cur_file(cpp)->tokens)->endloc;
+			toklist_insert_first(&cpp_cur_file(cpp)->tokens, t);
+		}
+	}
+
+	cpp->token = toklist_remove_first(&cpp_cur_file(cpp)->tokens);
+}
+
+/*
  * Skip rest of current line.
  *
  * NOTE: Nothing will be skipped if we're at the beginning of a line!
@@ -57,7 +89,7 @@ static bool have_directive(struct cpp *cpp, enum cpp_directive directive)
 static void skip_rest_of_line(struct cpp *cpp)
 {
 	while (!token_is_eol_or_eof(cpp->token))
-		cpp_next_token(cpp);
+		next_weol(cpp);
 }
 
 /*
@@ -76,7 +108,7 @@ static void skip_rest_and_warn(struct cpp *cpp)
 }
 
 /*
- * Expect a token @token on the input. If it's not there, issue an error.
+ * Expect a token on the input. If it's not there, issue an error.
  */
 static bool expect_token(struct cpp *cpp, enum token_type token)
 {
@@ -159,18 +191,18 @@ static void parse_macro_arglist(struct cpp *cpp, struct macro *macro)
 	bool expect_comma = false;
 	bool arglist_ended = false;
 
-	while (!token_is_eof_or_bol(cpp->token)) {
+	while (!token_is_eol_or_eof(cpp->token)) {
 		if (token_is(cpp->token, TOKEN_COMMA)) {
 			if (!expect_comma)
 				cpp_error(cpp, "comma was unexpected here");
 			expect_comma = false;
-			cpp_next_token(cpp); /* `,' */
+			next_weol(cpp); /* `,' */
 			continue;
 		}
 
 		if (token_is(cpp->token, TOKEN_RPAREN)) {
 			arglist_ended = true;
-			cpp_next_token(cpp);
+			next_weol(cpp);
 			break;
 		}
 
@@ -186,7 +218,7 @@ static void parse_macro_arglist(struct cpp *cpp, struct macro *macro)
 
 		toklist_insert_last(&macro->args, cpp->token);
 		expect_comma = true;
-		cpp_next_token(cpp); /* argument identifier or __VA_ARGS__ */
+		next_weol(cpp); /* argument identifier or __VA_ARGS__ */
 	}
 
 	if (!arglist_ended)
@@ -220,11 +252,11 @@ static void parse_define(struct cpp *cpp)
 	macro_init(&symdef->macro);
 	symdef->macro.name = symbol_get_name(cpp->token->symbol);
 
-	cpp_next_token(cpp); /* macro name */
+	next_weol(cpp); /* macro name */
 
 	if (cpp->token->type == TOKEN_LPAREN && !cpp->token->after_white) {
 		symdef->macro.flags = MACRO_FLAGS_FUNCLIKE;
-		cpp_next_token(cpp); /* ( */
+		next_weol(cpp); /* ( */
 		parse_macro_arglist(cpp, &symdef->macro);
 	} else {
 		symdef->macro.flags = MACRO_FLAGS_OBJLIKE;
@@ -239,7 +271,7 @@ static void parse_define(struct cpp *cpp)
 	 */
 	while (!token_is_eol_or_eof(cpp->token)) {
 		toklist_insert_last(&symdef->macro.expansion, cpp->token);
-		cpp_next_token(cpp);
+		next_weol(cpp);
 	}
 
 	//symtab_dump(&cpp->ctx->symtab, stderr);
@@ -261,7 +293,7 @@ static void process_undef(struct cpp *cpp)
 		return;
 	}
 
-	cpp_next_token(cpp);
+	next_weol(cpp);
 	skip_rest_and_warn(cpp);
 }
 
@@ -348,7 +380,7 @@ void cpp_parse_directive(struct cpp *cpp)
 	assert(token_is(cpp->token, TOKEN_HASH));
 	assert(cpp->token->is_at_bol);
 
-	cpp_next_token(cpp);
+	next_weol(cpp);
 
 	if (cpp->token->is_at_bol)
 		return;
@@ -363,17 +395,17 @@ void cpp_parse_directive(struct cpp *cpp)
 
 	cpp_cur_file(cpp)->lexer.inside_include = have_directive(cpp, CPP_DIRECTIVE_INCLUDE);
 
-	cpp_next_token(cpp);
+	next_weol(cpp);
 
 	switch (dir) {
 	case CPP_DIRECTIVE_IFDEF:
 		test_cond = cpp->token->symbol->def->type == SYMBOL_TYPE_CPP_MACRO;
-		cpp_next_token(cpp);
+		next_weol(cpp);
 		goto push_if;
 
 	case CPP_DIRECTIVE_IFNDEF:
 		test_cond = cpp->token->symbol->def->type != SYMBOL_TYPE_CPP_MACRO;
-		cpp_next_token(cpp);
+		next_weol(cpp);
 		goto push_if;
 
 	case CPP_DIRECTIVE_IF:

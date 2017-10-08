@@ -646,13 +646,6 @@ next_nonwhite_char:
 		}
 
 		assert(err == MCC_ERROR_OK);
-		token->type = TOKEN_EOL;
-		token->is_at_bol = false;
-		token->after_white = true;
-		token->enc_prefix = ENC_PREFIX_NONE;
-		token->startloc = lexer->location; /* TODO */
-		token->endloc = lexer->location; /* TODO */
-		return;
 	}
 
 	lexer->first_token = false; /* move down? */
