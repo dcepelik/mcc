@@ -141,12 +141,58 @@ static void cpp_setup_symtab(struct cpp *cpp)
 
 void cpp_next_token(struct cpp *cpp)
 {
-	if (!toklist_is_empty(&cpp_cur_file(cpp)->tokens))
-		cpp->token = toklist_remove_first(&cpp_cur_file(cpp)->tokens);
-	else
-		cpp->token = lexer_next(&cpp_cur_file(cpp)->lexer);
+	struct token *t;
+	if (toklist_is_empty(&cpp_cur_file(cpp)->tokens)) {
+		t = objpool_alloc(&cpp->ctx->token_pool);
+	/*
+	 * This ``again'' label is a refactoring aid.
+	 */
+again:
+		lexer_next(&cpp_cur_file(cpp)->lexer, t);
+		if (token_is_eol(t))
+			goto again;
+		/* TODO make this per-file, too */
+		toklist_insert_first(&cpp_cur_file(cpp)->tokens, t);
+	}
 
+	cpp->token = toklist_remove_first(&cpp_cur_file(cpp)->tokens);
 	assert(cpp->token != NULL); /* invariant: EOF guards the list */
+}
+
+static void cpp_requeue_current(struct cpp *cpp)
+{
+	toklist_insert_first(&cpp_cur_file(cpp)->tokens, cpp->token);
+}
+
+/*
+ * Get the next token to be preprocessed. This function works just as `cpp_next_token',
+ * except that it returns a TOKEN_EOL token when the token returned by `cpp_next_token'
+ * is on a new line.
+ *
+ * This is to simplify the processing of CPP directives, because each CPP directive
+ * has to be contained in a single logical line. This way, we know that an EOL
+ * token is always produced.
+ *
+ * TODO Produce EOL before EOF, always.
+ */
+void cpp_next_eol(struct cpp *cpp)
+{
+	struct token *eol;
+
+	cpp_next_token(cpp);
+	if (cpp->token->is_at_bol) {
+		eol = objpool_alloc(&cpp->ctx->token_pool);
+		eol->is_at_bol = false;
+		eol->after_white = false;
+		eol->noexpand = true;
+		eol->enc_prefix = ENC_PREFIX_NONE;
+		eol->startloc = cpp->token->startloc;
+		eol->endloc = eol->startloc;
+		eol->type = TOKEN_EOL;
+
+		cpp_requeue_current(cpp);
+		cpp->token = eol;
+	}
 }
 
 struct cpp *cpp_new(struct context *ctx)
@@ -222,11 +268,6 @@ void cpp_error(struct cpp *cpp, char *fmt, ...)
 	va_start(args, fmt);
 	cpp_error_internal(cpp, ERROR_LEVEL_ERROR, fmt, args);
 	va_end(args);
-}
-
-static void cpp_requeue_current(struct cpp *cpp)
-{
-	toklist_insert_first(&cpp_cur_file(cpp)->tokens, cpp->token);
 }
 
 struct token *cpp_peek(struct cpp *cpp)

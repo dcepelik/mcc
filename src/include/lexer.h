@@ -26,12 +26,12 @@ struct lexer
 	struct strbuf linebuf;		/* buffer for current logical line */
 	char *c;			/* current character within linebuf */
 	struct location location;	/* location of c within inbuf */
-	struct strbuf strbuf;		/* buffer for string accumulation */
+	struct strbuf strbuf;		/* buffer for various string accumulation */
 	struct strbuf spelling;		/* buffer for token spelling */
 	char *spelling_start;		/* start of current token's spelling */
 
 	/* flags */
-	bool inside_include;		/* are we lexing in an #include? */
+	bool inside_include;		/* are we various lexing in an #include? */
 	bool next_at_bol;		/* is next token at BOL? */
 	bool first_token;		/* first token of the line produced? */
 	bool had_whitespace;		/* whitespace before current token? */
@@ -39,6 +39,6 @@ struct lexer
 
 void lexer_init(struct lexer *lexer, struct context *ctx, struct inbuf *inbuf);
 void lexer_free(struct lexer *lexer);
-struct token *lexer_next(struct lexer *lexer);
+void lexer_next(struct lexer *lexer, struct token *token);
 
 #endif

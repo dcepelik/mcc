@@ -11,8 +11,6 @@
 
 #define STRBUF_INIT_SIZE	128
 
-static struct token eof = { .type = TOKEN_EOF };
-
 /*
  * Single-char escape sequences: mapping from what follows the \ to the resulting character.
  */
@@ -632,9 +630,8 @@ static inline enum enc_prefix get_enc_prefix(char c)
 	return ENC_PREFIX_NONE;
 }
 
-struct token *lexer_next(struct lexer *lexer)
+void lexer_next(struct lexer *lexer, struct token *token)
 {
-	struct token *token;
 	mcc_error_t err;
 
 next_nonwhite_char:
@@ -642,11 +639,20 @@ next_nonwhite_char:
 		err = lexer_read_line(lexer);
 		lexer->next_at_bol = true;
 
-		if (err == MCC_ERROR_EOF)
-			return &eof;
+		if (err == MCC_ERROR_EOF) {
+			token->type = TOKEN_EOF;
+			token->is_at_bol = false;
+			return;
+		}
 
-		if (err != MCC_ERROR_OK)
-			return NULL;
+		assert(err == MCC_ERROR_OK);
+		token->type = TOKEN_EOL;
+		token->is_at_bol = false;
+		token->after_white = true;
+		token->enc_prefix = ENC_PREFIX_NONE;
+		token->startloc = lexer->location; /* TODO */
+		token->endloc = lexer->location; /* TODO */
+		return;
 	}
 
 	lexer->first_token = false; /* move down? */
@@ -655,7 +661,6 @@ next_nonwhite_char:
 	if (lexer_is_eol(lexer))
 		goto next_nonwhite_char;
 
-	token = objpool_alloc(&lexer->ctx->token_pool);
 	token->is_at_bol = lexer->next_at_bol;
 	token->after_white = lexer->had_whitespace;
 	token->noexpand = false;
@@ -679,7 +684,8 @@ next_nonwhite_char:
 		if (*lexer->c == '8' && lexer->c[1] == '\"') {
 			lexer->c += 2;
 			token->enc_prefix = ENC_PREFIX_U8;
-			return lexer_lex_string_literal(lexer, token);
+			lexer_lex_string_literal(lexer, token);
+			return;
 		}
 
 		/* fall-through: it's not a string prefix */
@@ -691,14 +697,16 @@ next_nonwhite_char:
 		if (*lexer->c == '\'') {
 			token->enc_prefix = get_enc_prefix(lexer->c[-1]);
 			lexer->c++;
-			return lexer_lex_char(lexer, token);
+			lexer_lex_char(lexer, token);
+			return;
 		}
 		
 		/* L"string" or U"string" or u"string" */
 		if (*lexer->c == '\"') {
 			token->enc_prefix = get_enc_prefix(lexer->c[-1]);
 			lexer->c++;
-			return lexer_lex_string_literal(lexer, token);
+			lexer_lex_string_literal(lexer, token);
+			return;
 		}
 
 		/* fall-through: it's just a regular letter, not a prefix */
@@ -712,16 +720,19 @@ next_nonwhite_char:
 	case 'R': case 'S': case 'T': case 'V': case 'W': case 'X': case 'Y':
 	case 'Z':
 		lexer->c--;
-		return lexer_lex_name(lexer, token);
+		lexer_lex_name(lexer, token);
+		return;
 
 	case '\"':
 		if (lexer->inside_include)
-			return lexer_lex_header_qname(lexer, token);
+			lexer_lex_header_qname(lexer, token);
 		else
-			return lexer_lex_string_literal(lexer, token);
+			lexer_lex_string_literal(lexer, token);
+		return;
 
 	case '\'':
-		return lexer_lex_char(lexer, token);
+		lexer_lex_char(lexer, token);
+		return;
 
 	case '.':
 		if (!is_digit(*lexer->c)) {
@@ -741,7 +752,8 @@ next_nonwhite_char:
 	case '0': case '1': case '2': case '3': case '4': case '5':
 	case '6': case '7': case '8': case '9':
 		lexer->c--;
-		return lexer_lex_pp_number(lexer, token);
+		lexer_lex_pp_number(lexer, token);
+		return;
 
 	case '[':
 		token->type = TOKEN_LBRACKET;
@@ -918,7 +930,8 @@ next_nonwhite_char:
 			}
 		}
 		else {
-			return lexer_lex_header_hname(lexer, token);
+			lexer_lex_header_hname(lexer, token);
+			return;
 		}
 		break;
 
@@ -1015,8 +1028,10 @@ next_nonwhite_char:
 		break;
 
 	case '\\':
-		if (*lexer->c == 'u' || *lexer->c == 'U')
-			return lexer_lex_name(lexer, token);
+		if (*lexer->c == 'u' || *lexer->c == 'U') {
+			lexer_lex_name(lexer, token);
+			return;
+		}
 		
 		/* fall through to default lexeme handling */
 
@@ -1025,6 +1040,4 @@ next_nonwhite_char:
 		token->value = lexer->c[-1];
 		token->spelling = lexer_spelling_end(lexer);
 	}
-
-	return token;
 }

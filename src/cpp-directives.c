@@ -1,7 +1,6 @@
 /*
  * See 6.10 Preprocessing directives.
  */
-
 #include "context.h"
 #include "cpp-internal.h"
 
@@ -247,6 +246,7 @@ static void parse_define(struct cpp *cpp)
 }
 
 /*
+ * TODO check it's defined
  * TODO symbol_pop_definition(&cpp->ctx->symtab, cpp->token->symbol);
  */
 static void process_undef(struct cpp *cpp)

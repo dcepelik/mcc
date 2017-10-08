@@ -17,6 +17,7 @@ const char *token_names[] = {
 	[TOKEN_OP_DOT] = ".",
 	[TOKEN_ELLIPSIS] = "...",
 	[TOKEN_EOF] = "<<EOF>>",
+	[TOKEN_EOL] = "<<EOL>>",
 	[TOKEN_OP_ASSIGN] = "=",
 	[TOKEN_OP_EQ] = "==",
 	[TOKEN_OP_GE] = ">=",
@@ -113,9 +114,19 @@ bool token_is_eof(struct token *token)
 	return token_is(token, TOKEN_EOF);
 }
 
+bool token_is_eol(struct token *token)
+{
+	return token_is(token, TOKEN_EOL);
+}
+
 bool token_is_eof_or_bol(struct token *token)
 {
 	return token_is(token, TOKEN_EOF) || token->is_at_bol;
+}
+
+bool token_is_eol_or_eof(struct token *token)
+{
+	return token_is(token, TOKEN_EOL) || token_is(token, TOKEN_EOF);
 }
 
 bool token_is_any_keyword(struct token *token)

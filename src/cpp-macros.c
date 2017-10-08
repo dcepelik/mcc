@@ -225,14 +225,17 @@ static struct token *new_placemarker(struct cpp *cpp)
 	return token;
 }
 
+/*
+ * This function ``pastes'' two tokens. It does so by taking the spellings of
+ * those two tokens and concatenating them, and then lexes (``re-lexes'') the
+ * result. The process should yield a single valid preprocessing token.
+ *
+ * See TODO.
+ */
 static struct toklist macro_paste_do(struct cpp *cpp, struct token *a, struct token *b)
 {
 	struct strbuf buf;
-	struct inbuf inbuf;
-	struct lexer lexer;
 	struct toklist tokens;
-	struct token *token;
-	size_t num_tokens = 0;
 
 	toklist_init(&tokens);
 
@@ -246,30 +249,14 @@ static struct toklist macro_paste_do(struct cpp *cpp, struct token *a, struct to
 		return tokens;
 	}
 
-	/* TODO Error checking */
-
 	strbuf_init(&buf, 32);
 	strbuf_printf(&buf, "%s%s", token_get_spelling(a), token_get_spelling(b));
 
-	inbuf_open_mem(&inbuf, strbuf_get_string(&buf), strbuf_strlen(&buf));
-	lexer_init(&lexer, cpp->ctx, &inbuf);
-
-	while ((token = lexer_next(&lexer))) {
-		if (token->type == TOKEN_EOF)
-			break;
-
-		toklist_insert_last(&tokens, token);
-		num_tokens++;
-	}
-
-	assert(token->type == TOKEN_EOF);
-
-	if (num_tokens != 1)
+	toklist_load_from_strbuf(&tokens, cpp->ctx, &buf);
+	if (toklist_length(&tokens) != 1)
 		DEBUG_PRINTF("pasting %s and %s does not yield single valid preprocessing token",
 			token_get_spelling(a), token_get_spelling(b));
 
-	lexer_free(&lexer);
-	inbuf_close(&inbuf);
 	strbuf_free(&buf);
 
 	return tokens;

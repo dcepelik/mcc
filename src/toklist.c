@@ -125,12 +125,21 @@ void toklist_load_from_strbuf(struct toklist *lst, struct context *ctx, struct s
 	inbuf_open_mem(&inbuf, strbuf_get_string(str), strbuf_strlen(str));
 	lexer_init(&lexer, ctx, &inbuf);
 
-	while ((token = lexer_next(&lexer))) {
-		if (token->type == TOKEN_EOF)
+	while (1) {
+		token = objpool_alloc(&ctx->token_pool);
+		lexer_next(&lexer, token);
+		if (token_is_eof(token))
 			break;
-
+		/* TODO refactoring aid, remove */
+		if (token_is_eol(token)) {
+			objpool_dealloc(&ctx->token_pool, token);
+			continue;
+		}
 		toklist_insert_last(lst, token);
 	}
+
+	assert(token_is_eof(token));
+	objpool_dealloc(&ctx->token_pool, token);
 
 	lexer_free(&lexer);
 	inbuf_close(&inbuf);
