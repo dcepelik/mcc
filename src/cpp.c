@@ -30,7 +30,7 @@ void cpp_next_token(struct cpp *cpp)
 	struct cpp_file *this_file = cpp_this_file(cpp);
 
 	if (!toklist_is_empty(&this_file->tokens)) {
-		cpp->token = toklist_remove_last(&this_file->tokens);
+		cpp->token = toklist_remove_first(&this_file->tokens);
 	} else {
 		cpp->token = objpool_alloc(&cpp->ctx->token_pool);
 		lexer_next(&this_file->lexer, cpp->token);
@@ -45,8 +45,7 @@ struct token *cpp_peek(struct cpp *cpp)
 	current = cpp->token;
 	cpp_next_token(cpp);
 	next = cpp->token;
-	toklist_insert(&cpp_this_file(cpp)->tokens, next);
-	toklist_dump(&cpp_this_file(cpp)->tokens, stderr);
+	toklist_insert_first(&cpp_this_file(cpp)->tokens, next);
 	assert(!token_is_eol(next));
 	cpp->token = current;
 	return next;
