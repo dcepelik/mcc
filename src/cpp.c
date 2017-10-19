@@ -27,19 +27,34 @@ static void cpp_setup_symtab(struct cpp *cpp)
 
 void cpp_next_token(struct cpp *cpp)
 {
-	struct token *t;
-	if (toklist_is_empty(&cpp_this_file(cpp)->tokens)) {
-		t = objpool_alloc(&cpp->ctx->token_pool);
-		lexer_next(&cpp_this_file(cpp)->lexer, t);
-		toklist_insert_first(&cpp_this_file(cpp)->tokens, t);
+	struct cpp_file *this_file = cpp_this_file(cpp);
+	struct token *token;
+
+	if (toklist_is_empty(&this_file->tokens)) {
+		token = objpool_alloc(&cpp->ctx->token_pool);
+		lexer_next(&this_file->lexer, token);
+		assert(!toklist_contains(&this_file->tokens, token));
+		toklist_insert_first(&this_file->tokens, token);
 	}
 
-	DEBUG_EXPR("%lu", toklist_length(&cpp_this_file(cpp)->tokens));
-	DEBUG_MSG(toklist_is_empty(&cpp_this_file(cpp)->tokens) ? "empty" : "not empty");
-	toklist_dump(&cpp_this_file(cpp)->tokens, stderr);
+	assert(!toklist_is_empty(&this_file->tokens));
 
-	cpp->token = toklist_remove_first(&cpp_this_file(cpp)->tokens);
+	cpp->token = toklist_remove_first(&this_file->tokens);
 	assert(cpp->token != NULL); /* NOTE: EOF guards the list */
+}
+
+struct token *cpp_peek(struct cpp *cpp)
+{
+	struct token *tmp;
+	struct token *peek;
+
+	tmp = cpp->token;
+	cpp_next_token(cpp); /* TODO */
+	peek = cpp->token;
+	cpp_requeue_current(cpp);
+	cpp->token = tmp;
+
+	return peek;
 }
 
 static void cpp_error_internal(struct cpp *cpp, enum error_level level, char *fmt, va_list args)
@@ -84,20 +99,6 @@ void cpp_error(struct cpp *cpp, char *fmt, ...)
 	va_start(args, fmt);
 	cpp_error_internal(cpp, ERROR_LEVEL_ERROR, fmt, args);
 	va_end(args);
-}
-
-struct token *cpp_peek(struct cpp *cpp)
-{
-	struct token *tmp;
-	struct token *peek;
-
-	tmp = cpp->token;
-	cpp_next_token(cpp); /* TODO */
-	peek = cpp->token;
-	cpp_requeue_current(cpp);
-	cpp->token = tmp;
-
-	return peek;
 }
 
 /*

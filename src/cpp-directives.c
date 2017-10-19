@@ -76,7 +76,7 @@ static bool expect_directive(struct cpp *cpp)
 /******************************** end-of-line handling ********************************/
 
 /*
- * An end-of-line token returned by next_weol.
+ * An end-of-line token returned by next_weol. TODO not true at the moment
  */
 static struct token eol = {
 	.type = TOKEN_EOL,
@@ -99,10 +99,14 @@ static struct token eol = {
  */
 static void next_weol(struct cpp *cpp)
 {
+	struct token *new_eol;
+
 	/* NOTE: the `eol' token has `is_at_bol' set to false */
 	if (cpp_peek(cpp)->is_at_bol) {
-		assert(!toklist_contains(&cpp_this_file(cpp)->tokens, &eol));
-		toklist_insert_first(&cpp_this_file(cpp)->tokens, &eol);
+		new_eol = objpool_alloc(&cpp->ctx->token_pool);
+		*new_eol = eol;
+		assert(!toklist_contains(&cpp_this_file(cpp)->tokens, new_eol));
+		toklist_insert_first(&cpp_this_file(cpp)->tokens, new_eol);
 	}
 
 	cpp->token = toklist_remove_first(&cpp_this_file(cpp)->tokens);
@@ -385,6 +389,7 @@ static void process_include(struct cpp *cpp)
 
 	cpp_this_file(cpp)->lexer.inside_include = true;
 	next_weol(cpp); /* directive name (include) */
+	cpp_this_file(cpp)->lexer.inside_include = false;
 
 	if (cpp_is_skip_mode(cpp)) {
 		skip_rest_of_line(cpp);
@@ -419,7 +424,6 @@ static void process_include(struct cpp *cpp)
 		cpp_error(cpp, "cannot include file %s: %s", filename, error_str(err));
 		skip_rest_of_line(cpp); /* skip is delayed: error location */
 	}
-	cpp_this_file(cpp)->lexer.inside_include = false;
 }
 
 static bool eval_expr(struct cpp *cpp)
