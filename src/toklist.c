@@ -24,27 +24,27 @@ struct token *toklist_last(struct toklist *lst)
 
 struct token *toklist_next(struct token *token)
 {
-	return list_next(&token->list_node);
+	return lnode_next(&token->list_node);
 }
 
 bool toklist_is_empty(struct toklist *lst)
 {
-	return list_is_empty(&lst->tokens);
+	return list_empty(&lst->tokens);
 }
 
 size_t toklist_length(struct toklist *lst)
 {
-	return list_length(&lst->tokens);
+	return list_len(&lst->tokens);
 }
 
 struct token *toklist_insert_first(struct toklist *lst, struct token *token)
 {
-	return list_insert_first(&lst->tokens, &token->list_node);
+	return list_insert_head(&lst->tokens, &token->list_node);
 }
 
 struct token *toklist_insert_last(struct toklist *lst, struct token *token)
 {
-	return list_insert_last(&lst->tokens, &token->list_node);
+	return list_insert(&lst->tokens, &token->list_node);
 }
 
 void toklist_prepend(struct toklist *lst, struct toklist *lst_to_prepend)
@@ -59,17 +59,17 @@ void toklist_append(struct toklist *lst, struct toklist *lst_to_append)
 
 struct token *toklist_remove_first(struct toklist *lst)
 {
-	return list_remove_first(&lst->tokens);
+	return list_remove_head(&lst->tokens);
 }
 
 struct token *toklist_remove_last(struct toklist *lst)
 {
-	return list_remove_last(&lst->tokens);
+	return list_remove(&lst->tokens);
 }
 
 struct token *toklist_remove(struct toklist *lst, struct token *token)
 {
-	return list_remove(&lst->tokens, &token->list_node);
+	return list_remove_node(&lst->tokens, &token->list_node);
 }
 
 void toklist_remove_range(struct toklist *lst, struct token *a, struct token *b)
@@ -158,4 +158,9 @@ void toklist_load_from_string(struct toklist *lst, struct context *ctx, char *fm
 	toklist_load_from_strbuf(lst, ctx, &str);
 
 	strbuf_free(&str);
+}
+
+bool toklist_contains(struct toklist *lst, struct token *token)
+{
+	return list_contains(&lst->tokens, &token->list_node);
 }

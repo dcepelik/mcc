@@ -3,6 +3,4 @@
 *.swo
 *.o
 mcc
-mcpp
 vgcore.*
-tags

@@ -53,4 +53,6 @@ void toklist_copy(struct context *ctx, struct toklist *src, struct toklist *dst)
 void toklist_load_from_strbuf(struct toklist *lst, struct context *ctx, struct strbuf *str);
 void toklist_load_from_string(struct toklist *lst, struct context *ctx, char *str, ...);
 
+bool toklist_contains(struct toklist *lst, struct token *token);
+
 #endif

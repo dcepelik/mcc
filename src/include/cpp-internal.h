@@ -44,11 +44,12 @@ void cpp_warn(struct cpp *cpp, char *fmt, ...);
 
 void cpp_next_token(struct cpp *cpp);
 struct token *cpp_peek(struct cpp *cpp);
-bool lets_skip(struct cpp *cpp);
+
+bool cpp_is_skip_mode(struct cpp *cpp);
 
 struct cpp_file
 {
-	struct list_node list_node;
+	struct lnode list_node;
 	char *filename;
 	struct lexer lexer;
 	struct inbuf inbuf;
@@ -62,8 +63,8 @@ void cpp_close_file(struct cpp *cpp);
 mcc_error_t cpp_file_include_hheader(struct cpp *cpp, char *filename, struct cpp_file *file);
 mcc_error_t cpp_file_include_qheader(struct cpp *cpp, char *filename, struct cpp_file *file);
 void cpp_file_include(struct cpp *cpp, struct cpp_file *file);
-
-struct cpp_file *cpp_cur_file(struct cpp *cpp);
+bool cpp_expect(struct cpp *cpp, enum token_type token);
+struct cpp_file *cpp_this_file(struct cpp *cpp);
 
 /*
  * C preprocessor directives.
@@ -84,8 +85,8 @@ enum cpp_directive
 	CPP_DIRECTIVE_UNDEF,
 };
 
-void cpp_parse_directive(struct cpp *cpp);
-
+void cpp_setup_symtab_directives(struct symtab *table);
+void cpp_process_directive(struct cpp *cpp);
 void cpp_init_ifstack(struct cpp *cpp);
 
 /*
@@ -124,6 +125,8 @@ void macro_expand(struct cpp *file, struct toklist *invocation, struct toklist *
 
 bool macro_is_funclike(struct macro *macro);
 void macro_dump(struct macro *macro);
+
+void cpp_setup_symtab_builtins(struct cpp *cpp);
 
 /*
  * C preprocessor macro argument.

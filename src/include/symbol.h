@@ -16,7 +16,7 @@
 
 struct scope
 {
-	struct list_node scope_stack_node;
+	struct lnode scope_stack_node;
 	struct list defs;	/* symbol definitions in this scope */
 };
 
@@ -66,8 +66,8 @@ struct symdef *symbol_define(struct symtab *table, struct symbol *symbol);
 
 struct symdef
 {
-	struct list_node scope_list_node;
-	struct list_node def_stack_node;
+	struct lnode scope_list_node;
+	struct lnode def_stack_node;
 	struct symbol *symbol;
 	enum symbol_type type;
 	union {

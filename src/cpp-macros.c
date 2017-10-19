@@ -5,6 +5,90 @@
 #include "print.h"
 #include "strbuf.h"
 #include "toklist.h"
+#include <time.h>
+
+static void cpp_setup_builtin_handled(struct cpp *cpp, char *name, macro_handler_t *handler)
+{
+	struct symbol *symbol;
+	struct symdef *def;
+
+	symbol = symtab_search_or_insert(&cpp->ctx->symtab, name);
+
+	def = symbol_define(&cpp->ctx->symtab, symbol);
+	def->type = SYMBOL_TYPE_CPP_MACRO;
+
+	macro_init(&def->macro);
+	def->macro.flags = MACRO_FLAGS_BUILTIN | MACRO_FLAGS_HANDLED;
+	def->macro.handler = handler;
+}
+
+/*
+ * Setup CPP built-in macro.
+ */
+static void cpp_setup_builtin(struct cpp *cpp, char *name, char *fmt, ...)
+{
+	struct symbol *symbol;
+	struct symdef *def;
+	struct strbuf str;
+	va_list args;
+
+	symbol = symtab_search_or_insert(&cpp->ctx->symtab, name);
+
+	strbuf_init(&str, 16);
+	va_start(args, fmt);
+	strbuf_vprintf_at(&str, 0, fmt, args);
+	va_end(args);
+	
+	def = symbol_define(&cpp->ctx->symtab, symbol);
+	def->type = SYMBOL_TYPE_CPP_MACRO;
+
+	macro_init(&def->macro);
+	def->macro.flags = MACRO_FLAGS_BUILTIN;
+	toklist_load_from_strbuf(&def->macro.expansion, cpp->ctx, &str);
+
+	strbuf_free(&str);
+}
+
+/* TODO */
+static void cpp_builtin_file(struct cpp *cpp, struct macro *macro, struct toklist *out)
+{
+	(void) macro;
+	toklist_load_from_string(out, cpp->ctx, "\"%s\"", "some-file.c");
+}
+
+/* TODO */
+static void cpp_builtin_line(struct cpp *cpp, struct macro *macro, struct toklist *out)
+{
+	(void) macro;
+	toklist_load_from_string(out, cpp->ctx, "%lu", 128);
+}
+
+/*
+ * Setup CPP built-in (predefined) macros.
+ * See 6.10.8 Predefined macros.
+ */
+void cpp_setup_symtab_builtins(struct cpp *cpp)
+{
+	time_t rawtime;
+	struct tm *timeinfo;
+	char timestr[32];
+
+	time(&rawtime);
+	timeinfo = localtime(&rawtime);
+
+	strftime(timestr, sizeof(timestr), "\"%T\"", timeinfo);
+	cpp_setup_builtin(cpp, "__TIME__", timestr);
+
+	strftime(timestr, sizeof(timestr), "\"%b %e %Y\"", timeinfo); /* TODO shall be non-localized */
+	cpp_setup_builtin(cpp, "__DATE__", timestr);
+
+	cpp_setup_builtin(cpp, "__STDC__", "1");
+	cpp_setup_builtin(cpp, "__STDC_VERSION__", "201102L"); /* TODO check */
+	cpp_setup_builtin(cpp, "__STDC_HOSTED__", "0");
+
+	cpp_setup_builtin_handled(cpp, "__FILE__", cpp_builtin_file);
+	cpp_setup_builtin_handled(cpp, "__LINE__", cpp_builtin_line);
+}
 
 void macro_init(struct macro *macro)
 {
@@ -26,7 +110,7 @@ bool macro_is_funclike(struct macro *macro)
 	return macro->flags & MACRO_FLAGS_FUNCLIKE;
 }
 
-static inline bool token_is_expandable_macro(struct token *token)
+static bool token_is_expandable_macro(struct token *token)
 {
 	struct macro *macro;
 	struct token *peek;

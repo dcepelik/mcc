@@ -39,7 +39,7 @@ void errlist_insert(struct errlist *errlist, enum error_level level,
 	assert(error->level < ARRAY_SIZE(errlist->num_errors_by_level));
 	errlist->num_errors_by_level[error->level]++;
 
-	list_insert_last(&errlist->errors, &error->list_node);
+	list_insert(&errlist->errors, &error->list_node);
 }
 
 const char *error_level_to_string(enum error_level level)

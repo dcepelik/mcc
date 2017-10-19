@@ -14,11 +14,10 @@ static const char *include_dirs[] = {
 	NULL,
 };
 
-struct cpp_file *cpp_cur_file(struct cpp *cpp)
-{
-	return list_first(&cpp->file_stack);
-}
-
+/*
+ * Initialize a `cpp_file' structure: open the backing input buffer
+ * and initialize the lexer.
+ */
 mcc_error_t cpp_file_init(struct cpp *cpp, struct cpp_file *file, char *filename)
 {
 	mcc_error_t err;
@@ -33,6 +32,30 @@ mcc_error_t cpp_file_init(struct cpp *cpp, struct cpp_file *file, char *filename
 	return MCC_ERROR_OK;
 }
 
+/*
+ * Free the given instance of `cpp_file'.
+ */
+void cpp_file_free(struct cpp *cpp, struct cpp_file *file)
+{
+	(void) cpp;
+	inbuf_close(&file->inbuf);
+	lexer_free(&file->lexer);
+	toklist_free(&file->tokens);
+}
+
+/*
+ * Return the currently processed file.
+ */
+struct cpp_file *cpp_this_file(struct cpp *cpp)
+{
+	return list_first(&cpp->file_stack);
+}
+
+/*
+ * Call to `cpp_file_include' will push @file on top of the file stack.
+ * All token processing functions will operate on @file until a call to
+ * `cpp_close_file' is made.
+ */
 void cpp_file_include(struct cpp *cpp, struct cpp_file *file)
 {
 	/*
@@ -44,11 +67,16 @@ void cpp_file_include(struct cpp *cpp, struct cpp_file *file)
 	 * the other file.
 	 */
 	if (cpp->token)
-		toklist_insert_first(&cpp_cur_file(cpp)->tokens, cpp->token);
-	list_insert_first(&cpp->file_stack, &file->list_node);
+		toklist_insert_first(&cpp_this_file(cpp)->tokens, cpp->token);
+
+	list_insert_head(&cpp->file_stack, &file->list_node);
 }
 
-static mcc_error_t cpp_file_include_searchpath_do(struct cpp *cpp,
+/*
+ * Search the file @filename to be included in @search_dirs. Configure the
+ * `cpp_file' instance accordingly and return success indicator.
+ */
+static mcc_error_t search_file(struct cpp *cpp,
 	const char **search_dirs,
 	char *filename,
 	struct cpp_file *file)
@@ -68,8 +96,7 @@ static mcc_error_t cpp_file_include_searchpath_do(struct cpp *cpp,
 	if (filename[0] == '/') {
 		file_found = (access(filename, F_OK) == 0);
 		path = filename;
-	}
-	else {
+	} else {
 		for (i = 0; i < ARRAY_SIZE(include_dirs); i++) {
 			strbuf_reset(&pathbuf);
 			strbuf_printf(&pathbuf, "%s/%s", include_dirs[i], filename);
@@ -96,20 +123,12 @@ static mcc_error_t cpp_file_include_searchpath_do(struct cpp *cpp,
 
 mcc_error_t cpp_file_include_qheader(struct cpp *cpp, char *filename, struct cpp_file *file)
 {
-	return cpp_file_include_searchpath_do(cpp, include_dirs, filename, file);
+	return search_file(cpp, include_dirs, filename, file);
 }
 
 mcc_error_t cpp_file_include_hheader(struct cpp *cpp, char *filename, struct cpp_file *file)
 {
-	return cpp_file_include_searchpath_do(cpp, include_dirs, filename, file);
-}
-
-void cpp_file_free(struct cpp *cpp, struct cpp_file *file)
-{
-	(void) cpp;
-	inbuf_close(&file->inbuf);
-	lexer_free(&file->lexer);
-	toklist_free(&file->tokens);
+	return search_file(cpp, include_dirs, filename, file);
 }
 
 mcc_error_t cpp_open_file(struct cpp *cpp, char *filename)
@@ -132,12 +151,12 @@ mcc_error_t cpp_open_file(struct cpp *cpp, char *filename)
 
 void cpp_close_file(struct cpp *cpp)
 {
-	assert(!list_is_empty(&cpp->file_stack));
+	assert(!list_empty(&cpp->file_stack));
 
 	struct cpp_file *file;
 
 	file = list_first(&cpp->file_stack);
-	list_remove_first(&cpp->file_stack);
+	list_remove_head(&cpp->file_stack);
 
 	cpp_file_free(cpp, file);
 	objpool_dealloc(&cpp->file_pool, file);

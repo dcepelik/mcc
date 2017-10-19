@@ -63,7 +63,7 @@ void symtab_init(struct symtab *table)
 	list_init(&table->scope_stack);
 
 	scope_init(&table->file_scope);
-	list_insert_first(&table->scope_stack, &table->file_scope.scope_stack_node);
+	list_insert_head(&table->scope_stack, &table->file_scope.scope_stack_node);
 
 	hashtab_init(&table->table, &table->symbol_pool, 256);
 }
@@ -105,8 +105,8 @@ struct symdef *symbol_define(struct symtab *table, struct symbol *symbol)
 
 	def = objpool_alloc(&table->symdef_pool);
 	def->symbol = symbol;
-	list_insert_last(&scope->defs, &def->scope_list_node);
-	list_insert_first(&symbol->def_stack, &def->def_stack_node);
+	list_insert(&scope->defs, &def->scope_list_node);
+	list_insert_head(&symbol->def_stack, &def->def_stack_node);
 
 	symbol->def = def;
 
@@ -167,7 +167,7 @@ struct symbol *symtab_search_or_insert(struct symtab *table, char *name)
 void symtab_scope_begin(struct symtab *table)
 {
 	struct scope *scope = scope_new(table);
-	list_insert_first(&table->scope_stack, &scope->scope_stack_node);
+	list_insert_head(&table->scope_stack, &scope->scope_stack_node);
 }
 
 void symtab_scope_end(struct symtab *table)
@@ -183,9 +183,9 @@ void symtab_scope_end(struct symtab *table)
 		symbol = def->symbol;
 
 		assert(list_first(&symbol->def_stack) == &def->def_stack_node);
-		list_remove_first(&symbol->def_stack);
+		list_remove_head(&symbol->def_stack);
 
-		if (list_is_empty(&symbol->def_stack))
+		if (list_empty(&symbol->def_stack))
 			symbol->def = &symbol_undef;
 		else
 			symbol->def = container_of(list_first(&symbol->def_stack), struct symdef, def_stack_node);
@@ -193,7 +193,7 @@ void symtab_scope_end(struct symtab *table)
 		//objpool_dealloc(&table->symdef_pool, def); TODO How?
 	}
 
-	list_remove_first(&table->scope_stack);
+	list_remove_head(&table->scope_stack);
 
 	scope_delete(table, scope);
 }
@@ -202,7 +202,7 @@ void symtab_dump(struct symtab *table, FILE *fout)
 {
 	size_t i;
 	
-	i = list_length(&table->scope_stack) - 1;
+	i = list_len(&table->scope_stack) - 1;
 
 	fprintf(fout, "Symbol table:\n");
 	list_foreach(struct scope, scope, &table->scope_stack, scope_stack_node) {

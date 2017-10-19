@@ -7,14 +7,137 @@
 #define VA_ARGS_NAME	"__VA_ARGS__"
 
 /*
+ * C preprocessor directive information.
+ */
+struct cpp_dirinfo
+{
+	char *name;
+	enum cpp_directive directive;
+};
+
+/*
+ * Array of `struct cpp_dirinfo' used by `cpp_setup_symtab_directives'.
+ */
+static const struct cpp_dirinfo dirinfos[] = {
+	{ .name = "if", .directive = CPP_DIRECTIVE_IF },
+	{ .name = "ifdef", .directive = CPP_DIRECTIVE_IFDEF },
+	{ .name = "ifndef", .directive = CPP_DIRECTIVE_IFNDEF },
+	{ .name = "elif", .directive = CPP_DIRECTIVE_ELIF },
+	{ .name = "else", .directive = CPP_DIRECTIVE_ELSE },
+	{ .name = "endif", .directive = CPP_DIRECTIVE_ENDIF },
+	{ .name = "include", .directive = CPP_DIRECTIVE_INCLUDE },
+	{ .name = "define", .directive = CPP_DIRECTIVE_DEFINE },
+	{ .name = "undef", .directive = CPP_DIRECTIVE_UNDEF },
+	{ .name = "line", .directive = CPP_DIRECTIVE_LINE },
+	{ .name = "error", .directive = CPP_DIRECTIVE_ERROR },
+	{ .name = "pragma", .directive = CPP_DIRECTIVE_PRAGMA },
+};
+
+/*
+ * Provide definitions for symbols corresponding to names of CPP directives.
+ * See `struct dirinfo', `dirinfos'. See 6.10 Preprocessing directives.
+ */
+void cpp_setup_symtab_directives(struct symtab *table)
+{
+	struct symbol *symbol;
+	struct symdef *def;
+	size_t i;
+
+	for (i = 0; i < ARRAY_SIZE(dirinfos); i++) {
+		symbol = symtab_insert(table, dirinfos[i].name);
+
+		def = symbol_define(table, symbol);
+		def->type = SYMBOL_TYPE_CPP_DIRECTIVE;
+		def->directive = dirinfos[i].directive;
+	}
+}
+
+/*
+ * An end-of-line token returned by next_weol.
+ */
+static struct token eol = {
+	.type = TOKEN_EOL,
+	.spelling = NULL,
+	.after_white = false,
+	.is_at_bol = false,
+};
+
+/*
+ * Move to the next token. Does to same as `cpp_next_token', except that
+ * `next_weol' will produce a TOKEN_EOL when end-of-line is reached.
+ *
+ * This is suitable (only for) directive processing, because CPP directives
+ * are required to be contained within a single logical line. This way, one
+ * can depend on having the stream of line's tokens terminated with 
+ * a TOKEN_EOL token.
+ *
+ * NOTE: `next_weol' is incapable of eating the return EOL token. The
+ *       token will be returned over and over unless eaten by `cpp_next_token'.
+ */
+static void next_weol(struct cpp *cpp)
+{
+	/* NOTE: the `eol' token has `is_at_bol' set to false */
+	if (cpp_peek(cpp)->is_at_bol) {
+		assert(!toklist_contains(&cpp_this_file(cpp)->tokens, &eol));
+		toklist_insert_first(&cpp_this_file(cpp)->tokens, &eol);
+	}
+
+	cpp->token = toklist_remove_first(&cpp_this_file(cpp)->tokens);
+}
+
+/*
+ * Skip rest of current line.
+ *
+ * NOTE: Nothing will be skipped if we're at the beginning of a line!
+ */
+static void skip_rest_of_line(struct cpp *cpp)
+{
+	while (!token_is_eol_or_eof(cpp->token))
+		next_weol(cpp);
+}
+
+/*
+ * Skip rest of current line, issuing a warning if anything was there. This 
+ * is used when I assume there are no more tokens on a line, but if I'm 
+ * wrong, I want to skip them and let the user know I omitted something.
+ *
+ * NOTE: Nothing will be skiped if we're at the beginning of a line!
+ */
+static void skip_rest_grouching(struct cpp *cpp)
+{
+	if (!token_is_eol_or_eof(cpp->token)) {
+		cpp_warn(cpp, "unexpected extra tokens will be skipped");
+		skip_rest_of_line(cpp);
+	}
+}
+
+/*
+ * Expect any directive on the input. If it's not there, issue an error.
+ */
+static bool expect_directive(struct cpp *cpp)
+{
+	if (!cpp_expect(cpp, TOKEN_NAME))
+		return false;
+
+	if (cpp->token->symbol->def->type != SYMBOL_TYPE_CPP_DIRECTIVE) {
+		cpp_error(cpp, "`%s' is not a C preprocessor directive",
+			symbol_get_name(cpp->token->symbol));
+		return false;
+	}
+	return true;
+}
+
+/******************************** ifstack helpers ********************************/
+
+/*
  * Represents a currently processed CPP `if' directive.
  */
 struct cpp_if
 {
-	struct list_node list_node;
-	struct token *token;
-	bool skip_this_branch;
-	bool skip_next_branch;
+	struct lnode list_node;	/* node in the if-stack */
+	struct token *token;		/* the corresponding `if' token */
+	bool skip_this_branch;		/* are we inside a skipped branch? */
+	bool skip_next_branch;		/* should the next branch be skipped? */
 };
 
 /*
@@ -39,101 +162,7 @@ static struct cpp_if ifstack_bottom = {
 void cpp_init_ifstack(struct cpp *cpp)
 {
 	list_init(&cpp->ifs);
-	list_insert_first(&cpp->ifs, &ifstack_bottom.list_node);
-}
-
-static bool have_directive(struct cpp *cpp, enum cpp_directive directive)
-{
-	return token_is(cpp->token, TOKEN_NAME)
-		&& cpp->token->symbol->def->type == SYMBOL_TYPE_CPP_DIRECTIVE
-		&& cpp->token->symbol->def->directive == directive;
-}
-
-/*
- * Move to the next token. Does to same as `next_weol', except that
- * `next_weol' will produce a TOKEN_EOL when end-of-line is reached.
- *
- * This is suitable (only for) directive processing, because CPP directives
- * are required to be contained within a single logical line.
- */
-static void next_weol(struct cpp *cpp)
-{
-	struct token *t;
-	if (toklist_is_empty(&cpp_cur_file(cpp)->tokens)) {
-		t = objpool_alloc(&cpp->ctx->token_pool);
-		lexer_next(&cpp_cur_file(cpp)->lexer, t);
-		/* TODO make this per-file, too */
-		toklist_insert_first(&cpp_cur_file(cpp)->tokens, t);
-
-		if (t->is_at_bol) {
-			t = objpool_alloc(&cpp->ctx->token_pool);
-			t->type = TOKEN_EOL;
-			t->is_at_bol = false;
-			t->after_white = true;
-			t->enc_prefix = ENC_PREFIX_NONE;
-			/* TODO gosh! */
-			t->startloc = toklist_first(&cpp_cur_file(cpp)->tokens)->startloc;
-			t->endloc = toklist_first(&cpp_cur_file(cpp)->tokens)->endloc;
-			toklist_insert_first(&cpp_cur_file(cpp)->tokens, t);
-		}
-	}
-
-	cpp->token = toklist_remove_first(&cpp_cur_file(cpp)->tokens);
-}
-
-/*
- * Skip rest of current line.
- *
- * NOTE: Nothing will be skipped if we're at the beginning of a line!
- */
-static void skip_rest_of_line(struct cpp *cpp)
-{
-	while (!token_is_eol_or_eof(cpp->token))
-		next_weol(cpp);
-}
-
-/*
- * Skip rest of current line, issuing a warning if anything was there. This 
- * is used when I assume there are no more tokens on a line, but if I'm 
- * wrong, I want to skip them and let the user know I omitted something.
- *
- * NOTE: Nothing will be skiped if we're at the beginning of a line!
- */
-static void skip_rest_and_warn(struct cpp *cpp)
-{
-	if (!token_is_eol_or_eof(cpp->token)) {
-		cpp_warn(cpp, "unexpected extra tokens will be skipped");
-		skip_rest_of_line(cpp);
-	}
-}
-
-/*
- * Expect a token on the input. If it's not there, issue an error.
- */
-static bool expect_token(struct cpp *cpp, enum token_type token)
-{
-	if (cpp->token->type == token)
-		return true;
-
-	cpp_error(cpp, "%s was expected, got %s",
-		token_get_name(token), token_get_name(cpp->token->type));
-	return false;
-}
-
-/*
- * Expect any directive on the input. If it's not there, issue an error.
- */
-static bool expect_directive(struct cpp *cpp)
-{
-	if (!expect_token(cpp, TOKEN_NAME))
-		return false;
-
-	if (cpp->token->symbol->def->type != SYMBOL_TYPE_CPP_DIRECTIVE) {
-		cpp_error(cpp, "`%s' is not a C preprocessor directive",
-			symbol_get_name(cpp->token->symbol));
-		return false;
-	}
-	return true;
+	list_insert_head(&cpp->ifs, &ifstack_bottom.list_node);
 }
 
 /*
@@ -150,7 +179,7 @@ static struct cpp_if *push_if(struct cpp *cpp, struct token *token)
 	cpp_if->skip_this_branch = false;
 	cpp_if->skip_next_branch = false;
 
-	list_insert_first(&cpp->ifs, &cpp_if->list_node);
+	list_insert_head(&cpp->ifs, &cpp_if->list_node);
 
 	return cpp_if;
 }
@@ -160,30 +189,32 @@ static struct cpp_if *push_if(struct cpp *cpp, struct token *token)
  */
 static struct cpp_if *pop_if(struct cpp *cpp)
 {
-	assert(!list_is_empty(&cpp->ifs));
-	return list_remove_first(&cpp->ifs);
+	assert(!list_empty(&cpp->ifs));
+	return list_remove_head(&cpp->ifs);
 }
 
 /*
- * Return the top (or current, matching) `cpp_if' of the `if' stack.
+ * Return the top (``current'') `cpp_if' of the `if' stack.
  */
 static struct cpp_if *current_if(struct cpp *cpp)
 {
-	assert(!list_is_empty(&cpp->ifs));
+	assert(!list_empty(&cpp->ifs));
 	return list_first(&cpp->ifs);
 }
 
 /*
  * Are we inside an `if'/`elif'/`else' branch which should be skipped?
  */
-bool lets_skip(struct cpp *cpp)
+bool cpp_is_skip_mode(struct cpp *cpp)
 {
 	return current_if(cpp)->skip_this_branch;
 }
 
+/******************************** directive handlers ********************************/
+
 /*
- * Parse the argument list in the definition of a CPP macro. The document
- * list may only contain the opening parenthesis (already processed TODO),
+ * Parse the argument list in the definition of a CPP macro. The argument
+ * list may only contain the opening parenthesis (already eaten),
  * a list of comma-separated identifiers, and a closing parentheses.
  */
 static void parse_macro_arglist(struct cpp *cpp, struct macro *macro)
@@ -213,7 +244,7 @@ static void parse_macro_arglist(struct cpp *cpp, struct macro *macro)
 		if (cpp->token->type == TOKEN_ELLIPSIS)
 			cpp->token->symbol = symtab_search_or_insert(&cpp->ctx->symtab,
 				VA_ARGS_NAME);
-		else if (!expect_token(cpp, TOKEN_NAME))
+		else if (!cpp_expect(cpp, TOKEN_NAME))
 			continue;
 
 		toklist_insert_last(&macro->args, cpp->token);
@@ -233,13 +264,13 @@ static void parse_define(struct cpp *cpp)
 {
 	struct symdef *symdef;
 
-	if (lets_skip(cpp)) {
+	if (cpp_is_skip_mode(cpp)) {
 		skip_rest_of_line(cpp);
 		return;
 	}
 
-	if (!expect_token(cpp, TOKEN_NAME)) {
-		skip_rest_and_warn(cpp);
+	if (!cpp_expect(cpp, TOKEN_NAME)) {
+		skip_rest_grouching(cpp);
 		return;
 	}
 
@@ -283,18 +314,18 @@ static void parse_define(struct cpp *cpp)
  */
 static void process_undef(struct cpp *cpp)
 {
-	if (lets_skip(cpp)) {
+	if (cpp_is_skip_mode(cpp)) {
 		skip_rest_of_line(cpp);
 		return;
 	}
 
-	if (!expect_token(cpp, TOKEN_NAME)) {
-		skip_rest_and_warn(cpp);
+	if (!cpp_expect(cpp, TOKEN_NAME)) {
+		skip_rest_grouching(cpp);
 		return;
 	}
 
 	next_weol(cpp);
-	skip_rest_and_warn(cpp);
+	skip_rest_grouching(cpp);
 }
 
 /*
@@ -315,7 +346,7 @@ static void process_undef(struct cpp *cpp)
  */
 static void process_error(struct cpp *cpp)
 {
-	if (lets_skip(cpp)) {
+	if (cpp_is_skip_mode(cpp)) {
 		skip_rest_of_line(cpp);
 		return;
 	}
@@ -333,7 +364,9 @@ static void process_include(struct cpp *cpp)
 	mcc_error_t err;
 	struct cpp_file *file;
 
-	if (lets_skip(cpp)) {
+	cpp_this_file(cpp)->lexer.inside_include = true;
+
+	if (cpp_is_skip_mode(cpp)) {
 		skip_rest_of_line(cpp);
 		return;
 	}
@@ -352,7 +385,8 @@ static void process_include(struct cpp *cpp)
 		err = cpp_file_include_qheader(cpp, filename, file);
 	}
 	else {
-		cpp_error(cpp, "header name was expected, got %s", token_get_name(cpp->token->type));
+		cpp_error(cpp, "header name was expected, got %s",
+			token_get_name(cpp->token->type));
 		skip_rest_of_line(cpp);
 		return;
 	}
@@ -366,10 +400,17 @@ static void process_include(struct cpp *cpp)
 		skip_rest_of_line(cpp); /* skip is delayed: error location */
 	}
 
-	cpp_cur_file(cpp)->lexer.inside_include = false;
+	cpp_this_file(cpp)->lexer.inside_include = false;
 }
 
-void cpp_parse_directive(struct cpp *cpp)
+static void start_if(struct cpp *cpp)
+{
+	(void) cpp;
+}
+
+/******************************** public API ********************************/
+
+void cpp_process_directive(struct cpp *cpp)
 {
 	struct cpp_if *cpp_if;
 	struct token *prev;
@@ -393,7 +434,7 @@ void cpp_parse_directive(struct cpp *cpp)
 	prev = cpp->token;
 	dir = cpp->token->symbol->def->directive;
 
-	cpp_cur_file(cpp)->lexer.inside_include = have_directive(cpp, CPP_DIRECTIVE_INCLUDE);
+	cpp_this_file(cpp)->lexer.inside_include = (dir == CPP_DIRECTIVE_IF);
 
 	next_weol(cpp);
 
@@ -412,7 +453,7 @@ void cpp_parse_directive(struct cpp *cpp)
 		test_cond = true; /* TODO */
 
 push_if:
-		skipping = lets_skip(cpp);
+		skipping = cpp_is_skip_mode(cpp);
 		cpp_if = push_if(cpp, prev);
 		cpp_if->skip_next_branch = skipping;
 
@@ -469,5 +510,5 @@ conclude:
 		return;
 	}
 
-	skip_rest_and_warn(cpp);
+	skip_rest_grouching(cpp);
 }

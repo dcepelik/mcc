@@ -36,7 +36,7 @@ const char *error_level_to_string(enum error_level level);
 
 struct error
 {
-	struct list_node list_node;
+	struct lnode list_node;
 	enum error_level level;
 	char *filename;
 	char *message;

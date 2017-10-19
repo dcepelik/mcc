@@ -109,7 +109,7 @@ enum enc_prefix
 
 struct token
 {
-	struct list_node list_node;	/* node for token lists */
+	struct lnode list_node;	/* node for token lists */
 	char *spelling;			/* token as given in input */
 
 	enum token_type type;		/* token type */

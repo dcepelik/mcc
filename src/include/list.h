@@ -7,49 +7,67 @@
 
 #define container_of(ptr, type, member) ((type *)((char *)(ptr) - offsetof(type, member)))
 
-#define list_foreach(type, item, lst, member) \
-	for (type *item = container_of(list_first(lst), type, member); \
+#define list_foreach(type, item, l, member) \
+	for (type *item = container_of(list_first(l), type, member); \
 		item != offsetof(type, member); \
 		item = container_of(item->member.next, type, member))
 
-struct list_node
+/*
+ * Node of a singly-linked list.
+ */
+struct lnode
 {
-	struct list_node *next;
+	struct lnode *next;	/* next node in the list */
 };
 
+void *lnode_next(struct lnode *n);
+
+/*
+ * Singly-linked list with a head.
+ */
 struct list
 {
-	struct list_node head;
-	struct list_node *last;
+	struct lnode head;	/* the head of the list */
+	struct lnode *last;	/* the last node in the list or @head */
 };
 
-void list_init(struct list *lst);
-void list_free(struct list *lst);
+void list_init(struct list *l);
+void list_free(struct list *l);
 
-void list_prepend(struct list *lst, struct list *lst_to_prepend);
-void list_append(struct list *lst, struct list *lst_to_append);
+bool list_empty(struct list *l);
+size_t list_len(struct list *l);
 
-void list_insert_after(struct list *lst, struct list_node *after, struct list_node *node);
-void list_insert_list_after(struct list *lst, struct list_node *after, struct list *lst_to_insert);
+void *list_first(struct list *l);
+void *list_last(struct list *l);
 
-void *list_insert_first(struct list *lst, struct list_node *node);
-void *list_insert_last(struct list *lst, struct list_node *node);
+void *list_find_prev(struct list *l, struct lnode *n);
 
-void *list_remove_first(struct list *lst);
-void *list_remove_last(struct list *lst);
+bool list_contains(struct list *l, struct lnode *n);
 
-void *list_remove(struct list *lst, struct list_node *node);
-struct list list_remove_range(struct list *lst, struct list_node *start, struct list_node *end);
+/*
+ * TODO
+ * Concatenate @l1 and @l2. List @l1 will become the result and
+ * list @l2 will be empty.
+ */
 
-void *list_find_predecessor(struct list *lst, struct list_node *node);
+// list_cat(struct list *l1, struct list *l2);
+void list_prepend(struct list *l, struct list *lst_to_prepend);
+void list_append(struct list *l, struct list *lst_to_append);
 
-bool list_is_empty(struct list *lst);
-size_t list_length(struct list *lst);
+void list_insert_list_after(struct list *l, struct lnode *after, struct list *lst_to_insert);
 
-void *list_first(struct list *lst);
-void *list_last(struct list *lst);
-void *list_next(struct list_node *node);
+void *list_insert(struct list *l, struct lnode *n);
+void *list_insert_head(struct list *l, struct lnode *n);
+void list_insert_after(struct list *l, struct lnode *after, struct lnode *n);
 
-struct list_node *list_head(struct list *lst);
+void *list_remove(struct list *l);
+void *list_remove_head(struct list *l);
+void *list_remove_node(struct list *l, struct lnode *n);
+
+/*
+ * TODO Remove this as it makes no sense. Most of the time, I want to have
+ *      a hand on the items I remove so that I can dispose them properly.
+ */
+struct list list_remove_range(struct list *l, struct lnode *start, struct lnode *end);
 
 #endif
