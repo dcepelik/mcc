@@ -45,12 +45,29 @@ void cpp_setup_symtab_directives(struct symtab *table)
 
 	for (i = 0; i < ARRAY_SIZE(dirinfos); i++) {
 		symbol = symtab_insert(table, dirinfos[i].name);
-
 		def = symbol_define(table, symbol);
 		def->type = SYMBOL_TYPE_CPP_DIRECTIVE;
 		def->directive = dirinfos[i].directive;
 	}
 }
+
+/*
+ * Expect any directive on the input. If it's not there, issue an error.
+ */
+static bool expect_directive(struct cpp *cpp)
+{
+	if (!cpp_expect(cpp, TOKEN_NAME))
+		return false;
+
+	if (cpp->token->symbol->def->type != SYMBOL_TYPE_CPP_DIRECTIVE) {
+		cpp_error(cpp, "`%s' is not a C preprocessor directive",
+			symbol_get_name(cpp->token->symbol));
+		return false;
+	}
+	return true;
+}
+
+/******************************** end-of-line handling ********************************/
 
 /*
  * An end-of-line token returned by next_weol.
@@ -109,22 +126,6 @@ static void skip_rest_grouching(struct cpp *cpp)
 		cpp_warn(cpp, "unexpected extra tokens will be skipped");
 		skip_rest_of_line(cpp);
 	}
-}
-
-/*
- * Expect any directive on the input. If it's not there, issue an error.
- */
-static bool expect_directive(struct cpp *cpp)
-{
-	if (!cpp_expect(cpp, TOKEN_NAME))
-		return false;
-
-	if (cpp->token->symbol->def->type != SYMBOL_TYPE_CPP_DIRECTIVE) {
-		cpp_error(cpp, "`%s' is not a C preprocessor directive",
-			symbol_get_name(cpp->token->symbol));
-		return false;
-	}
-	return true;
 }
 
 /******************************** ifstack helpers ********************************/
@@ -214,13 +215,16 @@ bool cpp_is_skip_mode(struct cpp *cpp)
 
 /*
  * Parse the argument list in the definition of a CPP macro. The argument
- * list may only contain the opening parenthesis (already eaten),
- * a list of comma-separated identifiers, and a closing parentheses.
+ * list may only contain the opening parenthesis, a list of comma-separated
+ * identifiers, and a closing parentheses.
  */
 static void parse_macro_arglist(struct cpp *cpp, struct macro *macro)
 {
 	bool expect_comma = false;
 	bool arglist_ended = false;
+
+	assert(token_is(cpp->token, TOKEN_LPAREN));
+	next_weol(cpp); /* ( */
 
 	while (!token_is_eol_or_eof(cpp->token)) {
 		if (token_is(cpp->token, TOKEN_COMMA)) {
@@ -239,7 +243,7 @@ static void parse_macro_arglist(struct cpp *cpp, struct macro *macro)
 
 		if (expect_comma)
 			cpp_error(cpp, "comma was expected here");
-			/* fall-through: we know there should be a comma, act as if */
+			/* keep going: we know there should be a comma, act as if */
 
 		if (cpp->token->type == TOKEN_ELLIPSIS)
 			cpp->token->symbol = symtab_search_or_insert(&cpp->ctx->symtab,
@@ -247,7 +251,7 @@ static void parse_macro_arglist(struct cpp *cpp, struct macro *macro)
 		else if (!cpp_expect(cpp, TOKEN_NAME))
 			continue;
 
-		toklist_insert_last(&macro->args, cpp->token);
+		toklist_insert(&macro->args, cpp->token);
 		expect_comma = true;
 		next_weol(cpp); /* argument identifier or __VA_ARGS__ */
 	}
@@ -262,7 +266,7 @@ static void parse_macro_arglist(struct cpp *cpp, struct macro *macro)
  */
 static void parse_define(struct cpp *cpp)
 {
-	struct symdef *symdef;
+	struct symdef *macro_def;
 
 	if (cpp_is_skip_mode(cpp)) {
 		skip_rest_of_line(cpp);
@@ -276,32 +280,35 @@ static void parse_define(struct cpp *cpp)
 
 	/*
 	 * We will provide a new definition for macro name, which will be a CPP 
-	 * macro; either object-like or function like.
+	 * macro (either object-like or function-like).
 	 */
-	symdef = symbol_define(&cpp->ctx->symtab, cpp->token->symbol);
-	symdef->type = SYMBOL_TYPE_CPP_MACRO;
-	macro_init(&symdef->macro);
-	symdef->macro.name = symbol_get_name(cpp->token->symbol);
+	macro_def = symbol_define(&cpp->ctx->symtab, cpp->token->symbol);
+	macro_def->type = SYMBOL_TYPE_CPP_MACRO;
+	macro_init(&macro_def->macro);
+	macro_def->macro.name = symbol_get_name(cpp->token->symbol);
 
 	next_weol(cpp); /* macro name */
 
+	/*
+	 * If a left opening parentheses directly follows macro name,
+	 * the macro defined is function-like. Otherwise, it is object-like.
+	 */
 	if (cpp->token->type == TOKEN_LPAREN && !cpp->token->after_white) {
-		symdef->macro.flags = MACRO_FLAGS_FUNCLIKE;
-		next_weol(cpp); /* ( */
-		parse_macro_arglist(cpp, &symdef->macro);
+		macro_def->macro.flags = MACRO_FLAGS_FUNCLIKE;
+		parse_macro_arglist(cpp, &macro_def->macro);
 	} else {
-		symdef->macro.flags = MACRO_FLAGS_OBJLIKE;
+		macro_def->macro.flags = MACRO_FLAGS_OBJLIKE;
 	}
 		
 	//macro_dump(macro);
 
 	/*
 	 * For both object-like and function-like macros, construct the
-	 * replacement list (expansion) from the tokens on the current
+	 * replacement list (the expansion) from the tokens on the current
 	 * line.
 	 */
 	while (!token_is_eol_or_eof(cpp->token)) {
-		toklist_insert_last(&symdef->macro.expansion, cpp->token);
+		toklist_insert(&macro_def->macro.expansion, cpp->token);
 		next_weol(cpp);
 	}
 

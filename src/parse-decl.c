@@ -92,7 +92,7 @@ static void parse_init_declr(struct parser *parser, struct ast_init_declr *init_
 	while (token_is(parser->token, TOKEN_ASTERISK)
 		|| token_is(parser->token, TOKEN_LPAREN)
 		|| token_is_tqual(parser->token)) {
-		toklist_insert_last(&stack, parser->token);
+		toklist_insert(&stack, parser->token);
 		parser_next(parser);
 	}
 

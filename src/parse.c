@@ -44,7 +44,7 @@ void parser_skip(struct parser *parser)
 
 void parser_next_push(struct parser *parser, struct toklist *toklist)
 {
-	toklist_insert_last(toklist, parser->token);
+	toklist_insert(toklist, parser->token);
 	parser_next(parser);
 }
 

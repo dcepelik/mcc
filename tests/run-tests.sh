@@ -37,12 +37,14 @@ suite=$1
 
 num_ok=0
 num_errs=0
-prog=$(pwd)/../build/$suite
+prog=$(pwd)/../build/dbg/$suite
 
 if [ -z "$suite" ]; then
 	echo "$0: usage: $0 SUITE"
 	exit 1
 fi
+
+make --dir=.. || exit 1
 
 cd $suite
 

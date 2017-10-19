@@ -128,7 +128,7 @@ static void expand_macro_invocation(struct cpp *cpp)
 	toklist_init(&invocation);
 	toklist_init(&expansion);
 
-	toklist_insert_last(&invocation, cpp->token); /* macro name */
+	toklist_insert(&invocation, cpp->token); /* macro name */
 	cpp_next_token(cpp);
 
 	/*
@@ -148,7 +148,7 @@ static void expand_macro_invocation(struct cpp *cpp)
 					args_ended = true;
 			}
 
-			toklist_insert_last(&invocation, cpp->token);
+			toklist_insert(&invocation, cpp->token);
 			cpp_next_token(cpp);
 
 			if (args_ended)
@@ -293,7 +293,7 @@ struct token *cpp_next(struct cpp *cpp)
 		if (token_is_eol(cpp->token)) {
 		}
 		else if (token_is(cpp->token, TOKEN_STRING_LITERAL)) {
-			toklist_insert_last(&stringles, cpp->token);
+			toklist_insert(&stringles, cpp->token);
 		} else if (!toklist_is_empty(&stringles)) {
 			return concat_strings(cpp, &stringles);
 		} else if (token_is_eof(cpp->token)) {

@@ -253,7 +253,7 @@ static struct token *macro_parse_args(struct cpp *cpp, struct macro *macro, stru
 
 			next = toklist_next(token);
 			toklist_remove(invocation, token);
-			toklist_insert_last(&args, token);
+			toklist_insert(&args, token);
 			token = next;
 		}
 
@@ -282,13 +282,13 @@ static void macro_expand_rescan(struct cpp *cpp, struct toklist *in, struct tokl
 
 	while ((token = toklist_first(in)) != NULL) {
 		if (!token_is_expandable_macro(token)) {
-			toklist_insert_last(out, toklist_remove_first(in));
+			toklist_insert(out, toklist_remove_first(in));
 			continue;
 		}
 
 		if (token->symbol->def->macro.is_expanding) {
 			token->noexpand = true;
-			toklist_insert_last(out, toklist_remove_first(in));
+			toklist_insert(out, toklist_remove_first(in));
 			continue;
 		}
 
@@ -360,10 +360,10 @@ void macro_paste_arg_prepare(struct cpp *cpp, struct token *arg, struct toklist 
 		toklist_copy(cpp->ctx, &arg->symbol->def->macro_arg.tokens, lst);
 
 		if (toklist_is_empty(lst))
-			toklist_insert_last(lst, new_placemarker(cpp));
+			toklist_insert(lst, new_placemarker(cpp));
 	}
 	else {
-		toklist_insert_last(lst, arg);
+		toklist_insert(lst, arg);
 	}
 }
 
@@ -428,10 +428,10 @@ static void macro_replace_args(struct cpp *cpp, struct toklist *in, struct tokli
 		}
 		else if (!token_is_macro_arg(token)) {
 			assert(!hash); /* Not # {notarg} TODO Error reporting */
-			toklist_insert_last(out, toklist_remove_first(in));
+			toklist_insert(out, toklist_remove_first(in));
 		}
 		else if (hash) {
-			toklist_insert_last(out, cpp_stringify(cpp, token));
+			toklist_insert(out, cpp_stringify(cpp, token));
 			toklist_remove_first(in);
 			hash = false;
 		}

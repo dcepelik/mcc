@@ -35,7 +35,7 @@ bool toklist_is_empty(struct toklist *lst);
 size_t toklist_length(struct toklist *lst);
 
 struct token *toklist_insert_first(struct toklist *lst, struct token *token);
-struct token *toklist_insert_last(struct toklist *lst, struct token *token);
+struct token *toklist_insert(struct toklist *lst, struct token *token);
 
 void toklist_prepend(struct toklist *lst, struct toklist *lst_to_prepend);
 void toklist_append(struct toklist *lst, struct toklist *lst_to_append);

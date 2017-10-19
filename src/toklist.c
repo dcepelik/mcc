@@ -42,7 +42,7 @@ struct token *toklist_insert_first(struct toklist *lst, struct token *token)
 	return list_insert_head(&lst->tokens, &token->list_node);
 }
 
-struct token *toklist_insert_last(struct toklist *lst, struct token *token)
+struct token *toklist_insert(struct toklist *lst, struct token *token)
 {
 	return list_insert(&lst->tokens, &token->list_node);
 }
@@ -84,7 +84,7 @@ void toklist_copy(struct context *ctx, struct toklist *src, struct toklist *dst)
 	toklist_foreach(src_token, src) {
 		dst_token = objpool_alloc(&ctx->token_pool);
 		*dst_token = *src_token;
-		toklist_insert_last(dst, dst_token);
+		toklist_insert(dst, dst_token);
 	}
 
 	/* TODO handle errors */
@@ -135,7 +135,7 @@ void toklist_load_from_strbuf(struct toklist *lst, struct context *ctx, struct s
 			objpool_dealloc(&ctx->token_pool, token);
 			continue;
 		}
-		toklist_insert_last(lst, token);
+		toklist_insert(lst, token);
 	}
 
 	assert(token_is_eof(token));
