@@ -1,4 +1,4 @@
-*.d
-*.o
-mcc
-mcpp
+*
+!dbg/
+!opt/
+!deps/

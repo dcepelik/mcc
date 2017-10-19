@@ -1,68 +1,78 @@
-.PHONY: all clean
+# 
+#  Makefile for Minimalist C Compiler
+#  Copyright 2017 David Čepelík <d@dcepelik.cz>
+# 
+
+.SILENT:
+.PHONY: dbg opt all clean
+
+SRC_DIR = src
+INC_DIR = $(SRC_DIR)/include
 
 BUILD_DIR = build
-SRC_DIR = src
-OBJS_DIR = $(BUILD_DIR)/objs
 DEPS_DIR = $(BUILD_DIR)/deps
-INC_DIRS = $(SRC_DIR)/include
+DBG_DIR = $(BUILD_DIR)/dbg
+OPT_DIR = $(BUILD_DIR)/opt
 
-BINS = $(BUILD_DIR)/mcc $(BUILD_DIR)/mcpp
-SRCS = array.c \
-	ast.c \
-	common.c \
-	context.c \
-	cpp.c \
-	cpp-directives.c \
-	cpp-files.c \
-	cpp-macros.c \
-	debug.c \
-	errlist.c \
-	error.c \
-	hashtab.c \
-	inbuf.c \
-	keyword.c \
-	lexer.c \
-	list.c \
-	mcc.c \
-	mcpp.c \
-	mempool.c \
-	objpool.c \
-	operator.c \
-	parse.c \
-	parse-decl.c \
-	parse-expr.c \
-	print.c \
-	strbuf.c \
-	symbol.c \
-	token.c \
-	toklist.c \
-	utf8.c
-MAINS = $(OBJS_DIR)/mcc.o $(OBJS_DIR)/mcpp.o
-OBJS = $(filter-out $(MAINS), $(addprefix $(OBJS_DIR)/, $(patsubst %.c, %.o, $(SRCS))))
+BINS = mcc mcpp
+SRCS = array.c ast.c cexpr.c common.c context.c cpp.c cpp-directives.c \
+	cpp-files.c cpp-macros.c debug.c errlist.c error.c hashtab.c inbuf.c \
+	keyword.c lexer.c list.c mcc.c mcpp.c mempool.c objpool.c \
+	operator.c parse.c parse-decl.c parse-expr.c print.c strbuf.c symbol.c \
+	token.c toklist.c utf8.c
+
+MAINS = $(patsubst %, %.c, $(BINS))
+
 DEPS = $(addprefix $(DEPS_DIR)/, $(patsubst %.c, %.d, $(SRCS)))
 
+DBG_BINS = $(addprefix $(DBG_DIR)/, $(BINS))
+OPT_BINS = $(addprefix $(OPT_DIR)/, $(BINS))
+
+DBG_OBJS = $(addprefix $(DBG_DIR)/, $(patsubst %.c, %.o, $(filter-out $(MAINS), $(SRCS))))
+OPT_OBJS = $(addprefix $(OPT_DIR)/, $(patsubst %.c, %.o, $(filter-out $(MAINS), $(SRCS))))
+
 CFLAGS += -c -std=gnu11 \
-	-I $(INC_DIRS) \
 	-Wall -Wextra -Werror --pedantic -Wno-unused-function \
-	-Wimplicit-fallthrough=1 \
-	-g -DDEBUG
+		-Wno-gnu-statement-expression -Wimplicit-fallthrough=2 \
+	-I $(INC_DIR)
+
+DBG_CFLAGS += $(CFLAGS) -g
+OPT_CFLAGS += $(CFLAGS) -O
+
 LDFLAGS += -Wall
 
-$(OBJS_DIR)/%.o: $(SRC_DIR)/%.c $(DEPS_DIR)/%.d Makefile
-	$(CC) $(CFLAGS) -o $@ $<
+DBG_LDFLAGS += $(LDFLAGS)
+OPT_LDFLAGS += $(LDFLAGS)
 
 $(DEPS_DIR)/%.d: $(SRC_DIR)/%.c Makefile
-	$(CC) $(CFLAGS) -MM -MT $(OBJS_DIR)/$*.o -o $@ $<; sed 's_:_ $@:_' $@ > $@.tmp; mv $@.tmp $@
+	echo DEPS $@
+	$(CC) $(DBG_CFLAGS) -MM -MT $(DBG_DIR)/$*.o -o $@ $<
+	sed 's_:_ $@:_' $@ > $@.tmp
+	cp $@.tmp $@
+	sed -e 's/ *\\$$//g' -e 's/ \+/ /g' -e 's/^[^:]*: //' -e 's/$$/:/' < $@.tmp >> $@
+	rm $@.tmp
 
-all: $(BINS)
+$(DBG_DIR)/%.o: $(SRC_DIR)/%.c $(DEPS_DIR)/%.d Makefile
+	echo "CC   $@"
+	$(CC) $(DBG_CFLAGS) -o $@ $<
+
+$(OPT_DIR)/%.o: $(SRC_DIR)/%.c $(DEPS_DIR)/%.d Makefile
+	echo "CC   $@"
+	$(CC) $(OPT_CFLAGS) -o $@ $<
+
+dbg: $(DBG_BINS)
+opt: $(OPT_BINS)
+all: dbg opt
 
 clean:
-	rm -f -- $(OBJS_DIR)/*.o $(DEPS_DIR)/*.d $(BINS)
+	rm -f -- $(DEPS_DIR)/*.d $(DBG_DIR)/*.o $(DBG_BINS) $(OPT_DIR)/*.o $(OPT_BINS)
 
-$(BUILD_DIR)/mcc: $(OBJS) $(OBJS_DIR)/mcc.o
-	$(CC) $(LDFLAGS) -o $@ $^
+$(DBG_BINS): $(DBG_DIR)/%: $(DBG_OBJS) $(DBG_DIR)/%.o
+	echo LINK $@
+	$(CC) $(DBG_LDFLAGS) -o $@ $^
 
-$(BUILD_DIR)/mcpp: $(OBJS) $(OBJS_DIR)/mcpp.o
-	$(CC) $(LDFLAGS) -o $@ $^
+$(OPT_BINS): $(OPT_DIR)/%: $(OPT_OBJS) $(OPT_DIR)/%.o
+	echo LINK $@
+	$(CC) $(OPT_LDFLAGS) -o $@ $^
 
 include $(DEPS)
