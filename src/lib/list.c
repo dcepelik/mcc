@@ -24,18 +24,18 @@ bool list_empty(struct list *lst)
 	return lst->last == &lst->head;
 }
 
-void check_invariant(struct list *lst)
-{
-	DEBUG_EXPR("%lu", list_len(lst));
-	DEBUG_EXPR("%i", list_empty(lst));
-	struct lnode *n = list_first(lst), *m = NULL;
-	while (n != NULL) {
-		m = n;
-		n = lnode_next(n);
-	}
-	assert((m == NULL && list_last(lst) == &lst->head) || m == list_last(lst));
-	assert((list_len(lst) == 0 && list_empty(lst)) || (list_len(lst) > 0 && !list_empty(lst)));
-}
+//void check_invariant(struct list *lst)
+//{
+//	DEBUG_EXPR("%lu", list_len(lst));
+//	DEBUG_EXPR("%i", list_empty(lst));
+//	struct lnode *n = list_first(lst), *m = NULL;
+//	while (n != NULL) {
+//		m = n;
+//		n = lnode_next(n);
+//	}
+//	assert((m == NULL && list_last(lst) == &lst->head) || m == list_last(lst));
+//	assert((list_len(lst) == 0 && list_empty(lst)) || (list_len(lst) > 0 && !list_empty(lst)));
+//}
 
 void list_insert_after(struct list *lst, struct lnode *after, struct lnode *node)
 {
@@ -44,8 +44,6 @@ void list_insert_after(struct list *lst, struct lnode *after, struct lnode *node
 
 	if (after == lst->last)
 		lst->last = node;
-
-	check_invariant(lst);
 }
 
 void list_insert_list_after(struct list *lst, struct lnode *after, struct list *lst_to_insert)
@@ -67,7 +65,6 @@ void *list_insert(struct list *lst, struct lnode *node)
 	lst->last->next = node;
 	lst->last = node;
 
-	check_invariant(lst);
 	return node;
 }
 
@@ -75,15 +72,12 @@ void *list_insert_head(struct list *lst, struct lnode *node)
 {
 	DEBUG_TRACE;
 
-	check_invariant(lst);
-
 	if (list_empty(lst))
 		lst->last = node;
 
 	node->next = lst->head.next;
 	lst->head.next = node;
 
-	check_invariant(lst);
 	return node;
 }
 
@@ -91,14 +85,12 @@ void *list_remove_head(struct list *lst)
 {
 	DEBUG_TRACE;
 
-	check_invariant(lst);
 	struct lnode *first = list_first(lst);
 	assert(first != NULL);
 	
 	lst->head.next = first->next;
 	if (first == lst->last)
 		lst->last = &lst->head;
-	check_invariant(lst);
 	return first;
 }
 
@@ -114,7 +106,6 @@ void *list_remove(struct list *lst)
 	pred->next = NULL;
 	lst->last = pred;
 
-	check_invariant(lst);
 	return last;
 }
 
@@ -127,7 +118,6 @@ void *list_find_prev(struct list *lst, struct lnode *node)
 			break;
 	}
 
-	check_invariant(lst);
 	return cur;
 }
 
@@ -141,7 +131,6 @@ void *list_remove_node(struct list *lst, struct lnode *node)
 	pred->next = node->next;
 	//node->next = NULL;
 
-	check_invariant(lst);
 	return node;
 }
 

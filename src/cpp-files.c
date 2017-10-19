@@ -65,8 +65,13 @@ void cpp_file_include(struct cpp *cpp, struct cpp_file *file)
 	 * we're done reading the included file). Therefore, we'll enqueue
 	 * the token into the current file's unprocessed queue, then include
 	 * the other file.
+	 *
+	 * NOTE: Never push the `eol' token. For optimization, there's
+	 *       a single TOKEN_EOL token in the program (we don't alloc
+	 *       a new one each time). Putting it into the list would
+	 *       lead to messy situations!
 	 */
-	if (cpp->token)
+	if (cpp->token && !token_is_eol(cpp->token))
 		toklist_insert_first(&cpp_this_file(cpp)->tokens, cpp->token);
 
 	list_insert_head(&cpp->file_stack, &file->list_node);

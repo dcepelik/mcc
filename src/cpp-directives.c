@@ -76,7 +76,7 @@ static bool expect_directive(struct cpp *cpp)
 /******************************** end-of-line handling ********************************/
 
 /*
- * An end-of-line token returned by next_weol. TODO not true at the moment
+ * An end-of-line token returned by `next_weol'.
  */
 static struct token eol = {
 	.type = TOKEN_EOL,
@@ -87,29 +87,24 @@ static struct token eol = {
 
 /*
  * Move to the next token. Does to same as `cpp_next_token', except that
- * `next_weol' will produce a TOKEN_EOL when end-of-line is reached.
+ * `next_weol' will set `cpp->token' to the `eol' static token whenever
+ * the following token is on a new logical line. See `eol' defined above.
  *
- * This is suitable (only for) directive processing, because CPP directives
+ * This is suitable for directive processing, because CPP directives
  * are required to be contained within a single logical line. This way, one
- * can depend on having the stream of line's tokens terminated with 
- * a TOKEN_EOL token.
+ * can depend on having the stream of tokens terminated with either
+ * TOKEN_EOF or TOKEN_EOL.
  *
- * NOTE: `next_weol' is incapable of eating the return EOL token. The
- *       token will be returned over and over unless eaten by `cpp_next_token'.
+ * NOTE: The `eol' token cannot be eaten by `next_weol'. Once returned,
+ *       following calls to `next_weol' will return it again and again,
+ *       until `cpp_next_token' is called.
  */
 static void next_weol(struct cpp *cpp)
 {
-	struct token *new_eol;
-
-	/* NOTE: the `eol' token has `is_at_bol' set to false */
-	if (cpp_peek(cpp)->is_at_bol) {
-		new_eol = objpool_alloc(&cpp->ctx->token_pool);
-		*new_eol = eol;
-		assert(!toklist_contains(&cpp_this_file(cpp)->tokens, new_eol));
-		toklist_insert_first(&cpp_this_file(cpp)->tokens, new_eol);
-	}
-
-	cpp->token = toklist_remove_first(&cpp_this_file(cpp)->tokens);
+	if (cpp_peek(cpp)->is_at_bol)
+		cpp->token = &eol;
+	else
+		cpp_next_token(cpp);
 }
 
 /*

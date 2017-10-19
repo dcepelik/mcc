@@ -13,7 +13,7 @@ bool shall_debug_file(const char *filename)
 		return true;
 
 	if (strcmp(filename, "src/lib/list.c") == 0)
-		return true;
+		return false;
 
 	return false;
 }

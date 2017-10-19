@@ -39,11 +39,13 @@ size_t toklist_length(struct toklist *lst)
 
 struct token *toklist_insert_first(struct toklist *lst, struct token *token)
 {
+	assert(!token_is_eol(token));
 	return list_insert_head(&lst->tokens, &token->list_node);
 }
 
 struct token *toklist_insert(struct toklist *lst, struct token *token)
 {
+	assert(!token_is_eol(token));
 	return list_insert(&lst->tokens, &token->list_node);
 }
 
