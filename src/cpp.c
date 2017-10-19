@@ -3,11 +3,12 @@
  * TODO cexpr support in if conditionals
  */
 
-#include "cpp-internal.h"
 #include "context.h"
+#include "cpp-internal.h"
 #include "debug.h"
 #include "inbuf.h"
 #include "lexer.h"
+#include <assert.h>
 
 #define FILE_POOL_BLOCK_SIZE	16
 #define MACRO_POOL_BLOCK_SIZE	32
@@ -30,9 +31,12 @@ void cpp_next_token(struct cpp *cpp)
 	if (toklist_is_empty(&cpp_this_file(cpp)->tokens)) {
 		t = objpool_alloc(&cpp->ctx->token_pool);
 		lexer_next(&cpp_this_file(cpp)->lexer, t);
-		/* TODO make this per-file, too */
 		toklist_insert_first(&cpp_this_file(cpp)->tokens, t);
 	}
+
+	DEBUG_EXPR("%lu", toklist_length(&cpp_this_file(cpp)->tokens));
+	DEBUG_MSG(toklist_is_empty(&cpp_this_file(cpp)->tokens) ? "empty" : "not empty");
+	toklist_dump(&cpp_this_file(cpp)->tokens, stderr);
 
 	cpp->token = toklist_remove_first(&cpp_this_file(cpp)->tokens);
 	assert(cpp->token != NULL); /* NOTE: EOF guards the list */

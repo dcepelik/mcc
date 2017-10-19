@@ -76,18 +76,16 @@ void cpp_file_include(struct cpp *cpp, struct cpp_file *file)
  * Search the file @filename to be included in @search_dirs. Configure the
  * `cpp_file' instance accordingly and return success indicator.
  */
-static mcc_error_t search_file(struct cpp *cpp,
-	const char **search_dirs,
-	char *filename,
+static mcc_error_t search_file(struct cpp *cpp, const char **search_dirs, char *filename,
 	struct cpp_file *file)
 {
-	(void) search_dirs; /* TODO Use this */
-
 	bool file_found;
 	struct strbuf pathbuf;
 	char *path;
 	size_t i;
 	mcc_error_t err;
+
+	(void) search_dirs; /* TODO use this */
 
 	strbuf_init(&pathbuf, 128);
 

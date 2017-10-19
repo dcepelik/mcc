@@ -12,25 +12,24 @@
 struct cpp_dirinfo
 {
 	char *name;
-	enum cpp_directive directive;
 };
 
 /*
  * Array of `struct cpp_dirinfo' used by `cpp_setup_symtab_directives'.
  */
 static const struct cpp_dirinfo dirinfos[] = {
-	{ .name = "if", .directive = CPP_DIRECTIVE_IF },
-	{ .name = "ifdef", .directive = CPP_DIRECTIVE_IFDEF },
-	{ .name = "ifndef", .directive = CPP_DIRECTIVE_IFNDEF },
-	{ .name = "elif", .directive = CPP_DIRECTIVE_ELIF },
-	{ .name = "else", .directive = CPP_DIRECTIVE_ELSE },
-	{ .name = "endif", .directive = CPP_DIRECTIVE_ENDIF },
-	{ .name = "include", .directive = CPP_DIRECTIVE_INCLUDE },
-	{ .name = "define", .directive = CPP_DIRECTIVE_DEFINE },
-	{ .name = "undef", .directive = CPP_DIRECTIVE_UNDEF },
-	{ .name = "line", .directive = CPP_DIRECTIVE_LINE },
-	{ .name = "error", .directive = CPP_DIRECTIVE_ERROR },
-	{ .name = "pragma", .directive = CPP_DIRECTIVE_PRAGMA },
+	[CPP_DIRECTIVE_IF] = { .name = "if" },
+	[CPP_DIRECTIVE_IFDEF] = { .name = "ifdef" },
+	[CPP_DIRECTIVE_IFNDEF] = { .name = "ifndef" },
+	[CPP_DIRECTIVE_ELIF] = { .name = "elif" },
+	[CPP_DIRECTIVE_ELSE] = { .name = "else" },
+	[CPP_DIRECTIVE_ENDIF] = { .name = "endif" },
+	[CPP_DIRECTIVE_INCLUDE] = { .name = "include" },
+	[CPP_DIRECTIVE_DEFINE] = { .name = "define" },
+	[CPP_DIRECTIVE_UNDEF] = { .name = "undef" },
+	[CPP_DIRECTIVE_LINE] = { .name = "line" },
+	[CPP_DIRECTIVE_ERROR] = { .name = "error" },
+	[CPP_DIRECTIVE_PRAGMA] = { .name = "pragma" },
 };
 
 /*
@@ -47,8 +46,14 @@ void cpp_setup_symtab_directives(struct symtab *table)
 		symbol = symtab_insert(table, dirinfos[i].name);
 		def = symbol_define(table, symbol);
 		def->type = SYMBOL_TYPE_CPP_DIRECTIVE;
-		def->directive = dirinfos[i].directive;
+		def->directive = (enum cpp_directive)i;
 	}
+}
+
+static char *cpp_directive_to_string(enum cpp_directive dir)
+{
+	assert(0 <= dir && dir < ARRAY_SIZE(dirinfos));
+	return dirinfos[dir].name;
 }
 
 /*
@@ -60,6 +65,7 @@ static bool expect_directive(struct cpp *cpp)
 		return false;
 
 	if (cpp->token->symbol->def->type != SYMBOL_TYPE_CPP_DIRECTIVE) {
+		DEBUG_EXPR("%i", cpp->token->symbol->def->type);
 		cpp_error(cpp, "`%s' is not a C preprocessor directive",
 			symbol_get_name(cpp->token->symbol));
 		return false;
@@ -197,7 +203,7 @@ static struct cpp_if *pop_if(struct cpp *cpp)
 /*
  * Return the top (``current'') `cpp_if' of the `if' stack.
  */
-static struct cpp_if *current_if(struct cpp *cpp)
+static struct cpp_if *top_if(struct cpp *cpp)
 {
 	assert(!list_empty(&cpp->ifs));
 	return list_first(&cpp->ifs);
@@ -208,7 +214,7 @@ static struct cpp_if *current_if(struct cpp *cpp)
  */
 bool cpp_is_skip_mode(struct cpp *cpp)
 {
-	return current_if(cpp)->skip_this_branch;
+	return top_if(cpp)->skip_this_branch;
 }
 
 /******************************** directive handlers ********************************/
@@ -268,6 +274,8 @@ static void parse_define(struct cpp *cpp)
 {
 	struct symdef *macro_def;
 
+	next_weol(cpp); /* directive name (define) */
+
 	if (cpp_is_skip_mode(cpp)) {
 		skip_rest_of_line(cpp);
 		return;
@@ -321,6 +329,8 @@ static void parse_define(struct cpp *cpp)
  */
 static void process_undef(struct cpp *cpp)
 {
+	next_weol(cpp); /* directive name (undef) */
+
 	if (cpp_is_skip_mode(cpp)) {
 		skip_rest_of_line(cpp);
 		return;
@@ -353,6 +363,8 @@ static void process_undef(struct cpp *cpp)
  */
 static void process_error(struct cpp *cpp)
 {
+	next_weol(cpp); /* directive name (error) */
+
 	if (cpp_is_skip_mode(cpp)) {
 		skip_rest_of_line(cpp);
 		return;
@@ -372,6 +384,7 @@ static void process_include(struct cpp *cpp)
 	struct cpp_file *file;
 
 	cpp_this_file(cpp)->lexer.inside_include = true;
+	next_weol(cpp); /* directive name (include) */
 
 	if (cpp_is_skip_mode(cpp)) {
 		skip_rest_of_line(cpp);
@@ -381,8 +394,8 @@ static void process_include(struct cpp *cpp)
 	/*
 	 * TODO Disallow presence of NULs in header names.
 	 */
-
 	filename = cpp->token->str;
+	DEBUG_EXPR("%s", filename);
 	file = objpool_alloc(&cpp->file_pool);
 
 	if (token_is(cpp->token, TOKEN_HEADER_HNAME)) {
@@ -406,115 +419,189 @@ static void process_include(struct cpp *cpp)
 		cpp_error(cpp, "cannot include file %s: %s", filename, error_str(err));
 		skip_rest_of_line(cpp); /* skip is delayed: error location */
 	}
-
 	cpp_this_file(cpp)->lexer.inside_include = false;
 }
 
-static void start_if(struct cpp *cpp)
+static bool eval_expr(struct cpp *cpp)
 {
-	(void) cpp;
+	enum cpp_directive dir;
+	bool defined;
+
+	dir = cpp->token->symbol->def->directive;
+	next_weol(cpp); /* directive name */
+
+	if (dir == CPP_DIRECTIVE_IFDEF || dir == CPP_DIRECTIVE_IFNDEF) {
+		if (!cpp_expect(cpp, TOKEN_NAME))
+			return false;
+		defined = token_is_macro(cpp->token);
+		next_weol(cpp);
+		return (dir == CPP_DIRECTIVE_IFDEF) ? defined : !defined;
+	}
+
+	if (dir == CPP_DIRECTIVE_ELSE)
+		return true;
+
+	return true; /* TODO */
+}
+
+/*
+ * Handle the #if, #ifdef, #ifndef, #elif, #else and #endif directives.
+ *
+ * The logic behind this is simple, but technical. When we're inside
+ * a conditional branch, we only need to know:
+ *
+ *     a) whether this branch should be skipped, for example because the
+ *        controlling expression was false (`skip_this_branch'),
+ *
+ *     b) whether other branches within this #if/#ifdef/#ifndef should be
+ *        considered (`skip_next_branch').
+ *
+ * There are three valid combinations of these flags:
+ *
+ *     I)   !skip_this_branch && skip_next_branch: this branch had a controlling
+ *          expression which evaluated to true, it will be processed and the
+ *          following ``sibling'' branches (#elif and #else, if any) will be skipped.
+ *
+ *     II)  skip_this_branch && !skip_next_branch: this branch had a controlling
+ *          condition which evaluated to false and it will be skipped, but other
+ *          branches will be considered (#elif and #else, if any) will be skipped.
+ *
+ *     III) skip_this_branch && skip_next_branch: this branch had a controlling
+ *          condition which evaluated to false, or `skip_next_branch' was true.
+ *          It will be skipped and so will be any following #elif and #else branches.
+ *
+ * Things are only complicated by the fact that the whole #if block and all
+ * its branches may be nested within another #if's skipped branch, as in:
+ *
+ *     #if 0
+ *         #if 1 // inner if
+ *         ...
+ *         #else
+ *         ...
+ *         #endif
+ *     #else
+ *     ...
+ *     #endif
+ *
+ * The inner if will will be skipped. But we cannot ``just skip it'', because we
+ * need to keep record of the nesting (so that we know which #endif matches
+ * which #if/#ifdef/#endif).
+ *
+ * To tell whether we're inside a skipped branch, we use `cpp_is_skip_mode'.
+ *
+ * I should not say ``#if directive'' (with the hash sign), because the hash is not
+ * a part of the directive's name. But I think it makes the comments easier
+ * to read and understand.
+ */
+static void process_condition(struct cpp *cpp)
+{
+	enum cpp_directive dir = cpp->token->symbol->def->directive;
+	struct cpp_if *cur_if;
+	bool skip_outer;
+	
+	/*
+	 * This directive is either an #if/#ifdef/#ifndef directive, in which
+	 * case a new `cpp_if' will be pushed onto the stack, or it is an
+	 * #elif/#else/#endif directive, in which case we'll get the matching
+	 * if from the #if stack.
+	 *
+	 * In the former case, when the current branch is skipped, set
+	 * `skip_next_branch' on the newly pushed #if. This has the effect of
+	 * skipping all branches of the newly pushed #if. (See the comments above.)
+	 */
+	if (dir == CPP_DIRECTIVE_IF || dir == CPP_DIRECTIVE_IFDEF || dir == CPP_DIRECTIVE_IFNDEF) {
+		skip_outer = top_if(cpp)->skip_this_branch;
+		cur_if = push_if(cpp, cpp->token);
+		cur_if->skip_next_branch = skip_outer;
+	} else {
+		cur_if = top_if(cpp);
+	}
+
+	/*
+	 * If this was an #elif/#else/#endif directive and there's no matching
+	 * #if/#ifdef/#ifndef directive, it's an error.
+	 */
+	if (cur_if == &ifstack_bottom) {
+		cpp_error(cpp, "%s without a matching #if/#ifdef/#ifndef directive",
+			cpp_directive_to_string(dir));
+		skip_rest_grouching(cpp);
+		return;
+	}
+
+	if (dir == CPP_DIRECTIVE_ENDIF) {
+		pop_if(cpp);
+		next_weol(cpp); /* directive name (endif) */
+		skip_rest_grouching(cpp);
+		return;
+	}
+
+	/*
+	 * Sometimes we now immediately that a branch should be skipped without
+	 * looking at the condition. For example, when this whole #if is nested
+	 * in another #if's skipped branch, or when `skip_next_branch' is set.
+	 */
+	if (cur_if->skip_next_branch) {
+		cur_if->skip_this_branch = true;
+		skip_rest_of_line(cpp);
+		return;
+	}
+
+	/*
+	 * Otherwise, the condition needs to be evaluated. The condition is
+	 * implicitly true for the #else directive.
+	 */
+	cur_if->skip_this_branch = !eval_expr(cpp);
+
+	/*
+	 * If this branch is taken, the next is skipped.
+	 */
+	cur_if->skip_next_branch = !cur_if->skip_this_branch;
+
+	skip_rest_grouching(cpp);
 }
 
 /******************************** public API ********************************/
 
 void cpp_process_directive(struct cpp *cpp)
 {
-	struct cpp_if *cpp_if;
-	struct token *prev;
 	enum cpp_directive dir;
-	bool skipping;
-	bool test_cond;
 
-	assert(token_is(cpp->token, TOKEN_HASH));
-	assert(cpp->token->is_at_bol);
+	assert(token_is(cpp->token, TOKEN_HASH) && cpp->token->is_at_bol);
+	next_weol(cpp); /* `#' */
 
-	next_weol(cpp);
-
-	if (cpp->token->is_at_bol)
+	/*
+	 * Detect a null directive (line with only a `#' on the beginning).
+	 */
+	if (token_is_eol_or_eof(cpp->token)) {
+		cpp_next_token(cpp); /* EOL or EOF */
 		return;
+	}
 
 	if (!expect_directive(cpp)) {
 		skip_rest_of_line(cpp);
 		return;
 	}
 
-	prev = cpp->token;
+	/*
+	 * Call the appropriate directive handler. The conditions are
+	 * processed separately by `process_condition' for convenience.
+	 */
 	dir = cpp->token->symbol->def->directive;
-
-	cpp_this_file(cpp)->lexer.inside_include = (dir == CPP_DIRECTIVE_IF);
-
-	next_weol(cpp);
-
 	switch (dir) {
-	case CPP_DIRECTIVE_IFDEF:
-		test_cond = cpp->token->symbol->def->type == SYMBOL_TYPE_CPP_MACRO;
-		next_weol(cpp);
-		goto push_if;
-
-	case CPP_DIRECTIVE_IFNDEF:
-		test_cond = cpp->token->symbol->def->type != SYMBOL_TYPE_CPP_MACRO;
-		next_weol(cpp);
-		goto push_if;
-
-	case CPP_DIRECTIVE_IF:
-		test_cond = true; /* TODO */
-
-push_if:
-		skipping = cpp_is_skip_mode(cpp);
-		cpp_if = push_if(cpp, prev);
-		cpp_if->skip_next_branch = skipping;
-
-		goto conclude;
-
-	case CPP_DIRECTIVE_ELIF:
-		test_cond = true; /* TODO */
-		cpp_if = current_if(cpp);
-
-conclude:
-		cpp_if->skip_this_branch = !test_cond || cpp_if->skip_next_branch;
-		cpp_if->skip_next_branch |= !cpp_if->skip_this_branch;
-		break;
-	
-	case CPP_DIRECTIVE_ELSE:
-		/* TODO check elif after else */
-		cpp_if = current_if(cpp);
-		cpp_if->skip_this_branch = cpp_if->skip_next_branch;
-		break;
-
-	case CPP_DIRECTIVE_ENDIF:
-		assert(current_if(cpp) != &ifstack_bottom); /* TODO */
-
-		if (current_if(cpp) == &ifstack_bottom)
-			cpp_error(cpp, "endif without matching if/ifdef/ifndef");
-		else
-			pop_if(cpp);
-
-		break;
-
 	case CPP_DIRECTIVE_DEFINE:
 		parse_define(cpp);
-		//symtab_dump(&cpp->ctx->symtab, stderr);
 		break;
-
-	case CPP_DIRECTIVE_INCLUDE:
-		process_include(cpp);
-
-		/*
-		 * TODO To keep tokens after the #include "filename" (if any).
-		 *      How to get rid of this?
-		 */
-		return;
-
-	case CPP_DIRECTIVE_ERROR:
-		process_error(cpp);
-		break;
-
 	case CPP_DIRECTIVE_UNDEF:
 		process_undef(cpp);
 		break;
-
+	case CPP_DIRECTIVE_INCLUDE:
+		process_include(cpp);
+		break;
+	case CPP_DIRECTIVE_ERROR:
+		process_error(cpp);
+		break;
 	default:
-		return;
+		process_condition(cpp);
 	}
 
 	skip_rest_grouching(cpp);

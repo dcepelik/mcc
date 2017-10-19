@@ -3,37 +3,13 @@
 
 bool shall_debug_file(const char *filename)
 {
-	if (strcmp(filename, "cpp.c") == 0)
+	if (strcmp(filename, "src/cpp-files.c") == 0)
+		return false;
+
+	if (strcmp(filename, "src/cpp-directives.c") == 0)
 		return true;
 
-	if (strcmp(filename, "cppfile.c") == 0)
-		return true;
-
-	if (strcmp(filename, "cpp.h") == 0)
-		return true;
-
-	if (strcmp(filename, "lexer.c") == 0)
-		return true;
-
-	if (strcmp(filename, "list.c") == 0)
-		return true;
-
-	if (strcmp(filename, "symbol.c") == 0)
-		return true;
-
-	if (strcmp(filename, "macro.c") == 0)
-		return true;
-
-	if (strcmp(filename, "src/cpp-macros.c") == 0)
-		return true;
-
-	if (strcmp(filename, "cpp-directives.c") == 0)
-		return true;
-
-	if (strcmp(filename, "src/parse-expr.c") == 0)
-		return true;
-
-	if (strcmp(filename, "src/parse-decl.c") == 0)
+	if (strcmp(filename, "src/cpp.c") == 0)
 		return true;
 
 	return false;

@@ -35,8 +35,8 @@ CFLAGS += -c -std=gnu11 \
 		-Wno-gnu-statement-expression -Wimplicit-fallthrough=2 \
 	-I $(SRC_DIR)/include -I $(SRC_DIR)/lib/include
 
-DBG_CFLAGS += $(CFLAGS) -g
-OPT_CFLAGS += $(CFLAGS) -O
+DBG_CFLAGS += $(CFLAGS) -g -DDEBUG
+OPT_CFLAGS += $(CFLAGS) -O -DNDEBUG
 
 LDFLAGS += -Wall
 
