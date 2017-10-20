@@ -59,7 +59,7 @@ struct cpp_file *cpp_this_file(struct cpp *cpp)
 void cpp_file_include(struct cpp *cpp, struct cpp_file *file)
 {
 	/*
-	 * Whenever we process a token, we call `cpp_next_token' to indicate
+	 * Whenever we process a token, we call `move_next' to indicate
 	 * that we're done with it. Therefore, we're not done with `cpp->token',
 	 * whatever it is, and thus we'd like to keep it (and read it when
 	 * we're done reading the included file). Therefore, we'll enqueue
@@ -147,7 +147,7 @@ mcc_error_t cpp_open_file(struct cpp *cpp, char *filename)
 	}
 
 	cpp_file_include(cpp, file);
-	cpp_next_token(cpp);
+	move_next(cpp);
 
 	return MCC_ERROR_OK;
 }

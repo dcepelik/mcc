@@ -1,4 +1,4 @@
-Its __TIME__ of __DATE__
+"It's " __DATE__ " " __TIME__
 __STDC__
 __FILE__
 __LINE__

@@ -1,5 +1,9 @@
 /*
  * See 6.10 Preprocessing directives.
+ *
+ * I refer to the directive names here as #if, #error etc., i.e. with the
+ * hash sign at the beginning (which I should not, because the # is not part
+ * of the name, but it makes comments easier to understand).
  */
 #include "context.h"
 #include "cpp-internal.h"
@@ -50,6 +54,9 @@ void cpp_setup_symtab_directives(struct symtab *table)
 	}
 }
 
+/*
+ * Return the name of the given CPP directive.
+ */
 static char *cpp_directive_to_string(enum cpp_directive dir)
 {
 	assert(0 <= dir && dir < ARRAY_SIZE(dirinfos));
@@ -66,7 +73,7 @@ static bool expect_directive(struct cpp *cpp)
 
 	if (cpp->token->symbol->def->type != SYMBOL_TYPE_CPP_DIRECTIVE) {
 		DEBUG_EXPR("%i", cpp->token->symbol->def->type);
-		cpp_error(cpp, "`%s' is not a C preprocessor directive",
+		cpp_error(cpp, "`%s' is not a CPP directive",
 			symbol_get_name(cpp->token->symbol));
 		return false;
 	}
@@ -76,7 +83,7 @@ static bool expect_directive(struct cpp *cpp)
 /******************************** end-of-line handling ********************************/
 
 /*
- * An end-of-line token returned by `next_weol'.
+ * An end-of-line token returned by `move_next_eol'.
  */
 static struct token eol = {
 	.type = TOKEN_EOL,
@@ -86,8 +93,8 @@ static struct token eol = {
 };
 
 /*
- * Move to the next token. Does to same as `cpp_next_token', except that
- * `next_weol' will set `cpp->token' to the `eol' static token whenever
+ * Move to the next token. Does to same as `move_next', except that
+ * `move_next_eol' will set `cpp->token' to the `eol' static token whenever
  * the following token is on a new logical line. See `eol' defined above.
  *
  * This is suitable for directive processing, because CPP directives
@@ -95,16 +102,16 @@ static struct token eol = {
  * can depend on having the stream of tokens terminated with either
  * TOKEN_EOF or TOKEN_EOL.
  *
- * NOTE: The `eol' token cannot be eaten by `next_weol'. Once returned,
- *       following calls to `next_weol' will return it again and again,
- *       until `cpp_next_token' is called.
+ * NOTE: The `eol' token cannot be eaten by `move_next_eol'. Once returned,
+ *       following calls to `move_next_eol' will return it again and again,
+ *       until `move_next' is called.
  */
-static void next_weol(struct cpp *cpp)
+static void move_next_eol(struct cpp *cpp)
 {
 	if (cpp_peek(cpp)->is_at_bol)
 		cpp->token = &eol;
 	else
-		cpp_next_token(cpp);
+		move_next(cpp);
 }
 
 /*
@@ -115,7 +122,7 @@ static void next_weol(struct cpp *cpp)
 static void skip_rest_of_line(struct cpp *cpp)
 {
 	while (!token_is_eol_or_eof(cpp->token))
-		next_weol(cpp);
+		move_next_eol(cpp);
 }
 
 /*
@@ -125,7 +132,7 @@ static void skip_rest_of_line(struct cpp *cpp)
  *
  * NOTE: Nothing will be skiped if we're at the beginning of a line!
  */
-static void skip_rest_grouching(struct cpp *cpp)
+static void require_eol(struct cpp *cpp)
 {
 	if (!token_is_eol_or_eof(cpp->token)) {
 		cpp_warn(cpp, "unexpected extra tokens will be skipped");
@@ -136,7 +143,7 @@ static void skip_rest_grouching(struct cpp *cpp)
 /******************************** ifstack helpers ********************************/
 
 /*
- * Represents a currently processed CPP `if' directive.
+ * Represents CPP #if/#ifdef/#ifndef block.
  */
 struct cpp_if
 {
@@ -159,20 +166,18 @@ static struct cpp_if ifstack_bottom = {
 
 /*
  * Initialize the stack of `cpp_if' structures. The stack represents the 
- * currently processed (``open'') `if' directives. Whenever an `if' block 
- * ends with an `endif', the matching `cpp_if' structure is popped off the 
+ * currently processed (``open'') #if directives. Whenever an #if block 
+ * ends with an #endif, the matching `cpp_if' structure is popped off the 
  * stack.
- *
- * The `ifstack_bottom' item is inserted here. See above.
  */
 void cpp_init_ifstack(struct cpp *cpp)
 {
 	list_init(&cpp->ifs);
-	list_insert_head(&cpp->ifs, &ifstack_bottom.list_node);
+	list_insert(&cpp->ifs, &ifstack_bottom.list_node);
 }
 
 /*
- * Allocate and push a new `cpp_if' structure onto the `if' stack and 
+ * Allocate and push a new `cpp_if' structure onto the #if stack and 
  * initialize and return it. The @token shall be the [if] token.
  *
  * PERF: For performance reasons, it might be fruitful to use an objpool 
@@ -185,31 +190,31 @@ static struct cpp_if *push_if(struct cpp *cpp, struct token *token)
 	cpp_if->skip_this_branch = false;
 	cpp_if->skip_next_branch = false;
 
-	list_insert_head(&cpp->ifs, &cpp_if->list_node);
+	list_insert(&cpp->ifs, &cpp_if->list_node);
 
 	return cpp_if;
 }
 
 /*
- * Pop a `cpp_if' structure off the `if' stack.
+ * Pop a `cpp_if' structure off the #if stack.
  */
 static struct cpp_if *pop_if(struct cpp *cpp)
 {
 	assert(!list_empty(&cpp->ifs));
-	return list_remove_head(&cpp->ifs);
+	return list_remove(&cpp->ifs);
 }
 
 /*
- * Return the top (``current'') `cpp_if' of the `if' stack.
+ * Return the top (``current'') `cpp_if' of the #if stack.
  */
 static struct cpp_if *top_if(struct cpp *cpp)
 {
 	assert(!list_empty(&cpp->ifs));
-	return list_first(&cpp->ifs);
+	return list_last(&cpp->ifs);
 }
 
 /*
- * Are we inside an `if'/`elif'/`else' branch which should be skipped?
+ * Are we inside an #if/#elif/#else branch which should be skipped?
  */
 bool cpp_is_skip_mode(struct cpp *cpp)
 {
@@ -229,20 +234,20 @@ static void parse_macro_arglist(struct cpp *cpp, struct macro *macro)
 	bool arglist_ended = false;
 
 	assert(token_is(cpp->token, TOKEN_LPAREN));
-	next_weol(cpp); /* ( */
+	move_next_eol(cpp); /* ( */
 
 	while (!token_is_eol_or_eof(cpp->token)) {
 		if (token_is(cpp->token, TOKEN_COMMA)) {
 			if (!expect_comma)
 				cpp_error(cpp, "comma was unexpected here");
 			expect_comma = false;
-			next_weol(cpp); /* `,' */
+			move_next_eol(cpp); /* `,' */
 			continue;
 		}
 
 		if (token_is(cpp->token, TOKEN_RPAREN)) {
 			arglist_ended = true;
-			next_weol(cpp);
+			move_next_eol(cpp);
 			break;
 		}
 
@@ -251,14 +256,14 @@ static void parse_macro_arglist(struct cpp *cpp, struct macro *macro)
 			/* keep going: we know there should be a comma, act as if */
 
 		if (cpp->token->type == TOKEN_ELLIPSIS)
-			cpp->token->symbol = symtab_search_or_insert(&cpp->ctx->symtab,
+			cpp->token->symbol = symtab_find_or_insert(&cpp->ctx->symtab,
 				VA_ARGS_NAME);
 		else if (!cpp_expect(cpp, TOKEN_NAME))
 			continue;
 
 		toklist_insert(&macro->args, cpp->token);
 		expect_comma = true;
-		next_weol(cpp); /* argument identifier or __VA_ARGS__ */
+		move_next_eol(cpp); /* argument identifier or __VA_ARGS__ */
 	}
 
 	if (!arglist_ended)
@@ -266,14 +271,14 @@ static void parse_macro_arglist(struct cpp *cpp, struct macro *macro)
 }
 
 /*
- * Parse a C preprocessor's `define' directive.
+ * Parse a C preprocessor's #define directive.
  * See 6.10.3 Macro replacement
  */
-static void parse_define(struct cpp *cpp)
+static void process_define(struct cpp *cpp)
 {
 	struct symdef *macro_def;
 
-	next_weol(cpp); /* directive name (define) */
+	move_next_eol(cpp); /* directive name (define) */
 
 	if (cpp_is_skip_mode(cpp)) {
 		skip_rest_of_line(cpp);
@@ -281,7 +286,7 @@ static void parse_define(struct cpp *cpp)
 	}
 
 	if (!cpp_expect(cpp, TOKEN_NAME)) {
-		skip_rest_grouching(cpp);
+		require_eol(cpp);
 		return;
 	}
 
@@ -294,7 +299,7 @@ static void parse_define(struct cpp *cpp)
 	macro_init(&macro_def->macro);
 	macro_def->macro.name = symbol_get_name(cpp->token->symbol);
 
-	next_weol(cpp); /* macro name */
+	move_next_eol(cpp); /* macro name */
 
 	/*
 	 * If a left opening parentheses directly follows macro name,
@@ -306,7 +311,7 @@ static void parse_define(struct cpp *cpp)
 	} else {
 		macro_def->macro.flags = MACRO_FLAGS_OBJLIKE;
 	}
-		
+
 	//macro_dump(macro);
 
 	/*
@@ -316,7 +321,7 @@ static void parse_define(struct cpp *cpp)
 	 */
 	while (!token_is_eol_or_eof(cpp->token)) {
 		toklist_insert(&macro_def->macro.expansion, cpp->token);
-		next_weol(cpp);
+		move_next_eol(cpp);
 	}
 
 	//symtab_dump(&cpp->ctx->symtab, stderr);
@@ -328,7 +333,7 @@ static void parse_define(struct cpp *cpp)
  */
 static void process_undef(struct cpp *cpp)
 {
-	next_weol(cpp); /* directive name (undef) */
+	move_next_eol(cpp); /* directive name (undef) */
 
 	if (cpp_is_skip_mode(cpp)) {
 		skip_rest_of_line(cpp);
@@ -336,16 +341,16 @@ static void process_undef(struct cpp *cpp)
 	}
 
 	if (!cpp_expect(cpp, TOKEN_NAME)) {
-		skip_rest_grouching(cpp);
+		require_eol(cpp);
 		return;
 	}
 
-	next_weol(cpp);
-	skip_rest_grouching(cpp);
+	move_next_eol(cpp);
+	require_eol(cpp);
 }
 
 /*
- * Process the `error' directive.
+ * Process the #error directive.
  *
  * 6.10.5 Error directive:
  *
@@ -362,7 +367,7 @@ static void process_undef(struct cpp *cpp)
  */
 static void process_error(struct cpp *cpp)
 {
-	next_weol(cpp); /* directive name (error) */
+	move_next_eol(cpp); /* directive name (error) */
 
 	if (cpp_is_skip_mode(cpp)) {
 		skip_rest_of_line(cpp);
@@ -383,7 +388,7 @@ static void process_include(struct cpp *cpp)
 	struct cpp_file *file;
 
 	cpp_this_file(cpp)->lexer.inside_include = true;
-	next_weol(cpp); /* directive name (include) */
+	move_next_eol(cpp); /* directive name (include) */
 	cpp_this_file(cpp)->lexer.inside_include = false;
 
 	if (cpp_is_skip_mode(cpp)) {
@@ -421,19 +426,23 @@ static void process_include(struct cpp *cpp)
 	}
 }
 
+/*
+ * Evaluate the controlling expression of an #if/#elif/#else/#ifdef/#ifndef.
+ * Return true when the expression evaluates to non-zero value, false otherwise.
+ */
 static bool eval_expr(struct cpp *cpp)
 {
 	enum cpp_directive dir;
 	bool defined;
 
 	dir = cpp->token->symbol->def->directive;
-	next_weol(cpp); /* directive name */
+	move_next_eol(cpp); /* directive name */
 
 	if (dir == CPP_DIRECTIVE_IFDEF || dir == CPP_DIRECTIVE_IFNDEF) {
 		if (!cpp_expect(cpp, TOKEN_NAME))
 			return false;
 		defined = token_is_macro(cpp->token);
-		next_weol(cpp);
+		move_next_eol(cpp);
 		return (dir == CPP_DIRECTIVE_IFDEF) ? defined : !defined;
 	}
 
@@ -487,12 +496,8 @@ static bool eval_expr(struct cpp *cpp)
  * which #if/#ifdef/#endif).
  *
  * To tell whether we're inside a skipped branch, we use `cpp_is_skip_mode'.
- *
- * I should not say ``#if directive'' (with the hash sign), because the hash is not
- * a part of the directive's name. But I think it makes the comments easier
- * to read and understand.
  */
-static void process_condition(struct cpp *cpp)
+static void process_cond_branch(struct cpp *cpp)
 {
 	enum cpp_directive dir = cpp->token->symbol->def->directive;
 	struct cpp_if *cur_if;
@@ -523,14 +528,14 @@ static void process_condition(struct cpp *cpp)
 	if (cur_if == &ifstack_bottom) {
 		cpp_error(cpp, "%s without a matching #if/#ifdef/#ifndef directive",
 			cpp_directive_to_string(dir));
-		skip_rest_grouching(cpp);
+		require_eol(cpp);
 		return;
 	}
 
 	if (dir == CPP_DIRECTIVE_ENDIF) {
 		pop_if(cpp);
-		next_weol(cpp); /* directive name (endif) */
-		skip_rest_grouching(cpp);
+		move_next_eol(cpp); /* directive name (endif) */
+		require_eol(cpp);
 		return;
 	}
 
@@ -556,7 +561,7 @@ static void process_condition(struct cpp *cpp)
 	 */
 	cur_if->skip_next_branch = !cur_if->skip_this_branch;
 
-	skip_rest_grouching(cpp);
+	require_eol(cpp);
 }
 
 /******************************** public API ********************************/
@@ -566,13 +571,13 @@ void cpp_process_directive(struct cpp *cpp)
 	enum cpp_directive dir;
 
 	assert(token_is(cpp->token, TOKEN_HASH) && cpp->token->is_at_bol);
-	next_weol(cpp); /* `#' */
+	move_next_eol(cpp); /* `#' */
 
 	/*
-	 * Detect a null directive (line with only a `#' on the beginning).
+	 * Ignore a null directive (line with only a `#' on the beginning).
 	 */
 	if (token_is_eol_or_eof(cpp->token)) {
-		cpp_next_token(cpp); /* EOL or EOF */
+		move_next(cpp); /* EOL or EOF */
 		return;
 	}
 
@@ -583,12 +588,12 @@ void cpp_process_directive(struct cpp *cpp)
 
 	/*
 	 * Call the appropriate directive handler. The conditions are
-	 * processed separately by `process_condition' for convenience.
+	 * processed separately by `process_cond_branch' for convenience.
 	 */
 	dir = cpp->token->symbol->def->directive;
 	switch (dir) {
 	case CPP_DIRECTIVE_DEFINE:
-		parse_define(cpp);
+		process_define(cpp);
 		break;
 	case CPP_DIRECTIVE_UNDEF:
 		process_undef(cpp);
@@ -600,8 +605,8 @@ void cpp_process_directive(struct cpp *cpp)
 		process_error(cpp);
 		break;
 	default:
-		process_condition(cpp);
+		process_cond_branch(cpp);
 	}
 
-	skip_rest_grouching(cpp);
+	require_eol(cpp);
 }

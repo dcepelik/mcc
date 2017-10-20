@@ -22,10 +22,10 @@ static void cpp_requeue_current(struct cpp *cpp)
 static void cpp_setup_symtab(struct cpp *cpp)
 {
 	cpp_setup_symtab_directives(&cpp->ctx->symtab);
-	cpp_setup_symtab_builtins(cpp);
+	cpp_setup_builtin_macros(cpp);
 }
 
-void cpp_next_token(struct cpp *cpp)
+void move_next(struct cpp *cpp)
 {
 	struct cpp_file *this_file = cpp_this_file(cpp);
 
@@ -43,7 +43,7 @@ struct token *cpp_peek(struct cpp *cpp)
 	struct token *next;
 
 	current = cpp->token;
-	cpp_next_token(cpp);
+	move_next(cpp);
 	next = cpp->token;
 	toklist_insert_first(&cpp_this_file(cpp)->tokens, next);
 	assert(!token_is_eol(next));
@@ -128,7 +128,7 @@ static void expand_macro_invocation(struct cpp *cpp)
 	toklist_init(&expansion);
 
 	toklist_insert(&invocation, cpp->token); /* macro name */
-	cpp_next_token(cpp);
+	move_next(cpp);
 
 	/*
 	 * For invocations of function-like macros, this code block will grab
@@ -148,7 +148,7 @@ static void expand_macro_invocation(struct cpp *cpp)
 			}
 
 			toklist_insert(&invocation, cpp->token);
-			cpp_next_token(cpp);
+			move_next(cpp);
 
 			if (args_ended)
 				break;
@@ -158,7 +158,7 @@ static void expand_macro_invocation(struct cpp *cpp)
 	macro_expand(cpp, &invocation, &expansion);
 	cpp_requeue_current(cpp);
 	toklist_prepend(&cpp_this_file(cpp)->tokens, &expansion);
-	cpp_next_token(cpp);
+	move_next(cpp);
 }
 
 /*
@@ -227,7 +227,7 @@ static void run(struct cpp *cpp)
 				cpp->token->noexpand = true;
 		}
 		else if (cpp_is_skip_mode(cpp)) {
-			cpp_next_token(cpp);
+			move_next(cpp);
 		}
 		else {
 			break;
@@ -269,7 +269,7 @@ void cpp_delete(struct cpp *cpp)
 
 /*
  * This function calls `run' to carry out the actual preprocessing
- * and macro expansion and further filters its output by concatenating
+ * and macro expansion and then filters its output by concatenating
  * adjacent string literals and handling EOF tokens.
  *
  * NOTE: Once TOKEN_EOF is returned for the first time, any further call
@@ -301,10 +301,10 @@ struct token *cpp_next(struct cpp *cpp)
 			cpp_close_file(cpp);
 		} else {
 			tmp = cpp->token;
-			cpp_next_token(cpp);
+			move_next(cpp);
 			return tmp;
 		}
 
-		cpp_next_token(cpp);
+		move_next(cpp);
 	}
 }

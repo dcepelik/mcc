@@ -153,7 +153,7 @@ struct symbol *symtab_insert(struct symtab *table, char *name)
 	return symbol;
 }
 
-struct symbol *symtab_search_or_insert(struct symtab *table, char *name)
+struct symbol *symtab_find_or_insert(struct symtab *table, char *name)
 {
 	struct symbol *symbol;
 
@@ -209,7 +209,7 @@ void symtab_dump(struct symtab *table, FILE *fout)
 		fprintf(fout, "\tScope %lu:\n", i);
 
 		list_foreach(struct symdef, def, &scope->defs, scope_list_node) {
-			fprintf(fout, "\t\t%-16s\t%-16s",
+			fprintf(fout, "\t\t%-32s\t%-16s",
 				symbol_get_name(def->symbol),
 				symbol_type_to_string(def->type));
 

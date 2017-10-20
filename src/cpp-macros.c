@@ -7,89 +7,6 @@
 #include "toklist.h"
 #include <time.h>
 
-static void cpp_setup_builtin_handled(struct cpp *cpp, char *name, macro_handler_t *handler)
-{
-	struct symbol *symbol;
-	struct symdef *def;
-
-	symbol = symtab_search_or_insert(&cpp->ctx->symtab, name);
-
-	def = symbol_define(&cpp->ctx->symtab, symbol);
-	def->type = SYMBOL_TYPE_CPP_MACRO;
-
-	macro_init(&def->macro);
-	def->macro.flags = MACRO_FLAGS_BUILTIN | MACRO_FLAGS_HANDLED;
-	def->macro.handler = handler;
-}
-
-/*
- * Setup CPP built-in macro.
- */
-static void cpp_setup_builtin(struct cpp *cpp, char *name, char *fmt, ...)
-{
-	struct symbol *symbol;
-	struct symdef *def;
-	struct strbuf str;
-	va_list args;
-
-	symbol = symtab_search_or_insert(&cpp->ctx->symtab, name);
-
-	strbuf_init(&str, 16);
-	va_start(args, fmt);
-	strbuf_vprintf_at(&str, 0, fmt, args);
-	va_end(args);
-	
-	def = symbol_define(&cpp->ctx->symtab, symbol);
-	def->type = SYMBOL_TYPE_CPP_MACRO;
-
-	macro_init(&def->macro);
-	def->macro.flags = MACRO_FLAGS_BUILTIN;
-	toklist_load_from_strbuf(&def->macro.expansion, cpp->ctx, &str);
-
-	strbuf_free(&str);
-}
-
-/* TODO */
-static void cpp_builtin_file(struct cpp *cpp, struct macro *macro, struct toklist *out)
-{
-	(void) macro;
-	toklist_load_from_string(out, cpp->ctx, "\"%s\"", "some-file.c");
-}
-
-/* TODO */
-static void cpp_builtin_line(struct cpp *cpp, struct macro *macro, struct toklist *out)
-{
-	(void) macro;
-	toklist_load_from_string(out, cpp->ctx, "%lu", 128);
-}
-
-/*
- * Setup CPP built-in (predefined) macros.
- * See 6.10.8 Predefined macros.
- */
-void cpp_setup_symtab_builtins(struct cpp *cpp)
-{
-	time_t rawtime;
-	struct tm *timeinfo;
-	char timestr[32];
-
-	time(&rawtime);
-	timeinfo = localtime(&rawtime);
-
-	strftime(timestr, sizeof(timestr), "\"%T\"", timeinfo);
-	cpp_setup_builtin(cpp, "__TIME__", timestr);
-
-	strftime(timestr, sizeof(timestr), "\"%b %e %Y\"", timeinfo); /* TODO shall be non-localized */
-	cpp_setup_builtin(cpp, "__DATE__", timestr);
-
-	cpp_setup_builtin(cpp, "__STDC__", "1");
-	cpp_setup_builtin(cpp, "__STDC_VERSION__", "201102L"); /* TODO check */
-	cpp_setup_builtin(cpp, "__STDC_HOSTED__", "0");
-
-	cpp_setup_builtin_handled(cpp, "__FILE__", cpp_builtin_file);
-	cpp_setup_builtin_handled(cpp, "__LINE__", cpp_builtin_line);
-}
-
 void macro_init(struct macro *macro)
 {
 	macro->name = NULL;
@@ -127,6 +44,9 @@ static bool token_is_expandable_macro(struct token *token)
 	return true;
 }
 
+/*
+ * Print the given macro to the given string buffer.
+ */
 static void macro_print(struct macro *macro, struct strbuf *buf)
 {
 	strbuf_printf(buf, "%s", macro->name);
@@ -148,6 +68,126 @@ static void macro_print(struct macro *macro, struct strbuf *buf)
 		strbuf_putc(buf, ' ');
 	}
 }
+
+/******************************** built-in macros ********************************/
+
+/*
+ * Setup a built-in CPP macro and register a handler which will decide what
+ * the macro should expand to on each occurrence.
+ */
+static void setup_builtin_handler(struct cpp *cpp, char *name, macro_handler_t *handler)
+{
+	struct symbol *symbol;
+	struct symdef *def;
+
+	symbol = symtab_find_or_insert(&cpp->ctx->symtab, name);
+
+	def = symbol_define(&cpp->ctx->symtab, symbol);
+	def->type = SYMBOL_TYPE_CPP_MACRO;
+	macro_init(&def->macro);
+	def->macro.flags = MACRO_FLAGS_BUILTIN | MACRO_FLAGS_HANDLED;
+	def->macro.handler = handler;
+}
+
+/*
+ * Setup a built-in CPP macro and set its static expansion list. This is used
+ * for constant-expansion macros.
+ */
+static void setup_builtin_static(struct cpp *cpp, char *name, char *fmt, ...)
+{
+	struct symbol *symbol;
+	struct symdef *def;
+	struct strbuf str;
+	va_list args;
+
+	symbol = symtab_find_or_insert(&cpp->ctx->symtab, name);
+
+	strbuf_init(&str, 16);
+	va_start(args, fmt);
+	strbuf_vprintf_at(&str, 0, fmt, args);
+	va_end(args);
+	
+	def = symbol_define(&cpp->ctx->symtab, symbol);
+	def->type = SYMBOL_TYPE_CPP_MACRO;
+	macro_init(&def->macro);
+	def->macro.flags = MACRO_FLAGS_BUILTIN;
+	toklist_load_from_strbuf(&def->macro.expansion, cpp->ctx, &str);
+
+	strbuf_free(&str);
+}
+
+/*
+ * Expand __FILE__ to the name of this file.
+ */
+static void cpp_builtin_file(struct cpp *cpp, struct macro *macro, struct toklist *out)
+{
+	(void) macro;
+	toklist_load_from_string(out, cpp->ctx, "\"%s\"", cpp_this_file(cpp)->filename);
+}
+
+/*
+ * Expand __LINE__ to the number of currently processed line (where the current
+ * file's lexer operates).
+ */
+static void cpp_builtin_line(struct cpp *cpp, struct macro *macro, struct toklist *out)
+{
+	(void) macro;
+	toklist_load_from_string(out, cpp->ctx, "%lu", cpp_this_file(cpp)->lexer.location.line_no);
+}
+
+/*
+ * Expand __TIME__ to current time string.
+ */
+static void cpp_builtin_time(struct cpp *cpp, struct macro *macro, struct toklist *out)
+{
+	(void) macro;
+
+	time_t rawtime;
+	struct tm *timeinfo;
+	char timestr[32];
+
+	time(&rawtime);
+	timeinfo = localtime(&rawtime);
+	strftime(timestr, sizeof(timestr), "%T", timeinfo);
+	toklist_load_from_string(out, cpp->ctx, "\"%s\"", timestr);
+}
+
+/*
+ * Expand __DATE__ to current date string.
+ *
+ * TODO The date string shouldn't be localized (I think).
+ */
+static void cpp_builtin_date(struct cpp *cpp, struct macro *macro, struct toklist *out)
+{
+	(void) macro;
+
+	time_t rawtime;
+	struct tm *timeinfo;
+	char datestr[32];
+
+	time(&rawtime);
+	timeinfo = localtime(&rawtime);
+	strftime(datestr, sizeof(datestr), "%b %e %Y", timeinfo);
+	toklist_load_from_string(out, cpp->ctx, "\"%s\"", datestr);
+}
+
+/*
+ * Setup CPP built-in (predefined) macros.
+ * See 6.10.8 Predefined macros.
+ */
+void cpp_setup_builtin_macros(struct cpp *cpp)
+{
+	setup_builtin_static(cpp, "__STDC__", "1");
+	setup_builtin_static(cpp, "__STDC_VERSION__", "201102L"); /* TODO check */
+	setup_builtin_static(cpp, "__STDC_HOSTED__", "0");
+
+	setup_builtin_handler(cpp, "__FILE__", cpp_builtin_file);
+	setup_builtin_handler(cpp, "__LINE__", cpp_builtin_line);
+	setup_builtin_handler(cpp, "__TIME__", cpp_builtin_time);
+	setup_builtin_handler(cpp, "__DATE__", cpp_builtin_date);
+}
+
+/******************************** stringification ********************************/
 
 /*
  * See 6.10.3.2 The # operator, par. 2.
@@ -201,6 +241,95 @@ static struct token *cpp_stringify(struct cpp *cpp, struct token *token)
 	return result;
 }
 
+/******************************** token pasting ********************************/
+
+/*
+ * Alloc and init new placemarker token.
+ */
+static struct token *new_placemarker(struct cpp *cpp)
+{
+	struct token *token;
+
+	token = objpool_alloc(&cpp->ctx->token_pool);
+	token->type = TOKEN_PLACEMARKER;
+
+	return token;
+}
+
+/*
+ * Prepare token for pasting. If the token is a macro parameter, copy its
+ * replacement list into the output list and if the resulting list is empty,
+ * insert a placemarker.
+ *
+ * If the token is not a macro parameter, just insert it to the output.
+ */
+static void paste_prepare(struct cpp *cpp, struct token *arg, struct toklist *lst)
+{
+	if (token_is_macro_arg(arg)) {
+		toklist_copy(cpp->ctx, &arg->symbol->def->macro_arg.tokens, lst);
+
+		if (toklist_is_empty(lst))
+			toklist_insert(lst, new_placemarker(cpp));
+	} else {
+		toklist_insert(lst, arg);
+	}
+}
+
+/*
+ * This function ``pastes'' two tokens. It does so by taking the spellings of
+ * those tokens, concatenating them and then feeding the result back to the lexer.
+ * The lexing of the concatenation should produce a single valid preprocessing token.
+ *
+ * See TODO.
+ */
+static void paste(struct cpp *cpp, struct token *t, struct token *u, struct toklist *out)
+{
+	struct strbuf buf;
+	struct toklist lst_t1;
+	struct toklist lst_t2;
+	struct token *a;
+	struct token *b;
+	struct toklist paste_result;
+
+	toklist_init(&lst_t1);
+	toklist_init(&lst_t2);
+	toklist_init(&paste_result);
+	toklist_init(out);
+
+	paste_prepare(cpp, t, &lst_t1);
+	assert(!toklist_is_empty(&lst_t1));
+
+	paste_prepare(cpp, u, &lst_t2);
+	assert(!toklist_is_empty(&lst_t2));
+
+	a = toklist_remove_last(&lst_t1);
+	b = toklist_remove_first(&lst_t2);
+
+	if (token_is(a, TOKEN_PLACEMARKER)) {
+		toklist_insert_first(&paste_result, b);
+	} else if (token_is(b, TOKEN_PLACEMARKER)) {
+		toklist_insert_first(&paste_result, a);
+	} else {
+		strbuf_init(&buf, 32);
+		strbuf_printf(&buf, "%s%s", token_get_spelling(a), token_get_spelling(b));
+
+		DEBUG_EXPR("%s", strbuf_get_string(&buf));
+
+		toklist_load_from_strbuf(&paste_result, cpp->ctx, &buf);
+		if (toklist_length(&paste_result) != 1)
+			cpp_error(cpp, "pasting `%s' and `%s' does not yield a single preprocessing token",
+				token_get_spelling(a), token_get_spelling(b));
+
+		strbuf_free(&buf);
+	}
+
+	toklist_append(out, &lst_t1);
+	toklist_append(out, &paste_result);
+	toklist_append(out, &lst_t2);
+}
+
+/******************************** macro expansion ********************************/
+
 static struct token *macro_expand_internal(struct cpp *cpp, struct toklist *in, struct toklist *out);
 static void macro_expand_rescan(struct cpp *cpp, struct toklist *in, struct toklist *out);
 
@@ -209,42 +338,45 @@ static void macro_expand_rescan(struct cpp *cpp, struct toklist *in, struct tokl
  */
 static struct token *macro_parse_args(struct cpp *cpp, struct macro *macro, struct toklist *invocation)
 {
-	struct token *token = toklist_first(invocation);
+	struct token *token;
 	struct token *next;
 	struct symdef *def;
 	struct toklist args;
 	int parens_balance = 0;
-	bool args_ended = false;
 
+	token = toklist_first(invocation);
 	assert(token_is_expandable_macro(token));
+
+	token = toklist_next(token);
+	assert(token_is(token, TOKEN_LPAREN));
+
 	token = toklist_next(token);
 
-	assert(token->type == TOKEN_LPAREN);
-	token = toklist_next(token);
-
+	/*
+	 * The `macro->args' list is the list of TOKEN_NAME tokens which are
+	 * the formal parameters of the macro.
+	 */
 	toklist_foreach(param, &macro->args) {
-		toklist_init(&args);
-
+		/*
+		 * Define the symbol corresponding to the formal parameter to
+		 * be a CPP macro argument.
+		 */
 		def = symbol_define(&cpp->ctx->symtab, param->symbol);
 		def->type = SYMBOL_TYPE_UNDEF;
 		toklist_init(&def->macro_arg.tokens);
 
+		toklist_init(&args);
 		while (token) {
-			if (token->type == TOKEN_LPAREN) {
+			if (token_is(token, TOKEN_LPAREN)) {
 				parens_balance++;
-			}
-			else if (token->type == TOKEN_RPAREN) {
-				if (parens_balance > 0) {
+			} else if (token_is(token, TOKEN_RPAREN)) {
+				if (parens_balance > 0)
 					parens_balance--;
-				}
-				else {
-					args_ended = true;
+				else
 					break;
-				}
-			}
-			else if (token->type == TOKEN_COMMA && parens_balance == 0) {
+			} else if (token_is(token, TOKEN_COMMA) && parens_balance == 0) {
 				if (param->type != TOKEN_ELLIPSIS) {
-					token = toklist_next(token); /* skip , */
+					token = toklist_next(token); /* `,' */
 					break;
 				}
 			}
@@ -252,22 +384,27 @@ static struct token *macro_parse_args(struct cpp *cpp, struct macro *macro, stru
 			assert(parens_balance >= 0);
 
 			next = toklist_next(token);
-			toklist_remove(invocation, token);
+			toklist_remove(invocation, token); /* TODO make this cleaner */
 			toklist_insert(&args, token);
 			token = next;
 		}
 
 		/* TODO refactor the rest of this block */
 
+		/*
+		 * Copy the accumulated arguments in `args' to the argument's
+		 * definition.
+		 *
+		 * Expand the arguments recursively.
+		 */
 		toklist_copy(cpp->ctx, &args, &def->macro_arg.tokens);
-
 		toklist_init(&def->macro_arg.expansion);
 		macro_expand_rescan(cpp, &args, &def->macro_arg.expansion);
 
+		/*
+		 * NOTE: Set only after the expansion of the arguments too place.
+		 */
 		def->type = SYMBOL_TYPE_CPP_MACRO_ARG;
-
-		if (args_ended)
-			break;
 	}
 
 	/* TODO Error checking */
@@ -280,118 +417,23 @@ static void macro_expand_rescan(struct cpp *cpp, struct toklist *in, struct tokl
 	struct token *end;
 	struct toklist expansion;
 
-	while ((token = toklist_first(in)) != NULL) {
+	token = toklist_first(in);
+
+	while (token) {
 		if (!token_is_expandable_macro(token)) {
 			toklist_insert(out, toklist_remove_first(in));
-			continue;
-		}
-
-		if (token->symbol->def->macro.is_expanding) {
+		} else if (token->symbol->def->macro.is_expanding) {
 			token->noexpand = true;
 			toklist_insert(out, toklist_remove_first(in));
-			continue;
+		} else {
+			toklist_init(&expansion);
+			end = macro_expand_internal(cpp, in, &expansion);
+			toklist_remove_range(in, token, end);
+			toklist_append(out, &expansion);
 		}
 
-		toklist_init(&expansion);
-		end = macro_expand_internal(cpp, in, &expansion);
-		toklist_remove_range(in, token, end);
-		toklist_append(out, &expansion);
+		token = toklist_first(in);
 	}
-}
-
-static struct token *new_placemarker(struct cpp *cpp)
-{
-	struct token *token;
-
-	token = objpool_alloc(&cpp->ctx->token_pool);
-	token->type = TOKEN_PLACEMARKER;
-
-	return token;
-}
-
-/*
- * This function ``pastes'' two tokens. It does so by taking the spellings of
- * those two tokens and concatenating them, and then lexes (``re-lexes'') the
- * result. The process should yield a single valid preprocessing token.
- *
- * See TODO.
- */
-static struct toklist macro_paste_do(struct cpp *cpp, struct token *a, struct token *b)
-{
-	struct strbuf buf;
-	struct toklist tokens;
-
-	toklist_init(&tokens);
-
-	if (a->type == TOKEN_PLACEMARKER) {
-		toklist_insert_first(&tokens, b);
-		return tokens;
-	}
-
-	if (b->type == TOKEN_PLACEMARKER) {
-		toklist_insert_first(&tokens, a);
-		return tokens;
-	}
-
-	strbuf_init(&buf, 32);
-	strbuf_printf(&buf, "%s%s", token_get_spelling(a), token_get_spelling(b));
-
-	DEBUG_EXPR("%s", strbuf_get_string(&buf));
-
-	toklist_load_from_strbuf(&tokens, cpp->ctx, &buf);
-	if (toklist_length(&tokens) != 1)
-		DEBUG_PRINTF("pasting %s and %s does not yield single valid preprocessing token",
-			token_get_spelling(a), token_get_spelling(b));
-
-	strbuf_free(&buf);
-
-	return tokens;
-}
-
-/*
- * If arg is a macro parameter, insert arg's replacement tokens into lst.
- * If the resulting list is empty, insert a placemarker.
- *
- * If arg isn't a macro parameter, just insert it to lst.
- */
-void macro_paste_arg_prepare(struct cpp *cpp, struct token *arg, struct toklist *lst)
-{
-	if (token_is_macro_arg(arg)) {
-		toklist_copy(cpp->ctx, &arg->symbol->def->macro_arg.tokens, lst);
-
-		if (toklist_is_empty(lst))
-			toklist_insert(lst, new_placemarker(cpp));
-	}
-	else {
-		toklist_insert(lst, arg);
-	}
-}
-
-static struct toklist macro_paste(struct cpp *cpp, struct token *a, struct token *b)
-{
-	struct toklist lst_a;
-	struct toklist lst_b;
-	struct toklist paste_result;
-	struct toklist result;
-
-	toklist_init(&lst_a);
-	toklist_init(&lst_b);
-
-	macro_paste_arg_prepare(cpp, a, &lst_a);
-	macro_paste_arg_prepare(cpp, b, &lst_b);
-
-	assert(!toklist_is_empty(&lst_a));
-	assert(!toklist_is_empty(&lst_b));
-
-	paste_result = macro_paste_do(cpp, toklist_remove_last(&lst_a),
-		toklist_remove_first(&lst_b));
-
-	toklist_init(&result);
-	toklist_append(&result, &lst_a);
-	toklist_append(&result, &paste_result);
-	toklist_append(&result, &lst_b);
-
-	return result;
 }
 
 static void macro_replace_args(struct cpp *cpp, struct toklist *in, struct toklist *out)
@@ -418,7 +460,7 @@ static void macro_replace_args(struct cpp *cpp, struct toklist *in, struct tokli
 
 			assert(arg2 != NULL);
 
-			paste_result = macro_paste(cpp, arg1, arg2);
+			paste(cpp, arg1, arg2, &paste_result);
 			toklist_append(out, &paste_result);
 		}
 		else if (token_is(token, TOKEN_HASH)) {
@@ -499,6 +541,8 @@ static struct token *macro_expand_internal(struct cpp *cpp, struct toklist *in, 
 
 	return end;
 }
+
+/******************************** public API ********************************/
 
 void macro_expand(struct cpp *cpp, struct toklist *in, struct toklist *out)
 {

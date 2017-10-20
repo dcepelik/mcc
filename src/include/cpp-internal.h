@@ -42,7 +42,7 @@ void cpp_dump_file_stack(struct cpp *cpp);
 void cpp_error(struct cpp *cpp, char *fmt, ...);
 void cpp_warn(struct cpp *cpp, char *fmt, ...);
 
-void cpp_next_token(struct cpp *cpp);
+void move_next(struct cpp *cpp);
 struct token *cpp_peek(struct cpp *cpp);
 
 bool cpp_is_skip_mode(struct cpp *cpp);
@@ -126,7 +126,7 @@ void macro_expand(struct cpp *file, struct toklist *invocation, struct toklist *
 bool macro_is_funclike(struct macro *macro);
 void macro_dump(struct macro *macro);
 
-void cpp_setup_symtab_builtins(struct cpp *cpp);
+void cpp_setup_builtin_macros(struct cpp *cpp);
 
 /*
  * C preprocessor macro argument.

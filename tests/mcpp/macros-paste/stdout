@@ -6,4 +6,6 @@
 [abc]
 [a] [bc] [d]
 
+char p[] = "x ## y";
+
 <<EOF>>

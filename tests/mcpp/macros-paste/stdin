@@ -8,3 +8,14 @@ paste(1, 2)
 paste(paste(hello, _), world)
 paste(a, paste(b, c))
 paste(a b, c d)
+
+/*
+ * The following example is taken from the Draft, p. 169.
+ */
+
+#define hash_hash # ## #
+#define mkstr(a) # a
+#define in_between(a) mkstr(a)
+#define join(c, d) in_between(c hash_hash d)
+
+char p[] = join(x, y);

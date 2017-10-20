@@ -314,7 +314,7 @@ static struct token *lexer_lex_name(struct lexer *lexer, struct token *token)
 	}
 
 	token->type = TOKEN_NAME;
-	token->symbol = symtab_search_or_insert(&lexer->ctx->symtab, strbuf_get_string(&lexer->strbuf));
+	token->symbol = symtab_find_or_insert(&lexer->ctx->symtab, strbuf_get_string(&lexer->strbuf));
 	token->spelling = lexer_spelling_end(lexer);
 
 	return token;
