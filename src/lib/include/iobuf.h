@@ -4,7 +4,9 @@
 /*
  * - FILE
  * - file descriptor
+ *    - static buffers for stdin/stdout/stderr
  * - memory
+ * - anything else
  */
 
 #include "common.h"
@@ -35,11 +37,11 @@ struct iobuf iobuf_stdin;
 struct iobuf iobuf_stdout;
 struct iobuf iobuf_stderr;
 
-void iobuf_init_fd(struct iobuf *buf, int fd);
-void iobuf_init_file(struct iobuf *buf, FILE *f);
-void iobuf_init_memory(struct iobuf *buf, void *mem, size_t size);
-
-void iobuf_close(struct iobuf *buf);
+//void iobuf_init_fd(struct iobuf *buf, int fd);
+//void iobuf_init_file(struct iobuf *buf, FILE *f);
+//void iobuf_init_memory(struct iobuf *buf, void *mem, size_t size);
+//
+//void iobuf_close(struct iobuf *buf);
 
 ssize_t iobuf_read(struct iobuf *buf, byte_t *dst, size_t count);
 ssize_t iobuf_write(struct iobuf *buf, byte_t *src, size_t count);

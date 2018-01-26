@@ -9,7 +9,7 @@
  * Most functions in this module have been created to split the parsing
  * logic up, rather than to allow for code reuse.
  *
- * Operator information (`opinfo's) are declared in operator.c.
+ * Operator information (``opinfos'') are declared in operator.c.
  *
  * [1] https://en.wikipedia.org/wiki/Shunting-yard_algorithm
  */
@@ -139,7 +139,7 @@ static void parse_offset_operator(struct parser *parser, struct expr_ctx *ctx)
 	parser_next(parser);
 
 	/*
-	 * This is correct, the [*] operator is left-associative.
+	 * This is correct, the [] operator is left-associative.
 	 * Otherwise, we wouldn't be allowed to call `pop_ge_priority_operators'.
 	 */
 	pop_ge_priority_operators(parser, ctx, opinfo[OPER_OFFSET].prio);
@@ -202,7 +202,7 @@ static void parse_cast_operator(struct parser *parser, struct expr_ctx *ctx)
 }
 
 /*
- * Handle the occurrence of a left opening parentheses within an expression.
+ * Handle the occurrence of a left opening parenthesis within an expression.
  * The `(' may be either start of a sub-expression, or a function call,
  * or a cast operator.
  */
@@ -258,7 +258,7 @@ static void parse_primary_expr(struct parser *parser, struct expr_ctx *ctx)
 }
 
 /*
- * This function reads tokens and construct an expression AST.
+ * This function reads tokens and constructs an expression AST.
  */
 struct ast_expr *parse_expr(struct parser *parser)
 {
@@ -333,7 +333,7 @@ struct ast_expr *parse_expr(struct parser *parser)
 
 end_while:
 	/*
-	 * Reuse `pop_ge_priority_operators' to pop off everything else.
+	 * Reuse `pop_ge_priority_operators' to pop everything else off.
 	 * (Every operator on the stack has priority >= 0.)
 	 */
 	pop_ge_priority_operators(parser, &ctx, 0);

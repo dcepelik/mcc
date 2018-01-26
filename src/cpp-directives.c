@@ -3,8 +3,9 @@
  *
  * I refer to the directive names here as #if, #error etc., i.e. with the
  * hash sign at the beginning (which I should not, because the # is not part
- * of the name, but it makes comments easier to understand).
+ * of the name, but it makes comments much easier to understand).
  */
+
 #include "context.h"
 #include "cpp-internal.h"
 
@@ -130,7 +131,7 @@ static void skip_rest_of_line(struct cpp *cpp)
  * is used when I assume there are no more tokens on a line, but if I'm 
  * wrong, I want to skip them and let the user know I omitted something.
  *
- * NOTE: Nothing will be skiped if we're at the beginning of a line!
+ * NOTE: Nothing will be skipped if we're at the beginning of a line!
  */
 static void require_eol(struct cpp *cpp)
 {
@@ -147,7 +148,7 @@ static void require_eol(struct cpp *cpp)
  */
 struct cpp_if
 {
-	struct lnode list_node;	/* node in the if-stack */
+	struct lnode list_node;		/* node in the if-stack */
 	struct token *token;		/* the corresponding `if' token */
 	bool skip_this_branch;		/* are we inside a skipped branch? */
 	bool skip_next_branch;		/* should the next branch be skipped? */
@@ -226,7 +227,7 @@ bool cpp_is_skip_mode(struct cpp *cpp)
 /*
  * Parse the argument list in the definition of a CPP macro. The argument
  * list may only contain the opening parenthesis, a list of comma-separated
- * identifiers, and a closing parentheses.
+ * identifiers, and the closing parenthesis.
  */
 static void parse_macro_arglist(struct cpp *cpp, struct macro *macro)
 {
@@ -449,7 +450,11 @@ static bool eval_expr(struct cpp *cpp)
 	if (dir == CPP_DIRECTIVE_ELSE)
 		return true;
 
-	return true; /* TODO */
+	if (dir == CPP_DIRECTIVE_IF || dir == CPP_DIRECTIVE_ELIF) {
+		return true; /* TODO */
+	}
+
+	assert(0);
 }
 
 /*
@@ -497,7 +502,7 @@ static bool eval_expr(struct cpp *cpp)
  *
  * To tell whether we're inside a skipped branch, we use `cpp_is_skip_mode'.
  */
-static void process_cond_branch(struct cpp *cpp)
+static void process_condition(struct cpp *cpp)
 {
 	enum cpp_directive dir = cpp->token->symbol->def->directive;
 	struct cpp_if *cur_if;
@@ -588,7 +593,7 @@ void cpp_process_directive(struct cpp *cpp)
 
 	/*
 	 * Call the appropriate directive handler. The conditions are
-	 * processed separately by `process_cond_branch' for convenience.
+	 * processed separately by `process_condition' for convenience.
 	 */
 	dir = cpp->token->symbol->def->directive;
 	switch (dir) {
@@ -605,7 +610,7 @@ void cpp_process_directive(struct cpp *cpp)
 		process_error(cpp);
 		break;
 	default:
-		process_cond_branch(cpp);
+		process_condition(cpp);
 	}
 
 	require_eol(cpp);
